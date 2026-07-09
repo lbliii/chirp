@@ -12,7 +12,6 @@ import pytest
 
 from chirp import App, Request
 from chirp.config import AppConfig
-from chirp.errors import ConfigurationError
 
 
 def _make_listener() -> tuple[socket.socket, int]:
@@ -268,10 +267,13 @@ class TestWorkerLifecycleDispatch:
             )
 
 
-class TestWorkerLifecycleProductionGuard:
-    """Production launch rejects worker modes that cannot run worker hooks."""
+class TestWorkerLifecycleProductionAdapter:
+    """Production launch configures Pounce for registered worker hooks."""
 
-    def test_sync_worker_mode_rejected_when_worker_hooks_registered(self) -> None:
+    @patch("pounce.server.Server")
+    def test_sync_worker_mode_allows_worker_hooks_with_shutdown_policy(
+        self, mock_server: MagicMock
+    ) -> None:
         from chirp.server.production import run_production_server
 
         app = App(config=AppConfig(debug=False))
@@ -280,24 +282,21 @@ class TestWorkerLifecycleProductionGuard:
         async def setup():
             pass
 
-        with pytest.raises(ConfigurationError, match="worker_mode='async'"):
-            run_production_server(app, worker_mode="sync")
+        run_production_server(app, worker_mode="sync")
 
-    def test_auto_worker_mode_rejected_when_pounce_resolves_to_sync(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from chirp.server import production
+        config = mock_server.call_args.args[0]
+        assert config.worker_startup_failure == "shutdown"
+
+    @patch("pounce.server.Server")
+    def test_no_worker_hooks_keep_default_startup_policy(self, mock_server: MagicMock) -> None:
+        from chirp.server.production import run_production_server
 
         app = App(config=AppConfig(debug=False))
 
-        @app.on_worker_shutdown
-        async def teardown():
-            pass
+        run_production_server(app)
 
-        monkeypatch.setattr(production, "_effective_worker_mode", lambda mode: "sync")
-
-        with pytest.raises(ConfigurationError, match="resolved worker_mode='auto' to sync"):
-            production.run_production_server(app, worker_mode="auto")
+        config = mock_server.call_args.args[0]
+        assert config.worker_startup_failure == "ignore"
 
     @patch("pounce.server.Server")
     def test_async_worker_mode_allowed_when_worker_hooks_registered(
@@ -508,7 +507,7 @@ class TestPounceWorkerLifecycleIntegration:
 
         assert not thread.is_alive()
 
-    def test_pounce_worker_startup_failure_is_logged_best_effort(
+    def test_pounce_worker_startup_failure_shuts_down_worker(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         from pounce.config import ServerConfig
@@ -533,6 +532,7 @@ class TestPounceWorkerLifecycleIntegration:
                 port=port,
                 workers=1,
                 worker_mode="async",
+                worker_startup_failure="shutdown",
                 shutdown_timeout=0.5,
             ),
             app,
@@ -552,7 +552,6 @@ class TestPounceWorkerLifecycleIntegration:
             with contextlib.suppress(OSError):
                 sock.close()
 
-        assert b"200" in response
-        assert b"ok" in response
+        assert b"200" not in response
         assert "Worker startup hook raised" in caplog.text
         assert not thread.is_alive()

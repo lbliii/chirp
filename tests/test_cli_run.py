@@ -129,6 +129,18 @@ class TestChirpRun:
         assert kwargs["metrics_path"] == "/internal/metrics"
 
     @patch("pounce.server.Server")
+    def test_production_cli_worker_hooks_use_fail_loud_startup(
+        self, mock_server: MagicMock, fake_prod_app: App
+    ) -> None:
+        @fake_prod_app.on_worker_startup
+        async def setup() -> None:
+            pass
+
+        main(["run", "_run_test_app:app"])
+
+        assert mock_server.call_args.args[0].worker_startup_failure == "shutdown"
+
+    @patch("pounce.server.Server")
     def test_production_body_limit_reaches_pounce(
         self,
         mock_server: MagicMock,

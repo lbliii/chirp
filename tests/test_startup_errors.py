@@ -232,6 +232,21 @@ class TestServerLauncherErrorHandling:
         assert mock_production.call_args.args[0] is app
 
     @patch("pounce.server.Server")
+    def test_app_run_worker_hooks_use_fail_loud_startup(self, mock_server: MagicMock) -> None:
+        from chirp import App
+        from chirp.config import AppConfig
+
+        app = App(config=AppConfig(debug=False, worker_mode="sync"))
+
+        @app.on_worker_shutdown
+        async def teardown() -> None:
+            pass
+
+        app.run(host="127.0.0.1", port=0)
+
+        assert mock_server.call_args.args[0].worker_startup_failure == "shutdown"
+
+    @patch("pounce.server.Server")
     def test_app_run_body_limit_reaches_pounce(self, mock_server: MagicMock) -> None:
         from chirp import App
         from chirp.config import AppConfig
