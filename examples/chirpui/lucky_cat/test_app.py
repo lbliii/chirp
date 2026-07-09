@@ -59,7 +59,7 @@ class TestContracts:
 
 
 class TestHealth:
-    """Railway healthcheck."""
+    """Container liveness and readiness probes."""
 
     @pytest.mark.issue(221)
     async def test_health_ok(self, example_app) -> None:
@@ -67,6 +67,13 @@ class TestHealth:
             response = await client.get("/health")
             assert response.status == 200
             assert response.text == "ok"
+
+    @pytest.mark.issue(564)
+    async def test_ready_ok_after_startup(self, example_app) -> None:
+        async with TestClient(example_app) as client:
+            response = await client.get("/ready")
+            assert response.status == 200
+            assert response.text == "ready"
 
 
 class TestLanding:
