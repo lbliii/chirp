@@ -109,22 +109,20 @@ Use `@app.on_worker_startup` and `@app.on_worker_shutdown` for resources that
 must be created inside each production worker, such as async HTTP clients or
 event-loop-bound database pools.
 
-Worker lifecycle hooks require async workers in production:
+Worker lifecycle hooks work with Pounce sync and async workers in production:
 
 ```python
 config = AppConfig(debug=False, workers=4, worker_mode="async")
 ```
 
-Pounce 0.7 sync workers do not emit worker lifecycle scopes. On free-threaded
-Python, Pounce resolves `worker_mode="auto"` to sync workers, so Chirp rejects
-production launch when worker hooks are registered and the effective worker
-mode is sync.
+When either worker hook is registered, Chirp configures Pounce 0.9's
+`worker_startup_failure="shutdown"` policy so a failed startup hook stops the
+worker/server instead of serving with uninitialized worker state. Chirp does
+not expose Pounce timeout or executor controls through `AppConfig`.
 
-Worker startup failures are best-effort in Pounce 0.7 async workers: Pounce
-logs the exception and continues serving. Put must-succeed application-wide
-checks in `@app.on_startup`, and use a health check for dependencies that can
-fail after startup. Fail-loud worker startup is tracked upstream in
-[pounce#65](https://github.com/lbliii/pounce/issues/65).
+`worker_mode="subinterpreter"` remains unsupported by Chirp's production
+adapter because it receives a live `App` object rather than a Pounce import
+path. Use `sync`, `async`, or `auto` and follow the actionable startup error.
 
 ## Demo tier vs production tier
 

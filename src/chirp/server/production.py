@@ -17,31 +17,6 @@ if TYPE_CHECKING:
     from chirp.app import App
 
 
-def _effective_worker_mode(worker_mode: str) -> str:
-    from pounce._runtime import resolve_worker_execution_mode
-
-    return str(resolve_worker_execution_mode(worker_mode))
-
-
-def _validate_worker_lifecycle_mode(app: App, worker_mode: str) -> None:
-    if not (app._worker_startup_hooks or app._worker_shutdown_hooks):
-        return
-    if _effective_worker_mode(worker_mode) != "sync":
-        return
-
-    from chirp.errors import ConfigurationError
-
-    msg = (
-        "worker lifecycle hooks require worker_mode='async' in production. "
-        f"Pounce resolved worker_mode={worker_mode!r} to sync workers on this "
-        "Python build, and Pounce 0.7 sync workers do not emit "
-        "pounce.worker.startup or pounce.worker.shutdown scopes. Set "
-        "AppConfig(worker_mode='async') or remove @app.on_worker_startup/"
-        "@app.on_worker_shutdown hooks."
-    )
-    raise ConfigurationError(msg)
-
-
 def run_production_server(
     app: App,
     host: str = "0.0.0.0",
@@ -177,8 +152,6 @@ def run_production_server(
             "import-string production launch."
         )
         raise ConfigurationError(msg)
-    _validate_worker_lifecycle_mode(app, worker_mode)
-
     from pounce.config import ServerConfig
     from pounce.server import Server
 
@@ -188,6 +161,9 @@ def run_production_server(
         port=port,
         workers=workers,
         worker_mode=worker_mode,
+        worker_startup_failure=(
+            "shutdown" if app._worker_startup_hooks or app._worker_shutdown_hooks else "ignore"
+        ),
         # Phase 6.1: Prometheus Metrics
         metrics_enabled=metrics_enabled,
         metrics_path=metrics_path,
