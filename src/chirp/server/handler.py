@@ -559,19 +559,18 @@ async def handle_request(
         force_inline_sync_var.reset(sync_token)
         _active_kida_env.reset(env_token)
 
+    timeline_parent_sequence: int | None = None
     if debug and debug_wiring is not None and debug_wiring.trace_store is not None:
         return_trace = get_return_trace(request)
         if return_trace is not None and return_trace.route_path is not None:
             spec = debug_wiring.internal_route_for_path(request.path)
             internal = spec is not None and spec.visibility != "user"
             owner = spec.owner if spec is not None else "app"
-            debug_wiring.trace_store.record_http(
-                phase="response",
-                path=return_trace.route_path,
+            timeline_parent_sequence = debug_wiring.trace_store.record_http(
+                trace=return_trace,
                 request_id=request.request_id,
                 internal=internal,
                 owner=owner,
-                data=return_trace.payload(),
             )
 
     # Dispatch based on response type — X-Request-ID injected at send time
@@ -596,12 +595,14 @@ async def handle_request(
                 spec = debug_wiring.internal_route_for_path(request.path)
                 internal = spec is not None and spec.visibility != "user"
                 owner = spec.owner if spec is not None else "app"
+                route_pattern = return_trace.route_path if return_trace is not None else ""
 
                 def _trace_sink(phase: str, data: dict[str, Any]) -> None:
                     debug_wiring.trace_store.record_sse(
                         phase=phase,
-                        path=request.path,
+                        path=route_pattern or "",
                         request_id=request.request_id,
+                        parent_sequence=timeline_parent_sequence,
                         internal=internal,
                         owner=owner,
                         data=data,

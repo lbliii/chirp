@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import json
-import time
-from collections import deque
-from dataclasses import asdict, dataclass
-from threading import Lock
+from dataclasses import asdict
 from typing import Any
 
 from chirp.app.state import (
@@ -24,35 +21,28 @@ from chirp.server.dev_browser_reload import (
 from chirp.server.devtools import DEVTOOLS_BOOT_PATH, DEVTOOLS_BOOT_SNIPPET, HIGHLIGHT_PATH
 from chirp.server.fragment_dispatch import FRAGMENT_ROUTE_PREFIX
 from chirp.server.fragment_targets_debug import FRAGMENT_TARGETS_DEBUG_PATH
+from chirp.server.intent_timeline import (
+    _CaptureSnapshot,
+    _diagnostic_draft,
+    _http_drafts,
+    _IntentCapture,
+    _observation_mapping,
+    _sse_draft,
+)
 from chirp.server.route_explorer import ROUTE_EXPLORER_PATH
+from chirp.templating.trace import ReturnTrace
 
 DEBUG_MANIFEST_PATH = "/__chirp/debug/manifest.json"
 DEBUG_TRACES_PATH = "/__chirp/debug/traces.json"
 
 
-@dataclass(frozen=True, slots=True)
-class DebugTraceRecord:
-    """One bounded debug trace record."""
-
-    channel: str
-    phase: str
-    path: str
-    request_id: str
-    internal: bool
-    owner: str
-    ts_ms: int
-    data: dict[str, Any]
-
-
 class DebugTraceStore:
-    """Thread-safe bounded in-memory trace buffer for debug mode."""
+    """Debug adapter over the private ordered intent capture."""
 
-    __slots__ = ("_items", "_limit", "_lock")
+    __slots__ = ("_capture",)
 
-    def __init__(self, limit: int = 500) -> None:
-        self._limit = limit
-        self._items: deque[DebugTraceRecord] = deque(maxlen=limit)
-        self._lock = Lock()
+    def __init__(self, limit: int = 500, *, byte_limit: int = 1_048_576) -> None:
+        self._capture = _IntentCapture(record_limit=limit, byte_limit=byte_limit)
 
     def record_sse(
         self,
@@ -60,73 +50,50 @@ class DebugTraceStore:
         phase: str,
         path: str,
         request_id: str,
+        parent_sequence: int | None,
         internal: bool,
         owner: str,
         data: dict[str, Any] | None = None,
     ) -> None:
         """Record an SSE lifecycle event without mutating stream output."""
-        self._record(
-            channel="sse",
-            phase=phase,
-            path=path,
-            request_id=request_id,
-            internal=internal,
-            owner=owner,
-            data=data,
+        self._capture.publish(
+            _sse_draft(
+                phase=phase,
+                route_pattern=path,
+                request_id=request_id,
+                parent_sequence=parent_sequence,
+                internal=internal,
+                owner=owner,
+                data=data,
+            )
         )
 
     def record_http(
         self,
         *,
-        phase: str,
-        path: str,
+        trace: ReturnTrace,
         request_id: str,
         internal: bool,
         owner: str,
-        data: dict[str, Any] | None = None,
-    ) -> None:
+    ) -> int:
         """Record one bounded HTTP render observation."""
-        self._record(
-            channel="http",
-            phase=phase,
-            path=path,
-            request_id=request_id,
-            internal=internal,
-            owner=owner,
-            data=data,
+        observations = self._capture.publish_many(
+            _http_drafts(
+                trace,
+                request_id=request_id,
+                internal=internal,
+                owner=owner,
+            )
         )
+        return observations[-1].sequence
 
-    def _record(
-        self,
-        *,
-        channel: str,
-        phase: str,
-        path: str,
-        request_id: str,
-        internal: bool,
-        owner: str,
-        data: dict[str, Any] | None,
-    ) -> None:
-        record = DebugTraceRecord(
-            channel=channel,
-            phase=phase,
-            path=path,
-            request_id=request_id,
-            internal=internal,
-            owner=owner,
-            ts_ms=time.time_ns() // 1_000_000,
-            data=data or {},
-        )
-        with self._lock:
-            self._items.append(record)
+    def record_diagnostic(self, code: str) -> None:
+        """Record a bounded framework-owned diagnostic code."""
+        self._capture.publish(_diagnostic_draft(code))
 
-    def records(self, *, include_internal: bool = False) -> tuple[DebugTraceRecord, ...]:
+    def snapshot(self, *, include_internal: bool = False) -> _CaptureSnapshot:
         """Return a stable snapshot of buffered records."""
-        with self._lock:
-            items = tuple(self._items)
-        if include_internal:
-            return items
-        return tuple(item for item in items if not item.internal)
+        return self._capture.snapshot(include_internal=include_internal)
 
 
 def build_runtime_debug_wiring(config: AppConfig) -> RuntimeDebugWiring:
@@ -289,8 +256,21 @@ def render_debug_traces_json(
 ) -> str:
     """Serialize buffered debug traces."""
     store = wiring.trace_store
-    records = store.records(include_internal=include_internal) if store is not None else ()
+    snapshot = store.snapshot(include_internal=include_internal) if store is not None else None
+    records = snapshot.observations if snapshot is not None else ()
+    truncation = snapshot.truncation if snapshot is not None else None
     return json.dumps(
-        {"records": [asdict(record) for record in records]},
+        {
+            "capture": {
+                "active": snapshot.active if snapshot is not None else False,
+                "retained_bytes": snapshot.retained_bytes if snapshot is not None else 0,
+                "truncated": truncation is not None,
+                "dropped_count": truncation.dropped_count if truncation is not None else 0,
+                "first_retained_sequence": (
+                    truncation.first_retained_sequence if truncation is not None else None
+                ),
+            },
+            "records": [_observation_mapping(record) for record in records],
+        },
         sort_keys=True,
     )
