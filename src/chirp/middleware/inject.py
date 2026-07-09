@@ -22,7 +22,6 @@ from chirp.http.response import FileResponse, Response, StreamingResponse
 from chirp.middleware.csp_nonce import csp_nonce
 from chirp.middleware.protocol import AnyResponse, Next
 from chirp.middleware.streaming_html import async_stream_inject_before_body
-from chirp.server.conditional import etag_matches, parse_http_date
 from chirp.server.sender import _format_http_date
 
 _LOG = logging.getLogger("chirp.middleware.inject")
@@ -91,7 +90,6 @@ async def _materialize_html_file(
 
 def _finalize_html(
     response: Response,
-    request: Request,
     *,
     mtime: float | None,
     stable: bool,
@@ -115,8 +113,8 @@ def _finalize_html(
       and never a 304 (no false cache hits). The stable ETag is a content hash
       of the injected body so it changes when either the file or the snippet
       changes.
-    * **304** is returned (body-less) when ``If-None-Match`` matches the
-      recomputed ETag, or ``If-Modified-Since`` covers the file mtime.
+    * Final conditional evaluation happens once, after the complete middleware
+      chain, so a later CSP nonce rewrite can suppress unsafe ``304`` reuse.
     * **Range / Accept-Ranges is intentionally dropped** for injected HTML:
       on-disk byte offsets shift once a snippet is inserted, so a Range against
       the file would return wrong bytes. Clients fall back to a full 200.
@@ -140,25 +138,7 @@ def _finalize_html(
 
     digest = hashlib.blake2b(response.body_bytes, digest_size=16).hexdigest()
     etag = f'"{digest}"'
-
-    headers = request.headers
-    inm = headers.get("if-none-match")
-    ims = headers.get("if-modified-since")
-    not_modified = False
-    if inm is not None:
-        # If-None-Match takes precedence over If-Modified-Since (RFC 9110).
-        not_modified = etag_matches(inm, etag)
-    elif ims is not None:
-        ims_ts = parse_http_date(ims)
-        # HTTP-date has whole-second resolution; truncate mtime so a file last
-        # modified at e.g. 12:00:00.53 still matches a 12:00:00 header.
-        if ims_ts is not None and int(mtime) <= int(ims_ts):
-            not_modified = True
-
     extra = (("Last-Modified", last_modified), ("ETag", etag))
-    if not_modified:
-        # 304: send_response zeroes the body for 304 via _body_allowed.
-        return replace(response, status=304, headers=(*response.headers, *extra))
     return replace(response, headers=(*response.headers, *extra))
 
 
@@ -274,12 +254,12 @@ class HTMLInject:
             stable = self._snippet_is_stable()
         elif self._full_page_only:
             # No injection performed: served bytes equal the file bytes (stable).
-            return _finalize_html(response, request, mtime=mtime, stable=True)
+            return _finalize_html(response, mtime=mtime, stable=True)
         else:
             body = body + snippet
             stable = self._snippet_is_stable()
 
-        return _finalize_html(replace(response, body=body), request, mtime=mtime, stable=stable)
+        return _finalize_html(replace(response, body=body), mtime=mtime, stable=stable)
 
 
 class StreamingHTMLInject(HTMLInject):
@@ -330,17 +310,17 @@ class StreamingHTMLInject(HTMLInject):
         if isinstance(body, bytes):
             body = body.decode("utf-8", errors="replace")
         if self._dedup_marker and self._dedup_marker in body:
-            return _finalize_html(response, request, mtime=mtime, stable=True)
+            return _finalize_html(response, mtime=mtime, stable=True)
         snippet = self._render_snippet()
         if self._target in body:
             body = body.replace(self._target, snippet + self._target, 1)
             stable = self._snippet_is_stable()
         elif self._full_page_only:
-            return _finalize_html(response, request, mtime=mtime, stable=True)
+            return _finalize_html(response, mtime=mtime, stable=True)
         else:
             body = body + snippet
             stable = self._snippet_is_stable()
-        return _finalize_html(replace(response, body=body), request, mtime=mtime, stable=stable)
+        return _finalize_html(replace(response, body=body), mtime=mtime, stable=stable)
 
     def _streaming(self, response: StreamingResponse, request: Request) -> StreamingResponse:
         if "text/html" not in response.content_type:
@@ -406,7 +386,7 @@ class AlpineInject(HTMLInject):
         if isinstance(body, bytes):
             body = body.decode("utf-8", errors="replace")
         if _html_has_script_chirp_marker(body, "alpine"):
-            return _finalize_html(response, request, mtime=mtime, stable=True)
+            return _finalize_html(response, mtime=mtime, stable=True)
         # Reuse the fetched response — do not call ``next`` again via super().
         target = self._target
         snippet = self._render_snippet()
@@ -414,11 +394,11 @@ class AlpineInject(HTMLInject):
             body = body.replace(target, snippet + target, 1)
             stable = self._snippet_is_stable()
         elif self._full_page_only:
-            return _finalize_html(response, request, mtime=mtime, stable=True)
+            return _finalize_html(response, mtime=mtime, stable=True)
         else:
             body = body + snippet
             stable = self._snippet_is_stable()
-        return _finalize_html(replace(response, body=body), request, mtime=mtime, stable=stable)
+        return _finalize_html(replace(response, body=body), mtime=mtime, stable=stable)
 
     def _alpine_streaming(self, response: StreamingResponse, request: Request) -> StreamingResponse:
         if "text/html" not in response.content_type:

@@ -120,6 +120,25 @@ Existing response primitives carry the protocol:
 - `ETag` and `Last-Modified` participate in the same conditional evaluation as
   GET and can produce a bodyless `304`.
 
+Attach source-specific validators to the ordinary `Response`; Chirp evaluates
+them after the full middleware chain, so a middleware may add the same headers
+without reimplementing conditional-request parsing:
+
+```python
+return (
+    Response(rendered_results)
+    .with_header("ETag", f'W/"search-source-{source_revision}"')
+    .with_header("Last-Modified", source_modified_http_date)
+)
+```
+
+The validator must describe the selected source representation. When the final
+response is HTML protected by a per-request nonce CSP, Chirp preserves those
+headers but sends a fresh `200` instead of `304`; otherwise a browser could
+combine cached HTML containing nonce A with a new policy containing nonce B.
+Nonce-bearing HTML also bypasses `CacheMiddleware`. Stable JSON, Markdown, and
+nonce-free HTML keep ordinary conditional `304` behavior.
+
 Equivalent-resource identifiers must be opaque. Never embed raw query content,
 credentials, personal data, or other sensitive body values in a URI.
 
@@ -145,11 +164,11 @@ app.add_middleware(
 
 The key hashes exact body bytes, request media metadata, target URI, `Accept`,
 configured vary headers, and htmx render shape without exposing the raw body.
-Cookie, Authorization, `Set-Cookie`, streaming, SSE, non-200, and private
-requests bypass QUERY caching. Cached hits preserve render metadata and
-re-evaluate ETag/Last-Modified conditions. Use a shared backend, short TTL,
-explicit invalidation, and application-specific vary headers for production
-experiments.
+Cookie, Authorization, `Set-Cookie`, streaming, SSE, non-200, nonce-bearing
+HTML, and private requests bypass QUERY caching. Cached hits preserve render
+metadata and re-evaluate ETag/Last-Modified conditions. Use a shared backend,
+short TTL, explicit invalidation, and application-specific vary headers for
+production experiments.
 
 ## Deployment checklist
 

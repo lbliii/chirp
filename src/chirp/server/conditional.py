@@ -7,6 +7,21 @@ from chirp.http.request import Request
 from chirp.http.response import Response
 
 
+def has_nonce_csp_html(response: Response) -> bool:
+    """Return whether an HTML response carries a nonce-based CSP.
+
+    A per-request CSP nonce makes the final HTML representation unsafe to
+    reuse through ``304 Not Modified``: the browser could combine a cached
+    body containing nonce A with a newly generated policy containing nonce B.
+    """
+    if "text/html" not in response.content_type.lower():
+        return False
+    return any(
+        name.lower() == "content-security-policy" and "'nonce-" in value.lower()
+        for name, value in response.headers
+    )
+
+
 def parse_http_date(value: str) -> float | None:
     """Parse an HTTP-date header into a POSIX timestamp, or None if invalid."""
     try:
@@ -66,6 +81,13 @@ def evaluate_conditional_response(request: Request, response: Response) -> Respo
                 and int(representation_time) > int(request_time)
             ):
                 return replace(response, body=b"", status=412)
+
+    # A nonce-bearing HTML body changes on every request even when an
+    # application-supplied source validator is unchanged. Preserve validators
+    # for diagnostics and source identity, but never let them reuse bytes that
+    # were rendered under a different CSP nonce.
+    if has_nonce_csp_html(response):
+        return response
 
     if_none_match = request.headers.get("if-none-match")
     if if_none_match is not None:

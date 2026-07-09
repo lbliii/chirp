@@ -175,7 +175,15 @@ return (
 Identifiers are application-owned and must be opaque; never copy sensitive
 QUERY content into a temporary URI. Ordinary GET and QUERY `Response` values
 share `If-None-Match` and `If-Modified-Since` evaluation when the application
-supplies `ETag` or `Last-Modified`, producing a bodyless `304` on a match.
+supplies source-specific `ETag` or `Last-Modified` headers. Evaluation happens
+after the full middleware chain, so validators may be attached in a handler or
+middleware without duplicating RFC parsing. A matching stable representation
+produces a bodyless `304`.
+
+Nonce-protected HTML instead returns a fresh `200` and bypasses shared response
+caching. This prevents a browser from reusing cached HTML containing nonce A
+under a newly generated CSP containing nonce B. Stable JSON, Markdown, and
+nonce-free HTML retain normal `304` behavior.
 
 `Redirect` also remains the only redirect primitive. Chirp preserves `301`,
 `302`, `307`, and `308` so an RFC-compliant client can repeat QUERY, while
