@@ -9,8 +9,10 @@ from .patterns import ID_ATTR as _ID_ATTR_RE
 from .types import ContractIssue, Severity
 
 _EXTENDS_TAG = re.compile(r"\{%\s*extends\s+")
+_EXTENDS_LITERAL = re.compile(r"\{%\s*extends\s+([\"'])(?P<template>[^\"']+)\1")
 _HX_TARGET_ATTR = re.compile(r"\bhx-target\s*=\s*([\"'])(?P<target>.*?)\1", re.IGNORECASE)
 _HX_SELECT_ATTR = re.compile(r"\bhx-select\s*=\s*([\"'])(?P<select>.*?)\1", re.IGNORECASE)
+_SIMPLE_ID_SELECTOR = re.compile(r"^#(?P<id>[A-Za-z][\w:.-]*)$")
 
 
 def _all_dom_ids(template_sources: dict[str, str]) -> frozenset[str]:
@@ -21,10 +23,133 @@ def _all_dom_ids(template_sources: dict[str, str]) -> frozenset[str]:
     return frozenset(ids)
 
 
+def _template_source_chain(
+    template_name: str,
+    template_sources: dict[str, str],
+) -> tuple[tuple[str, str], ...]:
+    """Return a literal ``extends`` chain, child first, without cycles."""
+    chain: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    current = template_name
+    while current not in seen:
+        seen.add(current)
+        source = template_sources.get(current)
+        if source is None:
+            break
+        chain.append((current, source))
+        match = _EXTENDS_LITERAL.search(source)
+        if match is None:
+            break
+        current = match.group("template")
+    return tuple(chain)
+
+
+def _effective_hx_target_select(
+    template_name: str,
+    template_sources: dict[str, str],
+) -> tuple[str, str, str] | None:
+    """Find the first literal target/select pair in a layout inheritance chain."""
+    for source_name, source in _template_source_chain(template_name, template_sources):
+        hx_target = _HX_TARGET_ATTR.search(source)
+        hx_select = _HX_SELECT_ATTR.search(source)
+        if hx_target is not None and hx_select is not None:
+            return (
+                source_name,
+                hx_target.group("target").strip(),
+                hx_select.group("select").strip(),
+            )
+    return None
+
+
+def _template_chain_has_id(
+    template_name: str,
+    element_id: str,
+    template_sources: dict[str, str],
+) -> bool:
+    return any(
+        element_id in _ID_ATTR_RE.findall(source)
+        for _, source in _template_source_chain(template_name, template_sources)
+    )
+
+
+def _check_omitted_outlet_selections(
+    discovered_routes: list[Any],
+    template_sources: dict[str, str],
+    fragment_target_registry: FragmentTargetRegistry | None,
+) -> list[ContractIssue]:
+    """Error when an omitted outlet owns an hx-select absent from page HTML."""
+    if fragment_target_registry is None:
+        return []
+    issues: list[ContractIssue] = []
+    seen: set[tuple[str, str, str, str]] = set()
+    for route in discovered_routes:
+        page_template = getattr(route, "template_name", None)
+        chain = getattr(route, "layout_chain", None)
+        route_path = getattr(route, "url_path", None)
+        if not page_template or chain is None or not route_path:
+            continue
+        for layout in getattr(chain, "layouts", ()):
+            outlet = getattr(layout, "outlet_target_id", None)
+            if not outlet:
+                continue
+            config = fragment_target_registry.get(outlet)
+            if config is None:
+                continue
+            skips_layout = (
+                getattr(layout, "outlet_mode", "compose") == "replace" or config.omit_outer_layouts
+            )
+            if not skips_layout:
+                continue
+            selection = _effective_hx_target_select(layout.template_name, template_sources)
+            if selection is None:
+                continue
+            selector_template, hx_target, hx_select = selection
+            if hx_target.lstrip("#") != outlet.lstrip("#"):
+                continue
+            selector_match = _SIMPLE_ID_SELECTOR.fullmatch(hx_select)
+            if selector_match is None:
+                continue
+            selector_id = selector_match.group("id")
+            if _template_chain_has_id(page_template, selector_id, template_sources):
+                continue
+            identity = (route_path, page_template, outlet, hx_select)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            mode = (
+                "outlet_mode='replace'"
+                if getattr(layout, "outlet_mode", "compose") == "replace"
+                else "omit_outer_layouts=True"
+            )
+            issues.append(
+                ContractIssue(
+                    severity=Severity.ERROR,
+                    category="layout_outlet",
+                    message=(
+                        f"Route '{route_path}' renders fragment block "
+                        f"'{config.fragment_block}' into #{outlet}, but layout "
+                        f"'{layout.template_name}' uses {mode} and inherits "
+                        f"hx-select=\"{hx_select}\" from '{selector_template}'. "
+                        f"Page template '{page_template}' does not define "
+                        f'id="{selector_id}", so htmx would empty #{outlet}.'
+                    ),
+                    route=route_path,
+                    template=page_template,
+                    details=(
+                        f"Use outlet_mode='compose', include {hx_select} in the rendered "
+                        f"'{config.fragment_block}' surface, or remove the inherited hx-select. "
+                        "Chirp emits HX-Reselect: * as a runtime corruption backstop."
+                    ),
+                )
+            )
+    return issues
+
+
 def check_layout_chains(
     layout_chains: list[Any],
     template_sources: dict[str, str],
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    discovered_routes: list[Any] | None = None,
 ) -> list[ContractIssue]:
     """Validate layout chains: targets, scopes, outlets, frames, extends conflict."""
     issues: list[ContractIssue] = []
@@ -248,4 +373,11 @@ def check_layout_chains(
                         template=layout.template_name,
                     )
                 )
+    issues.extend(
+        _check_omitted_outlet_selections(
+            discovered_routes or [],
+            template_sources,
+            fragment_target_registry,
+        )
+    )
     return issues

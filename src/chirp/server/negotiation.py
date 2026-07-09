@@ -274,7 +274,10 @@ def _render_composition(
         context_keys=_context_keys(plan.main_view.context),
         notes=(f"plan_intent={plan.intent}",),
     )
-    return _html_response(html, intent=intent).with_vary("HX-Request", "HX-Request-Type")
+    response = _html_response(html, intent=intent).with_vary("HX-Request", "HX-Request-Type")
+    for name, value in plan.response_headers.items():
+        response = response.with_header(name, value)
+    return response
 
 
 def _set_layout_debug_from_plan(plan: Any, request: Request | None) -> None:

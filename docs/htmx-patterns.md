@@ -107,6 +107,14 @@ single attribute.
 `hx-target="#main"`, `hx-swap="innerHTML"`, and `hx-select="#page-content"` on
 `<main id="main">` with a `#page-content` wrapper inside. All links inside inherit SPA navigation automatically.
 
+Keep the layout composed when its wrapper owns the inherited `hx-select`. If an
+advanced shell uses `{# outlet_mode: replace #}` or registers the target with
+`omit_outer_layouts=True`, the wide page fragment must define the selected id
+itself. `app.check()` reports a `layout_outlet` error when a literal `#id`
+selection is missing. For htmx 2 boosted requests, Chirp also emits
+`HX-Reselect: *` as a runtime backstop so a stale inherited selector cannot
+empty the outlet; htmx 4 explicit partial requests keep their normal response.
+
 **App shell (standalone, no chirp-ui):** use `hx-swap="outerHTML"` and `hx-select="#main"` on the same element you target for a full-main swap.
 
 **Standalone (no chirp-ui):**
@@ -130,6 +138,7 @@ inside the boosted content that navigation replaces; see
 [Realtime Product Patterns](realtime-production.md).
 
 **Behavior:**
+
 - **Links:** AJAX GET, push URL to history, target body, innerHTML swap
 - **Forms:** AJAX POST/GET (based on method), NO push URL by default
   (add `hx-push-url="true"` explicitly on forms)

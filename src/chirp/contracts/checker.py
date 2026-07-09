@@ -677,6 +677,7 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
                 snapshot.layout_chains,
                 template_sources,
                 fragment_target_registry=snapshot.fragment_target_registry,
+                discovered_routes=snapshot.discovered_routes,
             )
         )
         # Landmark check: root layout templates define the page shell (<html>/<body>)

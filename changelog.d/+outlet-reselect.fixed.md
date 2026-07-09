@@ -1,0 +1,1 @@
+Boosted htmx 2 navigation no longer blanks a shell outlet when a replace-mode or explicitly omitted layout owns an inherited `hx-select`; Chirp overrides the stale selector and `app.check()` identifies statically detectable page-fragment mismatches.
