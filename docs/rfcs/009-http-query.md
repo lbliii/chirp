@@ -126,9 +126,10 @@ enforcement, typed rendering, explicit body-aware cache opt-in, and the tested
 browser/server/proxy matrix are executable.
 
 Stable or first-class promotion is not approved. Filesystem/test-client
-ergonomics (#527), declarative htmx plus a native GET fallback (#528), complete
-static wiring diagnostics (#533), and the canonical complex-search example
-(#534) remain open. The canonical adoption guide is
+ergonomics (#527), declarative htmx transport (#528), and complete static
+wiring diagnostics (#533) remain open. The canonical complex-search example
+(#534) now supplies the programmatic htmx and JavaScript-disabled GET proof.
+The canonical adoption guide is
 [`docs/http-query.md`](../http-query.md). It preserves the deployment caveats,
 GET-first decision rule, and exact release checklist.
 

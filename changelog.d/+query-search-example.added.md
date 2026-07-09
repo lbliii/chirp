@@ -1,0 +1,1 @@
+**Canonical complex QUERY search** — a new standalone example demonstrates a JavaScript-disabled bookmarkable GET subset, an htmx-enhanced faceted QUERY body, full-page and named-block rendering from one Kida template, validation and malformed-content failures, empty/falsy results, and the explicit experimental compatibility boundary.

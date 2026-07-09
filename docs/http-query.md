@@ -107,6 +107,13 @@ Keep GET and QUERY on the same server-side render surface: the same handler
 logic or shared application function should feed the same template and named
 results block. Do not create a JSON/REST side channel for the enhanced path.
 
+The executable
+[complex QUERY search](../examples/standalone/query_search/README.md) shows the
+complete pattern: a JavaScript-disabled GET submits only a compact bookmarkable
+subset, while `htmx.ajax("QUERY", ...)` sends the larger faceted input and swaps
+the named results block. It uses no response JSON, duplicate partial, or
+JavaScript build pipeline.
+
 ## Redirects, equivalent resources, and validators
 
 Existing response primitives carry the protocol:
@@ -201,7 +208,7 @@ The experimental release gate is met; the stable promotion gate is not.
 | Filesystem/test-client ergonomics | Open | #527 requires a separate public-API decision |
 | Declarative htmx transport with native GET fallback | Open | #528 requires an approved client contract |
 | Complete static wiring diagnostics and freeze/speculation proof | Open | #533 |
-| Canonical complex-search example and no-JavaScript browser proof | Open | #534 |
+| Canonical complex-search example and no-JavaScript browser proof | Met | #534 and `examples/standalone/query_search` |
 | Canonical docs, compatibility statement, and release decision | Met | #535 and this guide |
 
 Therefore release notes and public docs may say **experimental early-adopter

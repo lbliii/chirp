@@ -37,6 +37,7 @@ CAPABILITIES = frozenset(
         "oob",
         "pages",
         "passkeys",
+        "query",
         "reactive",
         "routing",
         "security",
