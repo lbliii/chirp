@@ -8,14 +8,14 @@ _ROOT = Path(__file__).resolve().parents[2]
 _RFC = _ROOT / "docs" / "rfcs" / "020-intent-timeline.md"
 
 
-@pytest.mark.issue(336)
-def test_intent_timeline_rfc_is_explicitly_non_shipping() -> None:
+@pytest.mark.issue(336, 647)
+def test_intent_timeline_rfc_records_private_capture_implementation_scope() -> None:
     text = _RFC.read_text(encoding="utf-8")
 
-    assert "**Status:** Proposed" in text
-    assert "**Shipping impact:** None" in text
+    assert "**Status:** Accepted; private capture foundation implemented by #647" in text
+    assert "**Shipping impact:** Private debug/test capture only" in text
     assert "does not add an `AppConfig` field" in text
-    assert "No changelog: proposed RFC only" in text
+    assert "No changelog: #647 changes private debug/test capture internals only" in text
 
 
 @pytest.mark.issue(336)
@@ -26,6 +26,7 @@ def test_intent_timeline_rfc_cites_current_trace_evidence() -> None:
         "src/chirp/templating/trace.py",
         "src/chirp/server/transition_trace.py",
         "src/chirp/server/debug_runtime.py",
+        "src/chirp/server/intent_timeline.py",
         "src/chirp/server/devtools/js/state.js",
         "src/chirp/server/devtools/js/errors.js",
         "src/chirp/server/devtools/js/ui.js",

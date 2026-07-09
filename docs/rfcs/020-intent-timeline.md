@@ -1,16 +1,16 @@
 # RFC 020: Intent Timeline
 
-**Status:** Proposed
+**Status:** Accepted; private capture foundation implemented by #647
 
 **Issue:** [#336](https://github.com/lbliii/chirp/issues/336)
 
 **Parent saga:** [#335](https://github.com/lbliii/chirp/issues/335)
 
-**Last audited:** 2026-07-08
+**Last audited:** 2026-07-09
 
-**Shipping impact:** None. This RFC does not add an `AppConfig` field, public
-type, CLI command, middleware, route, trace field, replay endpoint, DevTools
-control, or production capture behavior.
+**Shipping impact:** Private debug/test capture only. This RFC does not add an `AppConfig` field,
+public type, CLI command, middleware, route, replay endpoint, DevTools control,
+or production capture behavior.
 
 ## Summary
 
@@ -77,6 +77,16 @@ create a JSON application side channel.
 The store is process-local and app-wide. It mixes observations from different
 browsers, has timestamps but no authoritative total-order sequence, and is not
 a session recorder or durable log.
+
+Issue #647 replaces the store's mutable retained mappings with the private
+frozen/slotted records in `src/chirp/server/intent_timeline.py`. The debug-only
+adapter now publishes an authoritative sequence under one lock, copies only
+allowlisted structural facts from `ReturnTrace` and SSE lifecycle metadata,
+derives opaque capture correlation IDs instead of retaining caller-supplied
+request IDs, links SSE children to their typed response, and exposes explicit
+count/byte truncation state. It still remains one process-local app capture; browser
+scoping, artifacts, comparison, and additional transport correlation belong to
+#648–#650.
 
 ### Browser DevTools history
 
@@ -454,11 +464,12 @@ handling.
 
 ### Phase 1: private observation model
 
-- add a frozen private observation record and versioned serializer;
-- allocate ordered sequences in a bounded debug/test capture;
-- adapt existing HTTP and SSE traces without changing response semantics;
-- validate/redact exports; and
-- add loader/comparator tests.
+- #647: add frozen private observation records and allocate ordered sequences
+  in a bounded debug/test capture;
+- #647: adapt existing HTTP and SSE traces without changing response semantics
+  or retaining bodies, headers, cookies, sessions, HTML, or context;
+- #648: add the versioned redacted artifact loader and comparator; and
+- #649: add separately reviewed transport/browser correlation.
 
 This phase changes debug protocol and must receive a separate review.
 
@@ -567,17 +578,20 @@ public behavior and requires separate approval.
 
 ## Collateral and status
 
-This RFC is canonical design research only. It needs no README, public API,
-site, example, scaffold, migration, benchmark, or changelog update because it
-ships no behavior and documents no available command.
+This RFC is the canonical design record. The #647 increment is private
+debug/test infrastructure, so it needs no README, public API, site, example,
+scaffold, migration, benchmark, or changelog update and documents no available
+command.
 
-No changelog: proposed RFC only.
+No changelog: #647 changes private debug/test capture internals only and adds no
+public API, configuration, CLI, or production behavior.
 
 ## Decision gates for implementation
 
-Before phase 1, maintainers must approve the private trace schema, debug capture
-scope, protocol/header changes, and redaction profile. Before phase 2, the
-rendering and DevTools stewards must approve lifecycle instrumentation. Before
-phase 3, maintainers must approve any testing protocol or public artifact API.
-Before any production use, issue #345 requires an independent security and
-operations review.
+Maintainer approval for #647 covers only the private observation schema,
+debug/test capture scope, and allowlisted copying described above. Before #648,
+maintainers must approve the artifact schema, loader, comparator, and redaction
+gate. Before #649, the rendering and DevTools stewards must approve lifecycle
+instrumentation. Before phase 3, maintainers must approve any testing protocol
+or public artifact API. Before any production use, issue #345 requires an
+independent security and operations review.
