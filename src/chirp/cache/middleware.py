@@ -1,7 +1,8 @@
 """Cache middleware — site-wide GET and explicit QUERY response caching.
 
 Opt-in via ``cache_middleware_enabled = True`` in config.
-Only caches GET requests that return 200 with no Set-Cookie header.
+Only caches GET requests that return stable 200 responses with no Set-Cookie
+header or per-request nonce HTML.
 Requests carrying Cookie or Authorization bypass the cache entirely.
 """
 
@@ -14,6 +15,7 @@ from dataclasses import dataclass
 from chirp.http.request import Request
 from chirp.http.response import RenderIntent, Response
 from chirp.middleware.protocol import AnyResponse, Next
+from chirp.server.conditional import has_nonce_csp_html
 
 from .key import default_cache_key
 
@@ -50,6 +52,7 @@ class CacheMiddleware:
     - Requests with Cookie or Authorization headers
     - Non-200 responses
     - Responses with Set-Cookie header
+    - HTML responses carrying a per-request nonce CSP
     - Streaming/SSE responses
     """
 
@@ -102,9 +105,7 @@ class CacheMiddleware:
                     headers=cached_response.headers,
                     render_intent=cached_response.render_intent,
                 )
-                from chirp.server.conditional import evaluate_conditional_response
-
-                return evaluate_conditional_response(request, response)
+                return response
             except Exception:
                 logger.warning("Cache decode error for %s", key, exc_info=True)
 
@@ -121,6 +122,7 @@ class CacheMiddleware:
             and response.status == 200
             and not response.cookies
             and not any(k.lower() == "set-cookie" for k, v in response.headers)
+            and not has_nonce_csp_html(response)
         ):
             try:
                 body = response.body

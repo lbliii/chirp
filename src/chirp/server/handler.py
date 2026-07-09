@@ -501,6 +501,12 @@ async def handle_request(
             manifest=htmx_manifest,
             is_htmx_request=bool(request.htmx),
         )
+        # Evaluate validators only after the complete middleware chain has
+        # finalized the representation. This includes application middleware
+        # that attaches ETag/Last-Modified and CSP middleware that makes HTML
+        # vary by a per-request nonce.
+        if isinstance(response, Response):
+            response = evaluate_conditional_response(request, response)
     except HTTPError as exc:
         response = await handle_http_error(
             exc,
@@ -707,8 +713,6 @@ async def _invoke_handler(
         suspense_error_block=suspense_error_block,
     )
     validate_query_response(match.route, request, response)
-    if isinstance(response, Response):
-        response = evaluate_conditional_response(request, response)
     if hypermedia_program is not None:
         return_trace = get_return_trace(request)
         if return_trace is not None:

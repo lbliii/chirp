@@ -1,0 +1,1 @@
+**Nonce-safe conditional HTML** — Chirp now evaluates application and middleware validators after CSP finalization, returns a fresh `200` for per-request nonce HTML instead of combining cached markup with a new nonce policy, and excludes nonce-bearing HTML from shared response caching. Stable JSON, Markdown, and nonce-free HTML retain `304` behavior.

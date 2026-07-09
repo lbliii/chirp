@@ -382,13 +382,17 @@ equivalent GET resource. Application code supplies consistent `ETag` and/or
 The #526 implementation evaluates application-supplied `ETag` and
 `Last-Modified` headers on ordinary `Response` values through one shared
 GET/HEAD/QUERY path. `If-None-Match` uses weak comparison and takes precedence
-over `If-Modified-Since`; matching validators produce a bodyless `304` while
-preserving representation metadata. `FileResponse` retains its existing sender
-evaluation. Stream and EventStream validator proof remains with #529; Chirp
-does not buffer a stream to invent a validator. `If-Match` uses strong
-comparison and `If-Unmodified-Since` uses the same shared HTTP-date evaluator;
-failed preconditions return bodyless `412` responses. Responses without a
-validator process normally.
+over `If-Modified-Since`; matching stable validators produce a bodyless `304`
+while preserving representation metadata. Evaluation occurs after middleware
+finalizes the response. Nonce-CSP HTML is representation-unstable across
+requests, so it preserves source validators but returns a fresh `200` and
+bypasses shared response caching. Stable JSON, Markdown, and nonce-free HTML
+retain `304` behavior. `FileResponse` retains its existing sender evaluation.
+Stream and EventStream validator proof remains with #529; Chirp does not buffer
+a stream to invent a validator. `If-Match` uses strong comparison and
+`If-Unmodified-Since` uses the same shared HTTP-date evaluator; failed
+preconditions return bodyless `412` responses. Responses without a validator
+process normally.
 
 ### 8.4 Range
 

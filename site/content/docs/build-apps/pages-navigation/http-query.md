@@ -98,6 +98,22 @@ Cross-origin Fetch triggers a CORS preflight. Add QUERY to
 - Application `ETag` and `Last-Modified` values participate in conditional
   evaluation and can produce `304`.
 
+Attach source-specific validators to the normal `Response`; Chirp evaluates
+them after all middleware has finalized the representation:
+
+```python
+return (
+    Response(rendered_results)
+    .with_header("ETag", f'W/"search-source-{source_revision}"')
+    .with_header("Last-Modified", source_modified_http_date)
+)
+```
+
+Nonce-protected HTML is the safety exception. Chirp keeps its validators but
+returns a fresh `200` and bypasses shared response caching, preventing cached
+HTML containing nonce A from being reused under a new CSP containing nonce B.
+Stable JSON, Markdown, and nonce-free HTML still use normal `304` semantics.
+
 ## Cache only by explicit opt-in
 
 Configuration-managed caching remains GET-only. A controlled experiment can
@@ -118,9 +134,9 @@ app.add_middleware(
 ```
 
 Private/authenticated requests, `Set-Cookie`, streaming/SSE, non-200 responses,
-and key/backend failures bypass. Use short TTLs, application-specific vary
-headers, explicit invalidation, and a shared backend when evaluating this in a
-multi-worker deployment.
+nonce-bearing HTML, and key/backend failures bypass. Use short TTLs,
+application-specific vary headers, explicit invalidation, and a shared backend
+when evaluating this in a multi-worker deployment.
 
 ## Deployment boundary
 
