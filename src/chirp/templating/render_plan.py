@@ -221,6 +221,47 @@ def _compute_layout_start_index(
     return idx
 
 
+def _needs_omitted_outlet_reselect(
+    *,
+    request: Request | None,
+    layout_chain: LayoutChain | None,
+    layout_start_index: int,
+    fragment_target_registry: FragmentTargetRegistry | None,
+) -> bool:
+    """Return whether htmx 2 needs its inherited selector neutralized.
+
+    A replace-mode shell (or a target with ``omit_outer_layouts``) deliberately
+    omits the layout that owns an inherited ``hx-select`` wrapper. The fragment
+    is valid, but the browser would select nothing and blank the outlet unless
+    the response overrides that stale selector. Htmx 4 partial requests carry
+    explicit target/partial metadata and do not use this compatibility path.
+    """
+    if (
+        request is None
+        or not request.is_boosted
+        or request.htmx_request_type is not None
+        or layout_chain is None
+        or not layout_chain.layouts
+    ):
+        return False
+    target_id = request.htmx_target_id
+    if target_id is None:
+        return False
+    matched_index = layout_chain.find_start_index_for_target(target_id)
+    if matched_index is None or layout_start_index <= matched_index:
+        return False
+    layout = layout_chain.layouts[matched_index]
+    normalized_target = target_id.lstrip("#")
+    if layout.outlet_target_id != normalized_target:
+        return False
+    config = (
+        fragment_target_registry.get(normalized_target)
+        if fragment_target_registry is not None
+        else None
+    )
+    return layout.outlet_mode == "replace" or bool(config and config.omit_outer_layouts)
+
+
 def normalize_to_composition(value: Any) -> PageComposition | None:
     """Convert Page, LayoutPage, or PageComposition to PageComposition.
 
@@ -322,6 +363,17 @@ def build_render_plan(
     if request and layout_chain and layout_chain.layouts and "current_path" not in layout_context:
         layout_context["current_path"] = request.path
 
+    response_headers: dict[str, str] = {}
+    if _needs_omitted_outlet_reselect(
+        request=request,
+        layout_chain=layout_chain,
+        layout_start_index=layout_start_index,
+        fragment_target_registry=fragment_target_registry,
+    ):
+        # Select the complete fragment response instead of an inherited wrapper
+        # that lived in the intentionally omitted layout.
+        response_headers["HX-Reselect"] = "*"
+
     return RenderPlan(
         intent=intent,
         main_view=main_view,
@@ -330,6 +382,7 @@ def build_render_plan(
         layout_chain=layout_chain,
         layout_start_index=layout_start_index,
         layout_context=layout_context,
+        response_headers=response_headers,
         region_updates=tuple(region_updates),
         include_layout_oob=include_layout_oob,
         oob_scope=oob_scope,

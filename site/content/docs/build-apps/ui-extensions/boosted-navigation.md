@@ -42,6 +42,23 @@ the target's page block without duplicating its surrounding shell. Htmx 2 keeps
 the existing full-layout response plus `hx-select` behavior. Both versions use
 the same `Page(...)` return value and named blocks.
 
+### Omitted outlet layouts and `hx-select`
+
+The default `outlet_mode: compose` keeps the layout that owns an inherited
+`hx-select`, which is the safest shell shape. If an advanced shell uses
+`{# outlet_mode: replace #}` or registers its target with
+`omit_outer_layouts=True`, the wide page fragment must contain the selected
+element itself. For example, a shell with `hx-select="#page-content"` needs an
+`id="page-content"` wrapper inside the rendered `page_block_name`.
+
+`app.check()` reports a `layout_outlet` error when it can statically see a
+literal `#id` selector that the page template does not define. Htmx 2 boosted
+responses also receive `HX-Reselect: *` in this omitted-layout case, preventing
+the inherited selector from turning a valid fragment into an empty swap. This
+header is a runtime corruption backstop, not a substitute for fixing the
+contract error. Htmx 4 explicit `partial` requests and narrow fragment requests
+keep their existing selection behavior.
+
 ## Minimal working example
 
 Return `Page(...)` with two block names. The first is the narrow block for
@@ -260,6 +277,8 @@ rather than quiet.
   - `hx-boost="false"` is set on an ancestor, or the `<a>` is outside the boosted outlet
 * - Fragment appears but the shell jumps
   - The handler returned `Template(...)` (full page) instead of `Page(...)`; the debug validator warns
+* - Boosted click leaves the outlet blank
+  - A replaced or omitted outlet layout owns `hx-select`, but the wide page fragment lacks that selected id; run `app.check()` and fix the `layout_outlet` error
 * - Cross-shell click does a full navigation
   - Expected — the destination is in another shell, so Chirp emits `HX-Redirect`
 * - Page renders twice / duplicate ids
