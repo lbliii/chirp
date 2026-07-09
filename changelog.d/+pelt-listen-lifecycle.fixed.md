@@ -1,0 +1,1 @@
+**Reliable PostgreSQL notifications** — Pelt listening connections now coordinate query and notification reads, so adding or removing channels, issuing a query while subscribed, and closing no longer race or desynchronize the wire protocol.

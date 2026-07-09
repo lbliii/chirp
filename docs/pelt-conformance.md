@@ -17,7 +17,7 @@ valuable, but it is not a substitute for server negotiation and round trips.
 | Enums and composites | None | Binary/text primitives in `test_codecs_composite_range_enum.py` | Missing live server-assigned OID proof |
 | Server cursors | `test_database_executemany_and_stream` | Portal suspension/resume vectors in `test_protocol_extended.py` | Covered |
 | Transactions and pool reset | `test_database_fetch_execute_transaction` and `test_pool_rolls_back_failed_transaction_before_reuse` | Connection/protocol state tests | Covered |
-| LISTEN/NOTIFY | None | Notification framing and protocol events only | Missing live lifecycle proof |
+| LISTEN/NOTIFY | `test_listen_notify_delivery_unsubscribe_and_close` covers delivery, ordinary queries on a listening connection, multi-channel unsubscribe, and close | Notification framing and protocol events | Covered |
 
 The live tests run through `tests/test_pelt/test_connection_integration.py` with
 `CHIRP_TEST_PG_DSN`. CI's `test-postgres` matrix is the authoritative receipt;
@@ -34,6 +34,6 @@ local runs without a DSN skip these cases rather than simulating success.
 - `INTERVAL` text decoding remains deliberately unsupported until the grammar is
   validated against live server `IntervalStyle` variants. Binary interval vectors
   are covered separately.
-- A live LISTEN/NOTIFY test must prove delivery, unsubscribe, and close behavior
-  without two tasks reading the same connection concurrently. Until that exists,
-  the feature is not marked live-conformant here.
+- A listening connection still has exactly one socket reader. Ordinary query,
+  LISTEN, and UNLISTEN round trips temporarily take exclusive read ownership;
+  the notification reader resumes afterward while subscriptions remain.

@@ -273,3 +273,79 @@ async def test_live_array_and_range_types_preserve_text_when_binary_is_not_reque
         "numbers": "{1,2,NULL}",
         "span": "[1,4)",
     }
+
+
+@requires_pg
+@pytest.mark.issue(260)
+async def test_listen_notify_delivery_unsubscribe_and_close() -> None:
+    """A live listener keeps one reader across queries, unsubscribe, and close."""
+    assert PG_DSN is not None
+    listener = await pelt_pool.connect(PG_DSN)
+    sender = await pelt_pool.connect(PG_DSN)
+    channel = "pelt_e7_conformance"
+    other_channel = "pelt_e7_conformance_other"
+    received: list[tuple[str, str]] = []
+    first_delivered = anyio.Event()
+    other_delivered = anyio.Event()
+    other_after_unlisten = anyio.Event()
+
+    def on_notify(
+        _connection: pelt_connection.Connection,
+        _pid: int,
+        notified_channel: str,
+        payload: str,
+    ) -> None:
+        received.append((notified_channel, payload))
+        if payload == "first":
+            first_delivered.set()
+
+    def on_other_notify(
+        _connection: pelt_connection.Connection,
+        _pid: int,
+        notified_channel: str,
+        payload: str,
+    ) -> None:
+        received.append((notified_channel, payload))
+        if payload == "other":
+            other_delivered.set()
+        elif payload == "other-after-unlisten":
+            other_after_unlisten.set()
+
+    try:
+        await listener.add_listener(channel, on_notify)
+        await sender.execute("SELECT pg_notify($1, $2)", channel, "first")
+        with anyio.fail_after(5):
+            await first_delivered.wait()
+
+        row = await listener.fetchrow("SELECT 1 AS still_queryable")
+        assert dict(row) == {"still_queryable": 1}
+
+        await listener.add_listener(other_channel, on_other_notify)
+        await sender.execute("SELECT pg_notify($1, $2)", other_channel, "other")
+        with anyio.fail_after(5):
+            await other_delivered.wait()
+
+        assert received == [(channel, "first"), (other_channel, "other")]
+
+        await listener.remove_listener(channel, on_notify)
+        await sender.execute("SELECT pg_notify($1, $2)", channel, "after-unlisten")
+        await sender.execute("SELECT pg_notify($1, $2)", other_channel, "other-after-unlisten")
+        with anyio.fail_after(5):
+            await other_after_unlisten.wait()
+        await anyio.sleep(0.1)
+        assert received == [
+            (channel, "first"),
+            (other_channel, "other"),
+            (other_channel, "other-after-unlisten"),
+        ]
+
+        await listener.remove_listener(other_channel, on_other_notify)
+        await sender.execute("SELECT pg_notify($1, $2)", other_channel, "after-all-unlisten")
+        await anyio.sleep(0.1)
+        assert received[-1] == (other_channel, "other-after-unlisten")
+    finally:
+        await listener.close()
+        await sender.close()
+
+    assert listener._closed is True
+    assert listener._listener_tg is None
