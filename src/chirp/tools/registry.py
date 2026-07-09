@@ -152,11 +152,11 @@ def compile_tools(
     seen_names: set[str] = set()
 
     for entry in pending:
-        if len(entry) == 4:
-            name, description, handler, approval_required = entry
-        else:
-            name, description, handler = entry
-            approval_required = False
+        match entry:
+            case (name, description, handler, approval_required):
+                pass
+            case (name, description, handler):
+                approval_required = False
         if name in seen_names:
             msg = f"Duplicate tool name: {name!r}"
             raise ValueError(msg)

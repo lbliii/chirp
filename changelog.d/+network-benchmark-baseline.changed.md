@@ -1,1 +1,0 @@
-**Benchmark evidence** — the cross-framework runner can now emit a versioned JSON artifact and regenerate the documented comparison table from it, preserving environment, latency, and failed-attempt data alongside synthetic-results caveats.

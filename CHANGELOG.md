@@ -1,3 +1,39 @@
+## [0.10.0] — 2026-07-08
+
+### Added
+
+- Add a versioned live-PostgreSQL Pelt benchmark that reports aggregate query scaling separately from single-cursor and sequential bulk-loop performance boundaries.
+
+### Changed
+
+- Published Chirp's tested full-application compiler proof and aligned README, architecture, and hypermedia documentation around the shipped contract compiler, live ASGI runtime, and optional static-export boundary. ([#513](https://github.com/lbliii/chirp/issues/513))
+- Moved the packaged `chirp` command tree from direct argparse registration to
+  released Milo 0.4.x lazy typed commands. Existing command syntax, output
+  channels, exit codes, handler laziness, and version aliases remain covered by
+  the compatibility suite; Milo help and root operations are additive, and agent
+  exposure remains an explicit deny-by-default allowlist. ([#572](https://github.com/lbliii/chirp/issues/572))
+- Exposed the reviewed read-only `check`, `diff`, and `routes` inspections through
+  Milo MCP and llms.txt. Their handlers now return stable structured values across
+  programmatic and agent calls while Milo's terminal renderer preserves existing
+  human output and exit behavior. Lifecycle and write-capable commands remain
+  CLI-only. ([#573](https://github.com/lbliii/chirp/issues/573))
+- Added a CI exception-hygiene ratchet that rejects new vague public raise messages, unjustified exception suppression, masked configuration-load failures, and silent pass/continue handlers while tracking existing findings as explicit cleanup debt. ([#620](https://github.com/lbliii/chirp/issues/620))
+- Added a machine-checked public claims ledger and narrowed free-threading, benchmark, and rolling-reload language to the scope supported by committed evidence. ([#621](https://github.com/lbliii/chirp/issues/621))
+- **Benchmark evidence** — the cross-framework runner can now emit a versioned JSON artifact and regenerate the documented comparison table from it, preserving environment, latency, and failed-attempt data alongside synthetic-results caveats.
+- **CI coverage gate enforced** — the main test job now runs pytest with `--cov`, so the `fail_under` threshold configured in `pyproject.toml` actually fails the build instead of being decorative.
+- Added FastHTML to the optional synthetic framework benchmark matrix using the same JSON, CPU, SQLite, and HTML-rendering workloads as the existing peers.
+- Added a same-runner core benchmark gate that publishes pull-request comparisons and fails CI when median latency regresses by more than 20 percent or a tracked workload disappears.
+- Run Pelt's real-wire conformance suite against PostgreSQL 13–18, retaining final 13.22 as an explicit EOL compatibility lane.
+
+### Fixed
+
+- Pelt database errors now link to a shipped troubleshooting catalog, preserve exact PostgreSQL SQLSTATE codes through a finite documented anchor, and verify the future extraction export surface. ([#260](https://github.com/lbliii/chirp/issues/260))
+- Anonymous requests that do not create session state no longer emit `Set-Cookie` or write to custom session stores, restoring shared-cache and CDN eligibility while preserving existing-session refresh, timeout, CSRF, nested-mutation, and regeneration behavior. ([#618](https://github.com/lbliii/chirp/issues/618))
+- **Production request limits** — Chirp now forwards `AppConfig.max_request_body_size` to Pounce, so valid bodies above Pounce's former 1 MiB default reach the application while oversized requests still receive 413 responses at the wire boundary.
+- Keep Pelt server cursors memory-bounded by releasing decoded batches after iteration, and document the `data-pg` backend, libpq-free deployment model, and single-query/bulk performance limits.
+- Preserve Pelt row metadata when a server-side cursor resumes, so streamed queries can cross multiple portal batches without a protocol error.
+
+
 ## [0.9.0] — 2026-07-07
 
 ### Added
