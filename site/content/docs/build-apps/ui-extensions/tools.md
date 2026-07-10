@@ -184,6 +184,46 @@ For the framework-wide model see
 [[docs/about/thread-safety|the free-threading thread-safety model]].
 :::{/dropdown}
 
+## Milo MCP Apps registration preview
+
+`chirp.ext.milo` is a provisional, setup-only bridge for applications that
+already register commands with Milo 0.4.1. It is separate from the stable
+`app.tool()` registry described above: it does not convert either registry,
+copy Milo schemas, or expose every Milo command automatically.
+
+The caller attaches `MCPAppToolMeta` when the Milo command is originally
+registered, registers the linked `ui://` resource, and opts the canonical
+dotted command ID into an exact Chirp allowlist. `adapter.bind()` then records
+one existing Chirp template, named block, and parameterless application context
+provider. At `app.freeze()`, Chirp verifies the public Milo command/resource
+link and publishes frozen binding metadata:
+
+```python
+adapter = use_milo(app, cli, allowlist=("work-items.create",))
+adapter.bind(
+    "work-items.create",
+    template="work_items.html",
+    block="create_tool",
+    context=resource_context,
+)
+
+app.freeze()
+print(adapter.bindings[0].resource_uri)
+```
+
+Milo is already a bounded direct dependency of Chirp, so this preview needs no
+additional extra. The adapter never freezes or mutates the caller-owned Milo
+CLI, invokes the context provider during freeze, or manufactures a Chirp
+request/session. Application state captured by the provider remains
+application-owned and must be safe for concurrent reads.
+
+This is registration groundwork, not MCP App HTML rendering. Issue #578 owns
+invoking the provider and rendering the named block through Chirp's existing
+fail-loud render surface. The offline
+[`milo_mcp_apps` example](https://github.com/lbliii/chirp/tree/main/examples/standalone/milo_mcp_apps)
+keeps that boundary executable without adding a parallel template or
+placeholder HTML path.
+
 ## The shipping example
 
 The runnable demo registers three tools, serves a notes UI, and streams tool

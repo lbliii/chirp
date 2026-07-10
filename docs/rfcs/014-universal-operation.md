@@ -1,6 +1,6 @@
 # RFC 014: Universal Operation Projections
 
-**Status:** Accepted — declarative WebMCP form preview implemented; security proof implemented; other projections pending
+**Status:** Accepted — declarative WebMCP form preview and Milo MCP Apps registration boundary implemented; rendering and other projections pending
 **Issue:** [#339](https://github.com/lbliii/chirp/issues/339)
 **Parent epic:** [#568](https://github.com/lbliii/chirp/issues/568)
 **Saga:** [#566](https://github.com/lbliii/chirp/issues/566)
@@ -11,14 +11,19 @@ HTTP, htmx, a human and programmatic CLI, ordinary MCP tools, WebMCP, and MCP
 Apps without giving Chirp a REST serialization layer or giving Milo ownership
 of HTML rendering. The declarative WebMCP form slice is now implemented by
 issues #574–#576 through an explicit `FormContract` projection, structured
-startup checks, and a Chrome 149/server-security parity matrix. The Milo, ordinary
-MCP, and MCP Apps projections remain design-only; this document does not claim
-that those pending surfaces ship.
+startup checks, and a Chrome 149/server-security parity matrix. Issue #577 now
+ships the setup-only `chirp.ext.milo` binding verifier over Milo 0.4.1. It does
+not render MCP App resources: ordinary MCP projection and named-block resource
+rendering remain pending work owned by #578 and later slices.
 
 The external evidence used for this decision is pinned to:
 
-- Milo `0.3.1`, commit
+- the original Milo `0.3.1` decision evidence, commit
   `1f5370861fa38bc7942111a623fa2cb5a7f567b9`;
+- the implemented adapter boundary in `milo-cli>=0.4.1,<0.5`, whose public
+  `CLI.walk_commands()`, `CLI.get_command()`, `CLI.walk_ui_resources()`,
+  `MCPAppToolMeta`, and MCP App resource records are the #577 compatibility
+  seam;
 - the WebMCP proposal, commit
   `0b676d27a08aafd3b4f8a709756eeeab342fd9bd`; and
 - Milo's open MCP Apps boundary issue
@@ -30,7 +35,9 @@ RFC, not permanent dependency floors.
 
 ## 1. Decision summary
 
-Chirp will provide an **optional, explicit Milo projection adapter**. The
+Chirp provides an **explicit, opt-in Milo projection adapter**. Milo is already
+a bounded direct dependency for Chirp's CLI; opt-in describes integration
+activation, not a separate package extra. The
 adapter consumes an already registered Milo `CommandDef` and binds selected
 web and agent surfaces to it. It does not introduce a second operation
 decorator, schema compiler, command registry, renderer, or generic serializer.
@@ -219,6 +226,36 @@ public inspection surface.
 
 No request path introspects decorators, walks templates, imports a lazy command,
 or mutates an allowlist. Multiple worker threads share the frozen records.
+
+### 5.3 Implemented MCP Apps registration slice (#577)
+
+`chirp.ext.milo` implements only the identity, allowlist, and freeze boundary
+needed by later rendering work:
+
+1. the caller registers a Milo command with matching
+   `ui=MCPAppToolMeta(resource_uri=...)` and registers that exact `ui://`
+   resource on the caller-owned `CLI`;
+2. `use_milo(app, cli, allowlist=(...))` opts canonical dotted IDs into one
+   Chirp adapter; unrelated Milo commands remain outside its view;
+3. `adapter.bind(...)` names the existing Chirp template, named block, and an
+   explicit parameterless application context provider;
+4. app freeze verifies canonical identity, MCP surface exposure, exact
+   allowlist equality, tool/resource linkage, and parameterless callables; and
+5. Chirp publishes a deterministically sorted tuple of frozen, slotted binding
+   records containing copied identity and metadata values.
+
+The adapter uses Milo's public walkers and never accesses or rewrites Milo's
+private registries. Chirp freezes only its own immutable snapshot. It neither
+freezes nor mutates the caller-owned Milo `CLI`; later caller changes cannot
+alter the Chirp snapshot. The provider is not invoked at registration or
+freeze, and its captured read model remains application-owned and must be safe
+for concurrent access.
+
+No ambient Chirp `Request`, session, Milo context, or latest-operation-result
+cache is synthesized. Issue #578 owns provider invocation and named-block
+rendering through the existing render surface, including sync/async context,
+missing-block, empty-output, and host negotiation proof. Issue #577 does not
+call `CLI.ui_resource()`, Kida, or the render pipeline.
 
 ## 6. Inputs, contexts, and server authority
 
@@ -534,7 +571,8 @@ Issue #580 should prove the design with one deliberately small operation:
 - MCP App `ui://` resource from `create_tool`; and
 - fail-loud proof for a missing required block.
 
-The example must be executable, install the optional extra explicitly, and be
+The example must be executable. Milo is already installed with Chirp, so it
+must not advertise a redundant optional extra. It must be
 used by docs rather than duplicated as an untested snippet. It must not use a
 mock JSON endpoint, a second partial template tree, or a tool-only mutation
 path.
@@ -545,7 +583,7 @@ Runtime implementation is incomplete until these surfaces agree:
 
 | Surface | Required collateral |
 | --- | --- |
-| Optional dependency | `pyproject.toml` extra, lockfile, missing-extra import test and actionable install guidance |
+| Milo dependency boundary | Existing bounded direct dependency, lazy adapter import, broken-install test, and actionable reinstall guidance; no new extra or lock change |
 | Public imports | adapter exports, `docs/public-api.md`, import tests, changelog/migration notes |
 | Setup API | frozen/slotted records, lifecycle tests, API reference, runnable example |
 | Compiler | immutable graph records, deterministic identity tests, freeze/concurrency proof |
@@ -558,9 +596,11 @@ Runtime implementation is incomplete until these surfaces agree:
 | Site | compatibility tier and executable example; no generated output hand edits |
 | Release | towncrier fragment and migration guidance for any public behavior |
 
-The initial adapter lives under `chirp.ext` so importing `chirp` remains safe
-without Milo. Whether `use_milo` is eventually re-exported from `chirp` is a
-separate public-API decision; this RFC does not require a top-level export.
+The initial adapter lives under `chirp.ext.milo`; importing `chirp` or
+`chirp.ext` does not load the adapter-side Milo API. A missing or partial Milo
+installation fails only when the adapter is used and names the supported
+reinstall path. Whether `use_milo` is eventually re-exported from `chirp` is a
+separate public-API decision; #577 deliberately adds no top-level export.
 
 ## 17. Compatibility gates and dependencies
 
@@ -568,12 +608,13 @@ Implementation is gated by:
 
 1. **CLI contract (#571):** Chirp's own CLI behavior and Milo adoption gaps are
    recorded before deeper coupling.
-2. **Milo allowlist:** a public way to publish selected commands without
-   private registry mutation.
+2. **Milo allowlist:** satisfied for the #577 binding view by exact canonical
+   IDs verified through Milo's public walkers, without private registry
+   mutation.
 3. **Typed structured result parity:** Milo's MCP result must conform to the
    advertised return schema for the result shape the prototype claims.
-4. **Adapter (#577):** optional dependency, lazy import, identity resolution,
-   and lifecycle boundary.
+4. **Adapter (#577):** implemented registration-only slice: lazy import,
+   identity/resource verification, exact allowlist, and lifecycle boundary.
 5. **WebMCP (#574):** declarative preview after the core binding exists.
 6. **MCP Apps (#578 / Milo #74 and #79):** protocol/resource primitive before
    Chirp UI projection.
@@ -632,7 +673,7 @@ fallback.
 - No JSON API or generic `make_response()` path.
 - No new Chirp return type.
 - No `AppConfig` feature flag.
-- No mandatory Milo dependency.
+- No eager top-level adapter import or redundant Milo optional-dependency group.
 - No automatic route, tool, WebMCP, or MCP App exposure.
 - No generated forms or templates from schema.
 - No async, cancellation, or universal streaming claim in the first tier.
@@ -713,14 +754,14 @@ machine-verified
 
 ```text
 Steward: Extensions
-Area: Optional Milo dependency and lifecycle
+Area: Opt-in Milo integration and lifecycle
 Severity: P1
 Invariant: Core Chirp imports remain safe without Milo, and adapter state freezes before concurrent request use.
 Evidence: AGENTS.md:30-35,266-270; src/chirp/ext/AGENTS.md:3,18-21,47-53
 User Impact: A mandatory import breaks core users; mutable runtime registrations create worker-dependent exposure.
-Required Fix: Use a lazy optional adapter, actionable missing-extra error, setup-only registration, and immutable published records.
+Required Fix: Use a lazy opt-in adapter, actionable broken-install error, setup-only registration, and immutable published records.
 Required Proof: Missing/present-extra imports, post-freeze rejection, deterministic compilation, and concurrency tests.
-Collateral: Extra declaration, lockfile, install docs, public API notes, changelog.
+Collateral: Existing bounded dependency verification, install docs, public API notes, changelog; no new extra or lockfile change.
 Confidence: High
 Verification Status:
 machine-verified
@@ -750,8 +791,8 @@ until Milo has an async invocation contract.
 ### Ranked implementation backlog
 
 1. Milo allowlist and typed structured-result compatibility gaps.
-2. Optional adapter core: identity, lifecycle, binding, and missing-extra
-   behavior (#577).
+2. Opt-in adapter core: identity, lifecycle, binding, and broken-install
+   behavior (#577, implemented).
 3. Compiler and `app.check()` projection edges.
 4. Canonical browser/htmx/CLI/ordinary-MCP slice.
 5. Declarative WebMCP preview and trust-boundary proof (#574–#576).
@@ -773,7 +814,7 @@ This design is ready to implement when reviewers agree that it:
 - pins the exact experimental WebMCP vocabulary and fallback boundary;
 - places MCP App protocol mechanics with Milo and resource HTML with Chirp;
 - preserves and plans a safe migration for current `chirp.tools` users;
-- names public API, optional dependency, docs, examples, scaffold, test,
+- names public API, dependency boundary, docs, examples, scaffold, test,
   security, compiler, and changelog collateral; and
 - gives issue #580 an executable one-template prototype contract.
 

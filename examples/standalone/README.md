@@ -54,6 +54,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 - [`kanban`](kanban/) — canonical, tier 3
 - [`llm_minimal`](llm_minimal/) — canonical, tier 1
 - [`llm_streaming_kida`](llm_streaming_kida/) — supporting, tier 2
+- [`milo_mcp_apps`](milo_mcp_apps/) — experimental, tier 3
 - [`mutation_result`](mutation_result/) — supporting, tier 2
 - [`nojs_floor`](nojs_floor/) — canonical, tier 2
 - [`ollama`](ollama/) — canonical, tier 3

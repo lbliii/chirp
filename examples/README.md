@@ -233,6 +233,7 @@ cannot disappear from the catalog while its documentation debt remains visible.
 | [`standalone/kanban`](standalone/kanban/) | standalone | canonical | 3 | `auth`, `sessions` | none | `auth`, `csrf`, `forms`, `fragments`, `oob`, `sessions`, `sse`, `validation` | yes | [`kanban`](../examples/standalone/kanban) |
 | [`standalone/llm_minimal`](standalone/llm_minimal/) | standalone | canonical | 1 | — | optional | `ai`, `fragments`, `sse`, `streaming` | yes | [`llm_minimal`](../examples/standalone/llm_minimal) |
 | [`standalone/llm_streaming_kida`](standalone/llm_streaming_kida/) | standalone | supporting | 2 | — | optional | `ai`, `streaming` | yes | [`llm_streaming_kida`](../examples/standalone/llm_streaming_kida) |
+| [`standalone/milo_mcp_apps`](standalone/milo_mcp_apps/) | standalone | experimental | 3 | — | none | `contracts`, `pages`, `tools` | yes | [`milo_mcp_apps`](../examples/standalone/milo_mcp_apps) |
 | [`standalone/mutation_result`](standalone/mutation_result/) | standalone | supporting | 2 | — | none | `fragments`, `mutations`, `pages` | yes | [`mutation_result`](../examples/standalone/mutation_result) |
 | [`standalone/nojs_floor`](standalone/nojs_floor/) | standalone | canonical | 2 | — | none | `forms`, `fragments`, `mutations`, `no-js`, `pages`, `validation` | yes | [`nojs_floor`](../examples/standalone/nojs_floor) |
 | [`standalone/ollama`](standalone/ollama/) | standalone | canonical | 3 | `ai`, `markdown` | required | `ai`, `fragments`, `sse`, `streaming`, `tools` | yes | [`ollama`](../examples/standalone/ollama) |

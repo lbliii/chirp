@@ -82,6 +82,22 @@ def test_public_api_docs_classify_names_once() -> None:
     )
 
 
+@pytest.mark.issue(577)
+def test_milo_adapter_is_documented_as_a_provisional_submodule_api() -> None:
+    section = _section_body(_PUBLIC_API_DOC.read_text(), "Provisional Submodule APIs")
+
+    for name in (
+        "MiloContext",
+        "MiloContextProvider",
+        "MiloMCPAppAdapter",
+        "MiloMCPAppBinding",
+        "use_milo",
+    ):
+        assert section.count(f"`{name}`") == 1
+    assert "`chirp.ext.milo`" in section
+    assert "not re-exported from `chirp`" in section
+
+
 def test_configuration_guide_documents_every_app_config_field() -> None:
     """The published config guide should mention every AppConfig field."""
     markdown = _CONFIG_DOC.read_text()

@@ -11,8 +11,10 @@ This page classifies exported names by stability:
   but minor releases may adjust details when the contract improves.
 - **Debug / advanced**: exported for diagnostics, tests, and framework-level tooling. Prefer the
   stable return types and app methods for normal app code.
-- **Internal**: any module or name not exported from `chirp.__all__`. Importing it is allowed in
-  experiments, but it is not a compatibility promise.
+- **Internal**: any module or name not exported from `chirp.__all__` and not
+  explicitly listed under **Provisional Submodule APIs**. Importing other
+  internal names is allowed in experiments, but it is not a compatibility
+  promise.
 
 For the pre-1.0 audit queue, see `docs/plan-1-0-public-surface-audit.md`.
 
@@ -148,6 +150,25 @@ Compatibility is limited to the pinned declarative vocabulary. Chrome 149's
 origin trial/local testing flag is experimental; newer select and
 `SubmitEvent.agentInvoked`/`respondWith()` behavior is not supported. Mutation
 projection never changes server auth, CSRF, validation, or confirmation.
+
+## Provisional Submodule APIs
+
+These advanced integrations are intentionally not re-exported from `chirp`.
+Their qualified import paths are supported provisionally:
+
+| Module | Names | Boundary |
+|------|-------|----------|
+| `chirp.ext.milo` | `MiloContext`, `MiloContextProvider`, `MiloMCPAppAdapter`, `MiloMCPAppBinding`, `use_milo` | Setup-only verification of exact Milo command allowlists, MCP App tool/resource links, and immutable Chirp template/block bindings. Resource rendering remains pending in #578. |
+
+Milo 0.4.1 is already a bounded direct Chirp dependency; this adapter does not
+add an optional extra. Importing `chirp` or `chirp.ext` does not load the
+adapter-side Milo API. Callers attach `MCPAppToolMeta` when registering the
+original Milo command, register the matching `ui://` resource themselves, and
+then call `use_milo(app, cli, allowlist=(...))`. Chirp verifies public Milo
+records at app freeze and publishes only copied, frozen binding metadata. It
+does not freeze or mutate the caller-owned Milo CLI, invoke the parameterless
+application context provider, manufacture request/session state, or render the
+named block in this slice.
 
 ## 1.0 Audit Decisions
 

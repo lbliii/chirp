@@ -1,0 +1,23 @@
+{% block page_root %}
+<!doctype html>
+<html lang="en">
+  <head><title>{{ heading }}</title></head>
+  <body>
+    <main>
+      <h1>{{ heading }}</h1>
+      <p>The Chirp binding is verified at app freeze; MCP App rendering is pending #578.</p>
+    </main>
+  </body>
+</html>
+{% endblock %}
+
+{% block create_tool %}
+<main aria-labelledby="create-title">
+  <h1 id="create-title">{{ heading }}</h1>
+  <form>
+    <label for="title">Title</label>
+    <input id="title" name="title" required>
+    <button type="submit">Create</button>
+  </form>
+</main>
+{% endblock %}

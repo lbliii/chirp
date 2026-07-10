@@ -22,10 +22,23 @@ def _prose() -> str:
 def test_rfc_records_implemented_slice_and_pins_external_evidence() -> None:
     text = _rfc()
 
-    assert "**Status:** Accepted — declarative WebMCP form preview implemented" in text
+    assert "**Status:** Accepted — declarative WebMCP form preview and Milo MCP Apps" in text
     assert "1f5370861fa38bc7942111a623fa2cb5a7f567b9" in text
     assert "0b676d27a08aafd3b4f8a709756eeeab342fd9bd" in text
     assert "Milo's open MCP Apps boundary issue" in text
+
+
+@pytest.mark.issue(577)
+def test_rfc_records_the_milo_registration_only_slice() -> None:
+    text = _prose()
+
+    assert "`milo-cli>=0.4.1,<0.5`" in text
+    assert "`use_milo(app, cli, allowlist=(...))`" in text
+    assert "matching `ui=MCPAppToolMeta(resource_uri=...)`" in text
+    assert "explicit parameterless application context provider" in text
+    assert "neither freezes nor mutates the caller-owned Milo `CLI`" in text
+    assert "No ambient Chirp `Request`, session, Milo context" in text
+    assert "Issue #578 owns provider invocation and named-block rendering" in text
 
 
 def test_rfc_covers_every_required_projection() -> None:
