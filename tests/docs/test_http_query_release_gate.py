@@ -22,6 +22,9 @@ def test_query_guides_publish_the_same_experimental_boundary() -> None:
         assert "native" in compact
         assert "forms cannot submit QUERY" in compact
         assert "TestClient.query()" in compact
+        assert "accepts exactly one" in compact
+        assert 'request("QUERY", ...)' in compact
+        assert "There is no `TestClient.query()`" not in compact
         assert 'body=b"category=books&year=2026"' in compact
         assert "content=b" not in compact
         assert "filesystem `query()`" in compact
@@ -58,6 +61,7 @@ def test_readme_and_public_api_do_not_overclaim_query_support() -> None:
     assert "configuration-managed caching remains GET-only" in public_api
     assert "#535 experimental release decision documented" in rfc
     assert "Stable or first-class promotion is not approved" in rfc
+    assert "complete static wiring diagnostics (#533) remain open" not in rfc
 
 
 def test_query_site_navigation_links_the_adoption_guide() -> None:

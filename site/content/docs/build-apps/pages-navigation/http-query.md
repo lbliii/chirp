@@ -41,22 +41,33 @@ async def search(request: Request) -> Page:
 
 `query_media_types` is mandatory on QUERY routes and invalid elsewhere. Chirp
 validates the media ranges at freeze time. Support is explicit-route-only:
-there is no filesystem `query()` convention, `TestClient.query()` helper,
-`AppConfig` switch, or QUERY-specific return type.
+there is no filesystem `query()` convention, `AppConfig` switch, or
+QUERY-specific return type.
 
-Tests use the generic request API:
+Tests can use the QUERY convenience method:
 
 ```python
-response = await client.request(
-    "QUERY",
+response = await client.query(
     "/search",
-    headers={
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "text/html",
-    },
+    data={"category": "books", "year": "2026"},
+    headers={"Accept": "text/html"},
+)
+```
+
+`query()` accepts exactly one of raw `body=`, form-encoded `data=`, or JSON
+`json=`. It supplies the standard content type for form and JSON bodies. Raw
+bytes require an explicit media type:
+
+```python
+response = await client.query(
+    "/search",
+    headers={"Content-Type": "application/x-www-form-urlencoded"},
     body=b"category=books&year=2026",
 )
 ```
+
+The generic `client.request("QUERY", ...)` surface remains available for full
+wire-shape control. Both helpers traverse the same in-process ASGI path.
 
 ## Failure and discovery contract
 
@@ -183,7 +194,7 @@ for operator details.
 | Capability | Status |
 | --- | --- |
 | Request/response protocol, typed rendering, cache opt-in, and tested transport matrix | Implemented |
-| Filesystem/test-client ergonomics (#527) | Open |
+| Filesystem/test-client ergonomics (#527) | `TestClient.query()` implemented; filesystem convention deferred |
 | Declarative htmx plus no-JavaScript GET proof (#528) | Open |
 | Literal-client diagnostics and non-execution proof (#533) | Implemented |
 | Canonical complex-search example (#534) | Implemented and browser-tested |

@@ -56,22 +56,30 @@ does not include QUERY. Chirp validates and freezes its RFC 10008 media ranges
 at startup. The implementation is explicit-route-only: there is no filesystem
 `query()` handler convention and no `AppConfig` feature flag.
 
-Use the generic test-client surface:
+Use `TestClient.query()` for the common body encodings:
 
 ```python
-response = await client.request(
-    "QUERY",
+response = await client.query(
     "/search",
-    headers={
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "text/html",
-    },
+    data={"category": "books", "year": "2026"},
+    headers={"Accept": "text/html"},
+)
+```
+
+The helper accepts exactly one of `body=`, `data=`, or `json=`. Form data and
+JSON receive the same default content types and encoding as `post()`. Raw bytes
+remain exact and require an explicit `Content-Type`:
+
+```python
+response = await client.query(
+    "/search",
+    headers={"Content-Type": "application/x-www-form-urlencoded"},
     body=b"category=books&year=2026",
 )
 ```
 
-There is no `TestClient.query()` convenience method. Adding one remains a
-separate public-API decision in issue #527.
+`TestClient.request("QUERY", ...)` remains the generic baseline for tests that
+need complete control over the method, headers, and body.
 
 ## Request and response contract
 
@@ -229,7 +237,7 @@ The experimental release gate is met; the stable promotion gate is not.
 | Typed full-page, fragment, OOB, Stream, Suspense, validation, and DevTools paths | Met | #529 and `tests/contracts/test_query_render_surfaces.py` |
 | Collision-safe key plus explicit response-cache opt-in | Met | #530/#531 cache unit and end-to-end tests |
 | Browser, ASGI, Pounce, proxy, retry, limit, and observability matrix | Met | #532 and the interoperability report |
-| Filesystem/test-client ergonomics | Open | #527 requires a separate public-API decision |
+| Filesystem/test-client ergonomics | Partial | #527 ships `TestClient.query()`; the filesystem convention remains deferred |
 | Declarative htmx transport with native GET fallback | Open | #528 requires an approved client contract |
 | Literal-client diagnostics, inspection metadata, and freeze/speculation proof | Met | #533 and `tests/contracts/test_query_contracts.py` |
 | Canonical complex-search example and no-JavaScript browser proof | Met | #534 and `examples/standalone/query_search` |
@@ -264,7 +272,9 @@ interoperability caveats rather than inferring universal support from CI.
 
 - A pre-contract route using bare `methods=["QUERY"]` must add a non-empty
   `query_media_types=(...)` declaration or startup fails.
-- Continue using `TestClient.request("QUERY", ...)`; no QUERY shortcut exists.
+- Existing `TestClient.request("QUERY", ...)` calls remain valid;
+  `TestClient.query()` adds form, JSON, and raw-body convenience without a
+  second request path.
 - Continue using explicit decorator routes; filesystem `query()` is not
   discovered.
 - `AppConfig(cache_middleware_enabled=True)` remains GET-only. QUERY cache

@@ -153,6 +153,47 @@ class TestClient:
         merged = {**extra_headers, **(headers or {})}
         return await self.request("POST", path, headers=merged, body=request_body)
 
+    async def query(
+        self,
+        path: str,
+        *,
+        headers: dict[str, str] | None = None,
+        body: bytes | None = None,
+        data: Mapping[str, str | Sequence[str]] | None = None,
+        json: dict[str, object] | None = None,
+    ) -> Response:
+        """Send a QUERY request with exactly one optional body source.
+
+        ``data`` and ``json`` use the same encoding and default content types
+        as :meth:`post`. Raw ``body`` bytes require the caller to declare the
+        appropriate ``Content-Type`` header for the target QUERY route.
+        """
+        supplied = sum(value is not None for value in (body, data, json))
+        if supplied > 1:
+            msg = "TestClient.query() accepts only one of 'body', 'data', or 'json'."
+            raise TypeError(msg)
+
+        extra_headers: dict[str, str] = {}
+        request_body = body or b""
+
+        if json is not None:
+            import json as json_module
+
+            request_body = json_module.dumps(json).encode("utf-8")
+            extra_headers["content-type"] = "application/json"
+        elif data is not None:
+            from urllib.parse import urlencode
+
+            request_body = urlencode(data, doseq=True).encode("utf-8")
+            extra_headers["content-type"] = "application/x-www-form-urlencoded"
+
+        merged = dict(extra_headers)
+        for name, value in (headers or {}).items():
+            if name.lower() == "content-type":
+                merged.pop("content-type", None)
+            merged[name] = value
+        return await self.request("QUERY", path, headers=merged, body=request_body)
+
     async def put(
         self,
         path: str,
