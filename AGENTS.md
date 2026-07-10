@@ -115,6 +115,49 @@ for external contributors.
   (for example AI Phase 2 #431–#438, Horizon RFC drafting, Lucky Cat framework
   work without the GF label).
 
+### Backlog Operations
+
+The live GitHub issue graph is authoritative for active work. Parent text,
+markdown task lists, labels, roadmap files, and PR mentions do not replace
+actual GitHub parent/sub-issue relationships.
+
+Trigger phrases:
+
+- `survey backlog` or `survey issues` — read-only current-state audit.
+- `what should I work on`, `pick next issue`, or `next backlog task` — run the
+  read-only recommender and explain the highest-ranked workable leaves.
+- `groom backlog` or `groom issues` — reconcile decisions, labels, hierarchy,
+  closures, blockers, and missing children without implementing product code.
+- `cut work`, `cut issue`, or `make #N workable` — decompose the selected scope
+  into bounded leaves and attach them as actual GitHub sub-issues.
+- `reconcile backlog` or `close shipped issues` — verify merged work against
+  current source/docs/tests and close only fully resolved issues.
+
+Backlog invariants:
+
+- Select maintainer work with `scripts/backlog.py next`; use
+  `scripts/backlog.py explain N` before skipping a plausible issue. Selection
+  is read-only and never claims or assigns work.
+- `ready` is leaf-only. Never apply it to a saga, epic, or implementation epic.
+- Every open, unblocked saga/epic reaches at least one `ready` leaf. A fully
+  blocked parent instead names its blocker and exact revisit trigger.
+- Parent body fields are descriptive only. Attach hierarchy and same-repo
+  blockers through GitHub's native relationships.
+- Parent bodies keep outcomes, cross-child gates, boundaries, and decisions;
+  they do not mirror child state with `- [ ] #N` lists.
+- Do not infer completion from a checkbox, branch name, issue mention, test
+  marker, or merged PR alone. Verify current behavior, proof, child state, and
+  parent-level exit gates.
+- Do not repurpose a completed issue for residual scope. Close the completed,
+  rejected, or superseded decision and create a new leaf/RFC for the remainder.
+- Record decisions with status, evidence, rejected alternatives, implementation
+  owner, and revisit trigger.
+- Behavioral leaf closures require `@pytest.mark.issue(N)` traceability. A
+  non-testable closure uses `Acceptance #N: n/a (<reason>)` in its PR.
+- Finish mutating grooming with a receipt naming the baseline SHA, closures,
+  created/attached issues, decisions, ready leaves, blockers, not-now items,
+  and verification performed.
+
 ## Stop And Ask
 
 Check in before:

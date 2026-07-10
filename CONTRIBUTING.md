@@ -53,11 +53,15 @@ reconciled weeks later. CI runs a **`closure-acceptance`** check that requires
   (docs, positioning, tooling), add a line to the PR **description**:
 
   ```
-  Acceptance: n/a (docs-only)
+  Acceptance #123: n/a (docs-only; no runtime behavior)
   ```
 
-  The `(reason)` is required and is audited — a deliberate, visible
-  declaration, not a way to skip a test that should exist.
+  The issue number and `(reason)` are required and audited. A PR closing
+  several issues needs proof or a separate qualified exemption for each one.
+
+Branch names such as `issue-123-phase-one` and ordinary `#123` mentions only
+associate work with an issue. They never imply closure without an explicit
+closing keyword.
 
 If your PR does **not** close an issue, the gate does not apply — you can still
 reference an issue with `Refs #123` and let a maintainer close it. See

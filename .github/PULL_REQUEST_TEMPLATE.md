@@ -6,24 +6,45 @@
 
 <!-- How did you verify this? e.g. `uv run poe preflight`, or the specific tests you ran. -->
 
-## Linked issue
+## Issue linkage
 
 <!--
-  Closing an issue? Use a closing keyword so it auto-closes on merge:
+  Use `Closes` only for a fully completed leaf:
 
-      Closes #123        (also accepted: Fixes #123 / Resolves #123)
+      Closes #123
 
-  A PR that closes an issue must PROVE the issue is done — CI runs the
-  `closure-acceptance` gate, which requires ONE of:
+  Credit parent progress without closing it:
 
-    - an acceptance test decorated with  @pytest.mark.issue(123)   (preferred), OR
-    - for docs / positioning / tooling with no testable behavior, a line in THIS
-      description giving a reason:
+      Advances-Epic: #120
 
-          Acceptance: n/a (docs-only)
-
-  Not closing an issue? Use `Refs #123` instead, or delete this section.
-  Details: CONTRIBUTING.md → "Linking a PR to an issue".
+  For partial work use `Refs #123`. Branch names and ordinary mentions do not
+  imply closure.
 -->
 
-Closes #
+Refs #
+
+## Acceptance
+
+<!--
+  Every issue named by Closes/Fixes/Resolves needs its own proof.
+
+  Behavioral:
+
+      Acceptance #123: @pytest.mark.issue(123)
+
+  Non-testable:
+
+      Acceptance #123: n/a (docs-only; no runtime behavior)
+
+  A single global exemption does not exempt several closing issues.
+-->
+
+Acceptance #
+
+## Backlog impact
+
+<!--
+  Hierarchy: none / #child attached to #parent
+  Decision: none / approved / rejected / deferred / superseded
+  Residual work: none / new issue #N
+-->

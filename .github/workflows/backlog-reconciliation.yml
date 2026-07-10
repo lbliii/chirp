@@ -1,9 +1,10 @@
 name: Backlog reconciliation
 
 # Weekly (and on-demand) sweep that re-derives backlog truth from merged PRs +
-# acceptance-test coverage and labels the drift, so the tracker can't silently
-# rot behind a fast, agent-driven merge cadence. Read-derives, then applies the
-# derived labels (merged-pending-close / stale-epic-review / acceptance-tracked).
+# acceptance-test coverage and reports graph/workability drift, so the tracker
+# cannot silently rot behind a fast, agent-driven merge cadence. Scheduled runs
+# are read-only while the graph-aware rules soak; manual runs may apply only
+# deterministic derived labels.
 # See docs/backlog-automation.md.
 
 on:
@@ -35,8 +36,18 @@ jobs:
       - name: Reconcile backlog
         env:
           GH_TOKEN: ${{ github.token }}
-          APPLY: ${{ github.event_name == 'schedule' || inputs.apply }}
+          APPLY: ${{ github.event_name == 'workflow_dispatch' && inputs.apply }}
         run: |
-          ARGS=""
-          if [ "$APPLY" = "true" ]; then ARGS="--apply"; fi
-          uv run --no-project python scripts/reconcile_backlog.py $ARGS | tee -a "$GITHUB_STEP_SUMMARY"
+          ARGS="--report-workability --with-dependencies --snapshot backlog-snapshot.json"
+          if [ "$APPLY" = "true" ]; then ARGS="$ARGS --apply"; fi
+          uv run --no-project python scripts/reconcile_backlog.py $ARGS | tee backlog-report.md | tee -a "$GITHUB_STEP_SUMMARY"
+          uv run --no-project python scripts/reconcile_backlog.py --json --with-dependencies > backlog-findings.json
+
+      - name: Upload backlog receipts
+        uses: actions/upload-artifact@v7
+        with:
+          name: backlog-reconciliation-${{ github.run_id }}
+          path: |
+            backlog-report.md
+            backlog-findings.json
+            backlog-snapshot.json

@@ -7,9 +7,17 @@ body:
   - type: markdown
     attributes:
       value: |
-        **Tracking:** GitHub issues are authoritative. Create **tasks as GitHub sub-issues** immediately after opening this epic — do not use `- [ ]` lists here.
+        **Tracking:** Create bounded tasks immediately and attach them through
+        GitHub's actual sub-issue relationship. The parent field below is
+        descriptive only; body links and `- [ ] #N` lists do not count.
 
-        **Closure:** Epics close when sub-issues close. PRs should use `Advances-Epic: #N` rather than `Closes #N` unless this epic is the only deliverable.
+        **Workability:** Never label an epic `ready`. An unblocked epic exposes
+        at least one ready leaf. A blocked epic names its blocker and revisit
+        trigger.
+
+        **Closure:** Epics close when actual sub-issues and epic-level exit
+        gates close. PRs use `Advances-Epic: #N`; reserve `Closes #N` for leaf
+        deliverables.
 
         Read [`docs/backlog-automation.md`](https://github.com/lbliii/chirp/blob/main/docs/backlog-automation.md).
 
@@ -17,7 +25,7 @@ body:
     id: parent
     attributes:
       label: Parent saga
-      description: "e.g. #584 — https://github.com/lbliii/chirp/issues/584"
+      description: Descriptive reference only; attach this epic as an actual GitHub sub-issue after creation.
       placeholder: "#584"
     validations:
       required: false
@@ -44,7 +52,7 @@ body:
     id: dependencies
     attributes:
       label: Dependencies and related work
-      description: Other issues, RFCs, cross-repo work, or steward domains this epic relies on.
+      description: Blocking issues/RFCs/upstreams and exact revisit triggers. Write `None` when unblocked.
       placeholder: |
         - #652 topology projection
         - `docs/rfcs/021-contract-explorer.md`
@@ -56,7 +64,7 @@ body:
     id: exit_criteria
     attributes:
       label: Exit criteria
-      description: Epic-level done signal — downstream proof and/or all sub-issues closed.
+      description: Parent-level cross-child gates only; do not mirror child issue status here.
       placeholder: |
         - [ ] Elbysodic repro navigates cleanly with boost enabled
         - [ ] `chirp check` catches the mismatch class
