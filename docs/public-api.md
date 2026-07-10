@@ -170,6 +170,14 @@ does not freeze or mutate the caller-owned Milo CLI, invoke the parameterless
 application context provider, manufacture request/session state, or render the
 named block in this slice.
 
+The Phase 1 durable-job proof is deliberately **internal**, not a provisional
+submodule API. `chirp.data._jobs` and its frozen records may be exercised by
+framework tests, but applications receive no compatibility promise for those
+names or signatures. Its package-shipped Postgres migration is reviewable
+deployment evidence, not an automatic schema or a public executor. There is no
+top-level export, `chirp.data` export, `AppConfig` field, handler registry,
+poller, or SQLite parity.
+
 ## 1.0 Audit Decisions
 
 The 2026-05-03 public-surface audit made one stability correction:
