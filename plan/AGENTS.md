@@ -18,6 +18,15 @@ accepted findings from future work.
   and other repo planning files index and link issues. They do not duplicate
   scope, tasks, acceptance criteria, or proof commands — that copy rots. Read
   the linked issue bodies on <https://github.com/lbliii/chirp/issues>.
+- **The actual issue graph owns hierarchy.** Saga → Epic → Task relationships
+  are native GitHub parent/sub-issue edges. A parent number in prose, an `epic`
+  label, or a markdown checklist is not hierarchy.
+- **Ready means executable leaf work.** Sagas, epics, and implementation epics
+  never carry `ready`. Each unblocked parent exposes at least one ready leaf;
+  blocked parents name their dependency and revisit trigger.
+- **Decisions have receipts.** Approved, rejected, deferred, and superseded
+  decisions record evidence, rejected alternatives, implementation ownership,
+  and the condition that would reopen the decision.
 - **Plans are not shipped behavior.** They need an explicit status signal; when
   a completed-folder artifact preserves its original draft header, roadmap or
   companion context must make completion clear.
@@ -45,6 +54,10 @@ When this domain changes, check:
   compatibility.
 - Tests/docs/examples/changelog called out by the plan.
 - `STEWARD_AUDIT.md` or PR steward notes for accepted/deferred findings.
+- GitHub parent/sub-issue edges, workflow labels, blocker links, and ready-leaf
+  state agree with issue prose.
+- Backlog grooming produces a baseline/closure/hierarchy/decision/ready/blocker
+  receipt.
 
 ## Advocate
 
@@ -73,6 +86,12 @@ When this domain changes, check:
 - Preserve stale plans without status updates.
 - Duplicate open-issue scope, checklists, or proof in repo files when the
   GitHub issue already carries them.
+- Mark a saga, epic, or implementation epic `ready`.
+- Track child completion with markdown issue checklists instead of GitHub
+  sub-issues.
+- Reuse a completed issue number for newly discovered residual scope.
+- Close work from a PR mention or body checkbox without checking current
+  implementation and acceptance evidence.
 
 ## Own
 

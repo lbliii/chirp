@@ -1,6 +1,6 @@
 name: RFC / research
 description: Design exploration — not shipped behavior until promoted to implementation children
-title: "[P3] RFC: "
+title: "RFC: "
 labels:
   - rfc
   - research
@@ -8,9 +8,16 @@ body:
   - type: markdown
     attributes:
       value: |
-        **Status:** Research until promoted on GitHub (`ready` label or `implementation-epic` children).
+        **Status:** This is a research/decision leaf. Apply `ready` only when
+        the research itself is immediately actionable.
 
-        **Tracking:** Accepted RFC prose lives in `docs/rfcs/`. This issue tracks the decision — not duplicate scope in repo files.
+        **Tracking:** Accepted RFC prose lives in `docs/rfcs/`. The parent field
+        is descriptive only; attach this issue through GitHub's actual
+        sub-issue relationship.
+
+        **Closure:** Record an approved/rejected/deferred/superseded decision.
+        If approved, create a separate implementation epic and bounded task
+        children, attach them to the proper saga, then close this RFC.
 
         Horizon parent: [#335](https://github.com/lbliii/chirp/issues/335) · [`docs/backlog-automation.md`](https://github.com/lbliii/chirp/blob/main/docs/backlog-automation.md)
 
@@ -21,6 +28,18 @@ body:
       options:
         - P2
         - P3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: execution_state
+    attributes:
+      label: Research state
+      description: Research may be ready even though implementation is not approved.
+      options:
+        - Ready to research now
+        - Blocked by an internal issue
+        - Blocked by an upstream or external event
     validations:
       required: true
 
@@ -52,7 +71,7 @@ body:
     id: depends_on
     attributes:
       label: Depends on
-      description: Issues or shipped foundation required before this RFC can close.
+      description: Blocking issues/upstreams plus the exact condition for revisiting this RFC.
     validations:
       required: false
 
@@ -79,11 +98,12 @@ body:
     id: success_criteria
     attributes:
       label: Success criteria
-      description: Promotion gate — RFC accepted and implementation children opened.
+      description: Decision gate — evidence and disposition recorded; implementation moves to separate issues.
       placeholder: |
-        - [ ] RFC merged to `docs/rfcs/`
-        - [ ] Steward sign-off recorded
-        - [ ] Implementation epic + task sub-issues opened with proof commands
+        - RFC merged to `docs/rfcs/`
+        - Steward sign-off and decision receipt recorded
+        - Approved: implementation epic/tasks created and attached
+        - Rejected/deferred: rationale and revisit trigger recorded
     validations:
       required: true
 

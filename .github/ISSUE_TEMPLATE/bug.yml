@@ -8,7 +8,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        **Closure:** `Closes #N` must ship `@pytest.mark.issue(N)` regression test(s). See [`docs/backlog-automation.md`](https://github.com/lbliii/chirp/blob/main/docs/backlog-automation.md).
+        **Closure:** `Closes #N` must ship `@pytest.mark.issue(N)` regression
+        proof. A non-testable exception must be issue-qualified:
+        `Acceptance #N: n/a (<reason>)`.
 
         Include a minimal repro — failing test, example, or exact steps.
 
@@ -28,6 +30,7 @@ body:
     id: parent
     attributes:
       label: Parent epic (if any)
+      description: Descriptive reference only; attach this bug as an actual GitHub sub-issue after creation.
       placeholder: "#585"
     validations:
       required: false

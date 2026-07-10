@@ -8,9 +8,17 @@ body:
   - type: markdown
     attributes:
       value: |
-        **Tracking:** GitHub issues are authoritative. Create **epics as sub-issues** — not markdown task lists in this body.
+        **Tracking:** GitHub issues are authoritative. Create epics and attach
+        them through GitHub's actual sub-issue relationship. Body links and
+        markdown task lists do not create hierarchy.
 
-        **Closure:** Sagas close when their epic children close. PRs should use `Advances-Epic: #N` on epics; reserve `Closes #N` for leaf tasks.
+        **Workability:** Never label a saga `ready`. Every unblocked workstream
+        needs a ready leaf; blocked workstreams name the blocker and revisit
+        trigger.
+
+        **Closure:** Sagas close when actual epic children and saga-level
+        release gates close. PRs use `Advances-Epic: #N`; reserve `Closes #N`
+        for leaves.
 
         Read [`docs/backlog-automation.md`](https://github.com/lbliii/chirp/blob/main/docs/backlog-automation.md).
 
@@ -26,7 +34,7 @@ body:
     id: program_dependency
     attributes:
       label: Program dependencies
-      description: Cross-repo blockers, upstream sagas, or sequencing gates.
+      description: Blocking issue/upstream plus the exact condition that makes this actionable.
       placeholder: |
         Milo foundation: https://github.com/lbliii/milo-cli/issues/72
         Compiler saga #503 must be closed before public inspection work ships.
@@ -49,7 +57,7 @@ body:
     id: workstreams
     attributes:
       label: Workstreams
-      description: Epic-sized themes to open as sub-issues. Link issue numbers after creating them.
+      description: Epic-sized themes only. Track created epics in the GitHub sub-issue panel, not a body checklist.
     validations:
       required: true
 

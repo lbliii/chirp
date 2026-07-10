@@ -8,7 +8,9 @@ body:
       value: |
         **Tracking:** This issue body is the task spec. Repo planning files only link here.
 
-        **Closure:** `Closes #N` requires `@pytest.mark.issue(N)` test(s) — or `Acceptance: n/a (reason)` in the PR for docs-only work. See [`docs/backlog-automation.md`](https://github.com/lbliii/chirp/blob/main/docs/backlog-automation.md).
+        **Closure:** `Closes #N` requires `@pytest.mark.issue(N)` proof or an
+        issue-qualified exemption such as
+        `Acceptance #N: n/a (docs-only; no runtime behavior)`.
 
         Set title to `Task: …` and add a `priority:P*` label (or legacy `P*`) matching the dropdown below.
 
@@ -24,11 +26,23 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: execution_state
+    attributes:
+      label: Execution state
+      description: Select Ready only when dependencies and required approvals are satisfied; apply the matching workflow label after creation.
+      options:
+        - Ready now
+        - Blocked by an internal issue
+        - Blocked by an upstream or external event
+    validations:
+      required: true
+
   - type: input
     id: parent
     attributes:
       label: Parent epic
-      description: Epic or saga this task burns down.
+      description: Descriptive reference; attach this task as an actual GitHub sub-issue after creation.
       placeholder: "#337"
     validations:
       required: true
@@ -37,12 +51,20 @@ body:
     id: depends_on
     attributes:
       label: Depends on
-      description: Other issues that must land first. Link issue numbers explicitly.
+      description: Blocking issues only. This task cannot be `ready` until they close. Write `None` when unblocked.
       placeholder: |
         - #652 topology projection
         - #647 intent capture
     validations:
       required: false
+
+  - type: textarea
+    id: revisit_trigger
+    attributes:
+      label: Blocker / revisit trigger
+      description: For blocked work, name the blocker, the exact condition that clears it, and the first action after unblock. Write `None` when ready.
+    validations:
+      required: true
 
   - type: input
     id: rfc
@@ -58,6 +80,14 @@ body:
     attributes:
       label: Outcome
       description: One sentence — what is true when this issue closes?
+    validations:
+      required: true
+
+  - type: textarea
+    id: next_action
+    attributes:
+      label: Immediate next action
+      description: The first concrete action an agent can take without another design decision.
     validations:
       required: true
 
@@ -113,6 +143,6 @@ body:
     id: approval
     attributes:
       label: Dependencies / approval
-      description: RFC sign-off, design check-in, or maintainer decision required before implementation?
+      description: Required approval or decision plus its owner and revisit trigger. This task cannot be `ready` while unresolved.
     validations:
       required: false
