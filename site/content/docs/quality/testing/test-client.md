@@ -36,7 +36,10 @@ The `TestClient` is an async context manager. It handles app startup/shutdown li
 
 ## HTTP Methods
 
-Every method accepts a `headers=` dict. `post()` also takes `data=` (form-encoded), `json=` (JSON body), or raw `body=` bytes; `put()` and `delete()` take only `headers=` and (for `put`) `body=`.
+Every method accepts a `headers=` dict. `post()` takes `data=` (form-encoded),
+`json=` (JSON body), or raw `body=` bytes. Experimental HTTP QUERY routes use
+`query()` with the same body encodings, but reject mixed body sources. `put()`
+and `delete()` take only `headers=` and (for `put`) `body=`.
 
 ```python
 async def test_methods():
@@ -55,6 +58,12 @@ async def test_methods():
         # POST with form data
         response = await client.post("/login", data={"username": "alice", "password": "secret"})
 
+        # Safe, body-bearing HTTP QUERY with form data
+        response = await client.query(
+            "/search",
+            data={"category": "books", "year": "2026"},
+        )
+
         # PUT with a raw body (put() has no json= / data= shortcut)
         import json
         response = await client.put(
@@ -67,6 +76,22 @@ async def test_methods():
         response = await client.delete("/users/1")
         assert response.status == 200
 ```
+
+`query()` accepts exactly one of `body=`, `data=`, or `json=` and delegates to
+the same ASGI request path as `request("QUERY", ...)`. Form data is encoded as
+`application/x-www-form-urlencoded`; JSON is encoded as `application/json`.
+For raw bytes, declare the route's media type explicitly:
+
+```python
+response = await client.query(
+    "/search",
+    body=b"category=books&year=2026",
+    headers={"Content-Type": "application/x-www-form-urlencoded"},
+)
+```
+
+See [[docs/build-apps/pages-navigation/http-query|Experimental HTTP QUERY]] for
+route declarations, GET fallbacks, and deployment constraints.
 
 ## Fragment Requests
 

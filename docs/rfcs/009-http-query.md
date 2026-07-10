@@ -125,9 +125,10 @@ as **experimental early-adopter HTTP QUERY support** because request/response
 enforcement, typed rendering, explicit body-aware cache opt-in, and the tested
 browser/server/proxy matrix are executable.
 
-Stable or first-class promotion is not approved. Filesystem/test-client
-ergonomics (#527), declarative htmx transport (#528), and complete static
-wiring diagnostics (#533) remain open. The canonical complex-search example
+Stable or first-class promotion is not approved. The `TestClient.query()`
+convenience from #527 is implemented, while filesystem ergonomics (#527),
+and declarative htmx transport (#528) remain open. Complete static wiring
+diagnostics (#533) are implemented. The canonical complex-search example
 (#534) now supplies the programmatic htmx and JavaScript-disabled GET proof.
 The canonical adoption guide is
 [`docs/http-query.md`](../http-query.md). It preserves the deployment caveats,

@@ -186,6 +186,12 @@ evidence helpers. They consume real debug responses, correlate them with opaque
 compiled transition IDs, and report only caller-declared coverage expectations;
 they do not replace browser behavior tests.
 
+`TestClient.query(path, *, headers=None, body=None, data=None, json=None)` is the
+public convenience for experimental HTTP QUERY routes. It accepts exactly one
+body source, applies the existing POST form/JSON encodings, and delegates to
+the ordinary ASGI `TestClient.request("QUERY", ...)` path. `TestClient` remains
+exported from `chirp.testing`; no new top-level `chirp` name is added.
+
 ## `chirp.security` Module Surface
 
 A few public helpers live on the `chirp.security` module rather than the top-level
