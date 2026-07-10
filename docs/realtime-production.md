@@ -90,24 +90,37 @@ Production rules:
   catches a binding with no producer — the dead-binding class where an element
   never updates; `signal_orphan` (INFO) catches a producer no template displays.
 
-### Single-process constraint
+### Memory or Redis backplane
 
-The signal bus is in-process memory and the `/_chirp/live` connection is pinned to
-the worker that accepted it, so the single-node `signal()` primitive that ships
-today is **single-process only**: run `workers=1` and `worker_mode="async"`. With
-multiple OS-process workers each holds a separate copy of the bus and value cache —
-a push on one worker is invisible to bindings served by another, and the long-lived
-connection ties up a worker so page loads that land there can stall.
+With no `redis_url`, signals use process-local memory. Run that shape with
+`workers=1`; `app.check()` reports `signal_bus_single_worker` when an effective
+multi-worker launch would strand clients on another process. In production or
+`chirp check --deploy` it is an `ERROR`; staging and an explicit multi-worker
+development launch receive a `WARNING`.
 
-This is correct for a single-user demo, an internal tool, or any one-process
-deployment. **Multi-worker realtime needs a shared bus backplane** (Redis /
-Postgres pub-sub) plus an external state store so every worker sees the same emits
-and current values. The private multi-worker memory/Redis data plane has an
-accepted design but is not shipped — see
-[`RFC 023`](rfcs/023-private-signal-backplane.md); the surface is
-classified **Provisional** in `docs/public-api.md` until it lands. If you need
-cross-worker realtime today, use an `EventStream` over a product-owned durable
-cursor (see *Event Identity And Replay* below), where your store is the backplane.
+For multi-worker fan-out, configure the existing private Redis selection:
+
+```python
+app = App(AppConfig(
+    workers=4,
+    redis_url="redis://redis.internal:6379/0",
+    secret_key=os.environ["CHIRP_SECRET_KEY"],
+))
+```
+
+Install `chirp[redis]`, or set `CHIRP_REDIS_URL` and `CHIRP_SECRET_KEY` through
+the environment. An imperative `app.emit()` renders on the emitting instance
+and publishes client-neutral HTML to exact opaque subjects; receiving workers
+do not mutate raw caches or recompute derived values. Session audience keys stay
+in trusted server state and never appear in `/_chirp/live` URLs; register both
+`SessionMiddleware` and `SessionSignalMiddleware` for session-scoped signals.
+
+Redis Pub/Sub is an at-most-once wake-up/data plane, not the source of truth.
+There is no replay, cursor, internal reconnect loop, distributed source leader,
+or distributed `kick_user`. Keep signal state in a shared store for request-time
+SSR, let EventSource open a fresh authorized request after disconnect, and use a
+durable product-owned `EventStream` cursor when replay is required. Connection-
+owned `source=` generators remain local and do not republish through Redis.
 
 ## Event Identity And Replay
 

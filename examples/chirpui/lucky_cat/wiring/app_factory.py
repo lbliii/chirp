@@ -37,9 +37,7 @@ config = replace(
 
 app = App(config=config)
 
-# Signal fan-out seam — routes publish through the backplane instead of calling
-# app.emit directly so a Redis adapter can wake every worker's /_chirp/live
-# connection when workers>1 (see backplane.RedisBackplane skeleton).
+# Signal publication seam; App.emit owns memory/Redis transport (DESIGN.md §7).
 bind_emit(app.emit)
 
 

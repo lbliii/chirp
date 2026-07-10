@@ -545,8 +545,10 @@ class TestGlobals:
             render("alpha", "visitor-a"),
             render("beta", "visitor-b"),
         )
-        assert alpha == '<div hx-sse:connect="/_chirp/live?topics=alpha&aud=visitor-a">'
-        assert beta == '<div hx-sse:connect="/_chirp/live?topics=beta&aud=visitor-b">'
+        assert alpha == '<div hx-sse:connect="/_chirp/live?topics=alpha">'
+        assert beta == '<div hx-sse:connect="/_chirp/live?topics=beta">'
+        assert "visitor-a" not in alpha
+        assert "visitor-b" not in beta
 
     @pytest.mark.issue(544)
     async def test_htmx4_page_has_no_js_ssr_seed_and_one_scoped_connection(
@@ -631,6 +633,66 @@ class TestGlobals:
 
 
 class TestLiveStream:
+    @pytest.mark.issue(699)
+    async def test_live_route_rejects_forged_audience_and_unknown_topics(self) -> None:
+        app = App(config=AppConfig())
+
+        @app.signal("balance")
+        async def balance():
+            if False:
+                yield 0
+
+        async with TestClient(app) as client:
+            forged = await client.get("/_chirp/live?topics=balance&aud=visitor-a")
+            unknown = await client.get("/_chirp/live?topics=ghost")
+            empty = await client.get("/_chirp/live?topics=")
+        assert forged.status == 400
+        assert unknown.status == 400
+        assert empty.status == 400
+        assert "visitor-a" not in forged.text
+
+    @pytest.mark.issue(699)
+    async def test_live_route_authorizes_session_topics_from_server_state(self) -> None:
+        from chirp.middleware.session_signals import (
+            SessionSignalConfig,
+            SessionSignalMiddleware,
+        )
+
+        app = App(config=AppConfig())
+
+        @app.signal("balance", audience="session")
+        async def balance():
+            yield 42
+            await asyncio.sleep(1)
+
+        app.add_middleware(
+            SessionSignalMiddleware(
+                SessionSignalConfig(
+                    app=app,
+                    audience_key=lambda: "visitor-a",
+                    seeds={},
+                    require_authenticated=False,
+                )
+            )
+        )
+        async with TestClient(app) as client:
+            result = await client.sse("/_chirp/live?topics=balance", max_events=1)
+        assert result.status == 200
+        assert [(event.event, event.data) for event in result.events] == [("balance", "42")]
+
+    @pytest.mark.issue(699)
+    async def test_live_route_rejects_unauthorized_session_topic(self) -> None:
+        app = App(config=AppConfig())
+
+        @app.signal("balance", audience="session")
+        async def balance():
+            if False:
+                yield 0
+
+        async with TestClient(app) as client:
+            response = await client.get("/_chirp/live?topics=balance")
+        assert response.status == 403
+
     async def test_stream_emits_named_event_on_emit(self) -> None:
         reg = SignalRegistry()
         reg.register(SignalSpec(name="balance", initial=lambda: 0))
@@ -1017,11 +1079,27 @@ class TestSignalScopeCheck:
         assert "SessionMiddleware" in issues[0].message
 
     def test_session_scoped_signal_with_session_middleware_passes(self) -> None:
+        from chirp.middleware.session_signals import (
+            SessionSignalConfig,
+            SessionSignalMiddleware,
+        )
         from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
         mw = SessionMiddleware(SessionConfig(secret_key="test"))
-        issues = check_signal_scope([mw], frozenset({"balance", "notifications"}))
+        signal_mw = SessionSignalMiddleware(
+            SessionSignalConfig(app=object(), audience_key=lambda: "visitor", seeds={})
+        )
+        issues = check_signal_scope([mw, signal_mw], frozenset({"balance", "notifications"}))
         assert issues == []
+
+    @pytest.mark.issue(699)
+    def test_session_scoped_signal_requires_server_audience_middleware(self) -> None:
+        from chirp.middleware.sessions import SessionConfig, SessionMiddleware
+
+        mw = SessionMiddleware(SessionConfig(secret_key="test"))
+        issues = check_signal_scope([mw], frozenset({"balance"}))
+        assert len(issues) == 1
+        assert "SessionSignalMiddleware" in issues[0].message
 
     def test_no_session_signals_skips_check(self) -> None:
         issues = check_signal_scope([], frozenset())
@@ -1036,6 +1114,10 @@ class TestSignalScopeCheck:
 
     def test_app_check_catches_missing_session_middleware(self) -> None:
         from chirp.contracts import check_hypermedia_surface
+        from chirp.middleware.session_signals import (
+            SessionSignalConfig,
+            SessionSignalMiddleware,
+        )
         from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
         app = App(config=AppConfig())
@@ -1046,6 +1128,11 @@ class TestSignalScopeCheck:
                 yield 0
 
         app.add_middleware(SessionMiddleware(SessionConfig(secret_key="test")))
+        app.add_middleware(
+            SessionSignalMiddleware(
+                SessionSignalConfig(app=app, audience_key=lambda: "visitor", seeds={})
+            )
+        )
         app.freeze()
         assert not [
             i

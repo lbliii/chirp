@@ -1,6 +1,6 @@
 # RFC 023: Private multi-worker signal backplane
 
-**Status:** Accepted design; not implemented
+**Status:** Implemented by runtime child #699
 
 **Decision issue:** [#678](https://github.com/lbliii/chirp/issues/678)
 
@@ -10,9 +10,9 @@
 
 **Last audited:** 2026-07-10
 
-**Shipping impact:** None. This RFC records the private runtime contract and
-proof plan. It does not add a `SignalBus` export, an `AppConfig` field, a public
-setter, a Redis adapter, a contract category, or multi-worker behavior.
+**Shipping impact:** The private memory/Redis runtime, server-authorized routing,
+and `signal_bus_single_worker` contract ship without a `SignalBus` export, new
+`AppConfig` field, public setter, or custom adapter hook.
 
 ## Summary
 
@@ -41,15 +41,15 @@ The accepted boundary is deliberately narrow:
 - production `app.check()` fails when registered signals use the process-local
   backplane with an effective multi-worker launch posture.
 
-## Current implementation audit
+## Pre-implementation audit
 
-`SignalRegistry.bus` is currently a `ReactiveBus`. `SignalRegistry.emit()`
+Before #699, `SignalRegistry.bus` was only a `ReactiveBus`. `SignalRegistry.emit()`
 stores a raw value, emits a marker, and the SSE drain reads the latest local
 cache value before rendering. This makes one slow local subscriber converge on
 the latest cached value, but a remote process has neither the marker's cache nor
 the rendered value.
 
-The `/_chirp/live` route currently accepts public `topics=` and `aud=` query
+The old `/_chirp/live` route accepted public `topics=` and `aud=` query
 parameters. `signal_connect()` writes the raw session audience key into the
 browser URL, and the route trusts that value. Unknown requested topics fall
 back to subscribe-all. That shape is not accepted for a broker boundary. The

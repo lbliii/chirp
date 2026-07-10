@@ -158,7 +158,8 @@ original origin.
 | `signal_raw_marker` | INFO | Prefer `{{ signal_bind('x') }}` over a hand-written htmx 4 `data-chirp-signal="x"` marker so topic scoping stays exact. |
 | `signal_orphan` | INFO | Bind the registered signal with `signal()`/`signal_block()` in a template, or remove the unused producer. An orphan signal is produced but never displayed. |
 | `signal_connect_budget` | INFO | Merge multiple persistent `/_chirp/live` scopes into one `signal_connect()` wrapper — browsers cap concurrent SSE connections per origin (HTTP/1.1 footgun). |
-| `signal_scope` | ERROR / WARNING | Register `SessionMiddleware` before using `audience="session"` signals so each connection can resolve its `/_chirp/live?aud=…` key. WARNs when a derived signal depends on both global and session-scoped deps — verify the mixed dependency graph is intentional. |
+| `signal_scope` | ERROR / WARNING | Register `SessionMiddleware` and `SessionSignalMiddleware` before using `audience="session"` signals so each connection can resolve its trusted server-side audience without putting the key in the browser URL. WARNs when a derived signal depends on both global and session-scoped deps — verify the mixed dependency graph is intentional. |
+| `signal_bus_single_worker` | ERROR / WARNING | Use `workers=1` for the process-local memory backplane, or configure `redis_url` / `CHIRP_REDIS_URL` and shared signal state before a multi-worker launch. Production and `--deploy` ERROR; staging and explicit multi-worker development WARNING. |
 
 ## Forms, Commands, And Safety
 

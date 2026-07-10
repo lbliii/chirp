@@ -31,6 +31,7 @@ from chirp.contracts.rules_sse import (
 from chirp.contracts.types import ContractIssue, Severity
 
 _SESSION_MIDDLEWARE = "SessionMiddleware"
+_SESSION_SIGNAL_MIDDLEWARE = "SessionSignalMiddleware"
 
 #: Path of the merged signal stream (kept in sync with signal_globals).
 SIGNAL_STREAM_PATH = "/_chirp/live"
@@ -240,18 +241,25 @@ def check_signal_scope(
     """
     if not session_signal_names:
         return []
-    has_session = any(type(mw).__name__ == _SESSION_MIDDLEWARE for mw in middleware_list)
-    if has_session:
+    middleware_names = {type(mw).__name__ for mw in middleware_list}
+    missing = [
+        name
+        for name in (_SESSION_MIDDLEWARE, _SESSION_SIGNAL_MIDDLEWARE)
+        if name not in middleware_names
+    ]
+    if not missing:
         return []
     names = ", ".join(sorted(session_signal_names))
+    required = " and ".join(missing)
     return [
         ContractIssue(
             severity=Severity.ERROR,
             category="signal_scope",
             message=(
-                f"Session-scoped signal(s) ({names}) require SessionMiddleware "
-                "so each connection can resolve its audience key for "
-                "/_chirp/live?aud=…. Register SessionMiddleware before using "
+                f"Session-scoped signal(s) ({names}) require {required} "
+                "so each connection can authorize its trusted server-side audience "
+                "for /_chirp/live. Register both SessionMiddleware and "
+                "SessionSignalMiddleware before using "
                 "audience='session' signals."
             ),
         )

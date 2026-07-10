@@ -8,13 +8,14 @@ _ROOT = Path(__file__).resolve().parents[2]
 _RFC = _ROOT / "docs" / "rfcs" / "023-private-signal-backplane.md"
 
 
-@pytest.mark.issue(678)
-def test_signal_backplane_rfc_is_accepted_but_non_shipping() -> None:
+@pytest.mark.issue(699)
+def test_signal_backplane_rfc_records_private_shipping_boundary() -> None:
     text = _RFC.read_text(encoding="utf-8")
     normalized = " ".join(text.split())
 
-    assert "**Status:** Accepted design; not implemented" in text
-    assert "**Shipping impact:** None" in text
+    assert "**Status:** Implemented by runtime child #699" in text
+    assert "private memory/Redis runtime" in normalized
+    assert "without a `SignalBus` export" in normalized
     assert "no `AppConfig.signal_bus`" in normalized
     assert "no `app.set_signal_bus()`" in normalized
     assert "no exported or `runtime_checkable` protocol" in normalized

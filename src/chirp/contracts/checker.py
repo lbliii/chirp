@@ -432,6 +432,9 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         signal_names=_signal_names(app),
         schema=schema,
         _hypermedia_program=getattr(app._runtime_state, "hypermedia_program", None),
+        _signal_backplane_descriptor=getattr(
+            app._runtime_state, "_signal_backplane_descriptor", None
+        ),
     )
 
 
@@ -518,6 +521,15 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
     result.issues.extend(check_plugin_quarantine(snapshot.plugin_quarantines))
     result.issues.extend(check_debug_wiring(snapshot.debug_wiring))
     result.issues.extend(check_template_declarations(snapshot._hypermedia_program))
+    from chirp.contracts.rules_signal_backplane import check_signal_bus_single_worker
+
+    result.issues.extend(
+        check_signal_bus_single_worker(
+            posture_config,
+            snapshot._signal_backplane_descriptor,
+            snapshot.signal_names,
+        )
+    )
 
     referenced_templates_from_routes, referenced_route_paths = _route_prepass(
         router, kida_env, result

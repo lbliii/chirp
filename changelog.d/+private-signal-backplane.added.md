@@ -1,0 +1,1 @@
+Signals now select a private Redis Pub/Sub backplane from `AppConfig.redis_url`, authorize session topics from server state, and diagnose unsafe process-local multi-worker launches with `signal_bus_single_worker`.

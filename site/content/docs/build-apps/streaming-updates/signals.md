@@ -209,7 +209,8 @@ template either opens the connect itself or is composed under a layout that does
 `signal_connect()` emits an opening legacy
 `<div hx-ext="sse" sse-connect="/_chirp/live" hx-disinherit="hx-target hx-swap">`
 (or `<div hx-sse:connect="/_chirp/live">` on the exact htmx 4 preview)
-(session-scoped signals append `?aud=<key>` — see below). htmx binds `sse-swap`
+with public `topics=` names when bindings are scoped. Session audience keys stay
+in trusted server state and never appear in this URL. htmx binds `sse-swap`
 via `querySelectorAll`, which excludes the connect element itself, so every sink
 must be a *descendant* of the wrapper.
 
@@ -241,14 +242,15 @@ async def deposit(request: Request):
 ```
 
 `emit` takes an `audience_key` (the visitor's session store key) for session
-signals; `signal_connect()` renders the tier's connection attribute with
-`/_chirp/live?aud=<key>` so the
-bus fans that emit only to the matching connection.
+signals. `SessionSignalMiddleware` binds the same trusted server-side identity
+for the SSE request; client-supplied `aud` parameters are rejected, so the bus
+fans the emit only to an authorized matching connection without exposing the key.
 
 :::{note}
-Session-scoped signals resolve their audience key from the session, so they
-require `SessionMiddleware`. Without it the key is never available and per-visitor
-fan-out silently breaks — `app.check()` raises this as a `signal_scope` ERROR (see
+Session-scoped signals resolve their audience key from trusted server state, so
+they require `SessionMiddleware` plus `SessionSignalMiddleware`. Without that
+pair the key is never authorized and per-visitor fan-out fails closed —
+`app.check()` raises this as a `signal_scope` ERROR (see
 [[docs/quality/contracts-debugging/categories|Contract Categories]]).
 :::
 
@@ -389,11 +391,10 @@ one-shot CSS animation class only on values whose direction actually changed
 animation, so only real movement flashes.
 :::
 
-## Production constraint — single-process only
+## Production backplane — memory or Redis
 
-The signal bus is **in-process memory**, and the `/_chirp/live` SSE connection is
-pinned to the worker that accepted it. The single-node `signal()` primitive that
-ships today is **single-process only**:
+Without `redis_url`, the signal bus is **in-process memory**, and the
+`/_chirp/live` SSE connection is pinned to the worker that accepted it:
 
 :::{warning}
 - **Run `workers=1`.** With multiple OS-process workers, each holds a *separate*
@@ -407,16 +408,17 @@ ships today is **single-process only**:
   Worker Mode.)
 :::
 
-This is the right shape for a single-user demo, an internal tool, or any app you
-deploy as one process. **Multi-worker realtime needs a shared bus backplane**
-(Redis / Postgres pub-sub) plus an external state store, so every worker sees the
-same emits and the same current values. That pluggable multi-worker bus is
-designed but not yet shipped.
+For multi-worker fan-out, install `chirp[redis]` and set `redis_url` /
+`CHIRP_REDIS_URL` plus a shared non-empty `secret_key` / `CHIRP_SECRET_KEY`.
+Chirp renders imperative emits on the emitting worker and publishes the rendered
+HTML over exact opaque Redis subjects. Redis Pub/Sub is at-most-once: it adds no
+replay, broker retry loop, durable append delivery, distributed source leader,
+or distributed `kick_user`. Keep SSR state in a shared store and use a
+product-owned durable `EventStream` cursor when replay is required.
 
-If you need realtime across workers *today*, use product-owned transport: an
-`EventStream` reading a durable cursor (a database sequence, a queue offset) per
-the [[docs/build-apps/streaming-updates/server-sent-events|Server-Sent Events]]
-replay pattern, where the backplane is your store rather than an in-process bus.
+`app.check()` reports `signal_bus_single_worker` when process-local signals meet
+an unsafe worker posture. Production and `--deploy` treat it as an `ERROR`;
+staging and explicit multi-worker development treat it as a `WARNING`.
 
 ## Contract validation
 

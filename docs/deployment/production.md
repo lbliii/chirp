@@ -134,11 +134,15 @@ That is a **demo boundary**, not a framework ceiling.
 |---------|--------------------------|------------|
 | Workers | `1` | `N` with shared signal backplane |
 | State | In-process stores | External source of truth |
-| Signals | In-process fan-out | Shared bus (Redis adapter, etc.) |
+| Signals | In-process fan-out | Private Redis backplane via `redis_url` |
 | Secret | Dev fallback in `development` | Required `CHIRP_SECRET_KEY` |
 
 See `examples/chirpui/lucky_cat/DESIGN.md` §7 and `backplane.py`. Published
 copy: [production deployment — demo vs production](https://lbliii.github.io/chirp/docs/quality/deployment/production/).
+
+For framework signals, install `chirp[redis]` and set `CHIRP_REDIS_URL` plus a
+shared `CHIRP_SECRET_KEY`. Redis carries rendered live updates at-most-once;
+keep the source-of-truth state in an external store for SSR and reconnects.
 
 ## Realtime And Compression
 

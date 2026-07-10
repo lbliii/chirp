@@ -110,6 +110,10 @@ class LifecycleCoordinator:
 
                         await migrate(self._state.db, self._state.migrations_dir)
 
+            signal_registry = self._state.signal_registry
+            if signal_registry is not None and not signal_registry.empty:
+                await signal_registry.start_backplane()
+
             settings_registry = self._state.settings_registry
             if settings_registry is not None and not settings_registry.empty:
                 store = settings_registry.store
@@ -127,6 +131,11 @@ class LifecycleCoordinator:
             # monotonic for a process life (reset only on shutdown).
             self._state.ready = True
         except Exception:
+            signal_registry = self._state.signal_registry
+            if signal_registry is not None:
+                # silent: preserve the original startup failure after best-effort cleanup.
+                with contextlib.suppress(Exception):
+                    await signal_registry.close_backplane()
             if db_connected and self._state.db is not None:
                 with contextlib.suppress(Exception):
                     await self._state.db.disconnect()
@@ -140,6 +149,9 @@ class LifecycleCoordinator:
         self._state.ready = False
         for hook in self._state.shutdown_hooks:
             await _run_hook(hook)
+        signal_registry = self._state.signal_registry
+        if signal_registry is not None:
+            await signal_registry.close_backplane()
         if self._state.db is not None:
             await self._state.db.disconnect()
         self._state.tool_events.close()

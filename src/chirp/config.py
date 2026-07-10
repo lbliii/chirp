@@ -6,7 +6,7 @@ no string-key dict lookups.
 
 import os
 import warnings
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -155,7 +155,7 @@ class AppConfig:
     dev_browser_reload: bool | None = None
 
     # Security
-    secret_key: str = ""
+    secret_key: str = field(default="", repr=False)
     allowed_hosts: tuple[str, ...] = ("*",)
     csp_nonce_enabled: bool = False
     strict_transport_security: str | None = None
@@ -359,7 +359,7 @@ class AppConfig:
 
     # Enterprise scale (12-factor, observability, shared state)
     env: str = "development"  # development | staging | production
-    redis_url: str | None = None
+    redis_url: str | None = field(default=None, repr=False)
     audit_sink: str | None = "log"  # "log" | "none" | custom
     feature_flags: tuple[tuple[str, bool], ...] = ()  # (name, value) pairs
     http_timeout: float = 30.0

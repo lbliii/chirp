@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 import re
+import secrets
 import threading
 from collections.abc import AsyncIterator, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
@@ -36,6 +37,14 @@ from typing import Any, Literal
 
 from chirp.pages.reactive.bus import ReactiveBus
 from chirp.pages.reactive.events import ChangeEvent
+from chirp.realtime.events import _SignalUpdate
+from chirp.realtime.signal_backplane import (
+    _SignalBackplaneCoordinator,
+    _SignalBackplaneDescriptor,
+    _SignalBackplaneError,
+    _SignalBackplanePlan,
+    signal_subject,
+)
 
 SignalAudience = Literal["global", "session"]
 
@@ -49,6 +58,11 @@ _SIGNAL_NAME_RE = re.compile(r"^[A-Za-z0-9_.:-]+$")
 #: Bus scope prefix so signal fan-out never collides with reactive-document
 #: scopes sharing the same ``ReactiveBus`` family of keys.
 _SCOPE_PREFIX = "signal:"
+
+# Process-private key keeps session identifiers out of ReactiveBus scopes and
+# therefore out of its bounded-drop diagnostics. Memory subjects need only be
+# stable inside this process; Redis subjects use AppConfig.secret_key instead.
+_MEMORY_SUBJECT_KEY = secrets.token_bytes(32)
 
 
 def validate_signal_name(name: str) -> str:
@@ -87,8 +101,9 @@ class SignalSpec:
             a stale update under back-pressure is safe — the next emit reconciles
             every binding. Set ``False`` for append-style / drop-sensitive topics.
         audience: ``"global"`` (default) fans to every connection; ``"session"``
-            fans only to connections whose ``/_chirp/live?aud=…`` matches the
-            emit ``audience_key`` (per-visitor state — balance, notifications).
+            fans only to connections whose trusted server-side session audience
+            matches the emit ``audience_key`` (per-visitor state — balance,
+            notifications). The key is never placed in the browser URL.
     """
 
     name: str
@@ -149,11 +164,15 @@ class SignalRegistry:
     #: signal name -> dependent derived names (reverse index for recompute).
     _dependents: dict[str, set[str]] = field(default_factory=dict)
     #: (audience_key, name) -> last value. ``audience_key`` is ``""`` for global.
-    _values: dict[tuple[str, str], Any] = field(default_factory=dict)
+    _values: dict[tuple[str, str], Any] = field(default_factory=dict, repr=False)
+    #: Emitter-rendered payloads used by the memory stream without re-rendering.
+    _rendered_values: dict[tuple[str, str], str] = field(default_factory=dict, repr=False)
     #: Longest-prefix URL map for proactive topic activation (#317).
     _prefix_topics: dict[str, frozenset[str]] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
     bus: ReactiveBus = field(default_factory=ReactiveBus)
+    _backplane: _SignalBackplaneCoordinator | None = field(default=None, init=False, repr=False)
+    _backplane_bound: bool = field(default=False, init=False, repr=False)
 
     # -- registration (setup-only; called under App._check_not_frozen) --
 
@@ -263,6 +282,60 @@ class SignalRegistry:
         with self._lock:
             return tuple(s for s in self._specs.values() if s.source is not None)
 
+    def bind_backplane(self, plan: _SignalBackplanePlan) -> None:
+        """Bind the freeze-compiled private plan exactly once."""
+        with self._lock:
+            if self._backplane_bound:
+                raise RuntimeError("Signal backplane plan is already bound to this registry.")
+            self._backplane = _SignalBackplaneCoordinator(plan, self.bus)
+            self._backplane_bound = True
+
+    @property
+    def backplane_descriptor(self) -> _SignalBackplaneDescriptor | None:
+        with self._lock:
+            backplane = self._backplane
+        return backplane.descriptor if backplane is not None else None
+
+    @property
+    def distributed(self) -> bool:
+        with self._lock:
+            backplane = self._backplane
+        return backplane.distributed if backplane is not None else False
+
+    async def start_backplane(self) -> None:
+        with self._lock:
+            backplane = self._backplane
+        if backplane is not None:
+            await backplane.start()
+
+    async def close_backplane(self) -> None:
+        with self._lock:
+            backplane = self._backplane
+        if backplane is not None:
+            await backplane.close()
+
+    async def subscribe_backplane(
+        self, names: tuple[str, ...], *, audience_key: str
+    ) -> AsyncIterator[_SignalUpdate]:
+        """Yield rendered remote updates for exact authorized subjects."""
+        with self._lock:
+            backplane = self._backplane
+        if backplane is None or not backplane.distributed:
+            return
+        subjects: dict[str, str] = {}
+        for name in names:
+            audience = self.audience_of(name)
+            aud = audience_key if audience == "session" else ""
+            publication = backplane.publication(
+                name=name,
+                data="",
+                audience=audience,
+                audience_key=aud,
+            )
+            subjects[publication.subject] = name
+        async for update in backplane.subscribe(subjects):
+            yield update
+
     def set_prefix_topics(self, mapping: Mapping[str, Iterable[str]]) -> None:
         """Configure optional URL-prefix → signal topics for proactive activation."""
         normalized: dict[str, frozenset[str]] = {}
@@ -366,6 +439,20 @@ class SignalRegistry:
 
     def emit(self, name: str, value: Any, *, audience_key: str = "") -> None:
         """Publish a new *value* for signal *name* and cascade to derived signals."""
+        self._emit(name, value, audience_key=audience_key, local_only=False)
+
+    def emit_local(self, name: str, value: Any, *, audience_key: str = "") -> None:
+        """Connection-owned source emit that never crosses the Redis backplane."""
+        self._emit(name, value, audience_key=audience_key, local_only=True)
+
+    def _emit(
+        self,
+        name: str,
+        value: Any,
+        *,
+        audience_key: str,
+        local_only: bool,
+    ) -> None:
         audience = self._audience_of(name)
         aud = audience_key if audience == "session" else ""
         if audience == "session" and not aud:
@@ -383,6 +470,19 @@ class SignalRegistry:
                 )
                 raise KeyError(msg)
             spec = self._specs.get(name)
+            backplane = self._backplane
+            if (
+                not local_only
+                and spec is not None
+                and not spec.coalesce
+                and backplane is not None
+                and backplane.distributed
+            ):
+                raise _SignalBackplaneError(
+                    f"Redis-backed signal {name!r} uses coalesce=False, which requires "
+                    "durable append delivery. Use coalesce=True or a single-worker "
+                    "memory backplane."
+                )
             prev_present = key in self._values
             prev = self._values.get(key)
             self._values[key] = value
@@ -391,8 +491,8 @@ class SignalRegistry:
         if coalesce and prev_present and _values_equal(prev, value):
             return
 
-        self._publish(name, value, aud)
-        self._cascade(name, aud)
+        self._publish(name, value, aud, local_only=local_only)
+        self._cascade(name, aud, local_only=local_only)
 
     def seed(self, name: str, value: Any, *, audience_key: str = "") -> None:
         """Set the cached value without fan-out (SSR paint only)."""
@@ -410,7 +510,7 @@ class SignalRegistry:
         # Derived SSR seeds may depend on this — recompute derived cache quietly.
         self._seed_derived(name, aud)
 
-    def _cascade(self, changed: str, audience_key: str) -> None:
+    def _cascade(self, changed: str, audience_key: str, *, local_only: bool) -> None:
         """Recompute + re-emit every derived reachable from *changed*."""
         visited: set[str] = set()
         frontier = [changed]
@@ -451,7 +551,7 @@ class SignalRegistry:
                     self._values[dkey] = derived_value
                 if prev_present and _values_equal(prev, derived_value):
                     continue
-                self._publish(dname, derived_value, dep_aud)
+                self._publish(dname, derived_value, dep_aud, local_only=local_only)
                 frontier.append(dname)
 
     def _seed_derived(self, changed: str, audience_key: str) -> None:
@@ -492,12 +592,30 @@ class SignalRegistry:
                     self._values[_value_key(dname, dep_aud)] = derived_value
                 frontier.append(dname)
 
-    def _publish(self, name: str, value: Any, audience_key: str) -> None:
-        """Render *value* and fan it out as a ``ChangeEvent`` on the bus."""
-        scope = _bus_scope(name, audience_key)
-        self.bus.emit_sync(
-            ChangeEvent(scope=scope, changed_paths=frozenset({_rendered_marker(name)}))
+    def _publish(self, name: str, value: Any, audience_key: str, *, local_only: bool) -> None:
+        """Render once on the emitter, then publish without holding the registry lock."""
+        rendered = self.render_for_emit(name, value)
+        if rendered is None:
+            return
+        audience = self._audience_of(name)
+        with self._lock:
+            backplane = self._backplane
+            self._rendered_values[_value_key(name, audience_key)] = rendered
+        if local_only or backplane is None:
+            self.bus.emit_sync(
+                ChangeEvent(
+                    scope=_bus_scope(name, audience_key),
+                    changed_paths=frozenset({_rendered_marker(name)}),
+                )
+            )
+            return
+        publication = backplane.publication(
+            name=name,
+            data=rendered,
+            audience=audience,
+            audience_key=audience_key,
         )
+        backplane.publish(publication)
 
     def render_for_emit(self, name: str, value: Any) -> str | None:
         """Render *value* for the wire, isolating render failure. ``None`` skips."""
@@ -520,6 +638,13 @@ class SignalRegistry:
         with self._lock:
             return self._values.get(_value_key(name, aud))
 
+    def cached_rendered(self, name: str, *, audience_key: str = "") -> str | None:
+        """Return the last emitter-rendered delivery payload for the memory bus."""
+        audience = self._audience_of(name)
+        aud = audience_key if audience == "session" else ""
+        with self._lock:
+            return self._rendered_values.get(_value_key(name, aud))
+
 
 def _rendered_marker(name: str) -> str:
     """Marker path stored in a ChangeEvent for signal *name*."""
@@ -527,10 +652,16 @@ def _rendered_marker(name: str) -> str:
 
 
 def _bus_scope(name: str, audience_key: str) -> str:
-    """ReactiveBus scope for a signal fan-out."""
-    if audience_key:
-        return f"{_SCOPE_PREFIX}aud:{audience_key}:{name}"
-    return _SCOPE_PREFIX + name
+    """Opaque ReactiveBus scope for a process-local signal fan-out."""
+    if not audience_key:
+        return _SCOPE_PREFIX + name
+    audience: SignalAudience = "session" if audience_key else "global"
+    return signal_subject(
+        _MEMORY_SUBJECT_KEY,
+        audience=audience,
+        audience_key=audience_key,
+        name=name,
+    )
 
 
 def _value_key(name: str, audience_key: str) -> tuple[str, str]:

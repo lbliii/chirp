@@ -6,6 +6,7 @@ request queueing, error tracking, and zero-downtime hot reload.
 
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING, cast
 
 from pounce import ASGIApp
@@ -151,6 +152,23 @@ def run_production_server(
             "Use worker_mode='sync', 'async', or 'auto' until Chirp supports "
             "import-string production launch."
         )
+        raise ConfigurationError(msg)
+    app.freeze()
+    from chirp.contracts.rules_signal_backplane import check_signal_bus_single_worker
+    from chirp.errors import ConfigurationError
+
+    posture = copy.copy(app.config)
+    object.__setattr__(posture, "env", "production")
+    signal_registry = app._mutable_state.signal_registry
+    issues = check_signal_bus_single_worker(
+        posture,
+        app._runtime_state._signal_backplane_descriptor,
+        signal_registry.names if signal_registry is not None else frozenset(),
+        workers=workers,
+    )
+    if issues:
+        issue = issues[0]
+        msg = f"{issue.message}\n{issue.details}"
         raise ConfigurationError(msg)
     from pounce.config import ServerConfig
     from pounce.server import Server

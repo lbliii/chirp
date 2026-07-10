@@ -245,9 +245,9 @@ real production.
 
 | Concern | Demo (Lucky Cat) | Production |
 |---------|------------------|------------|
-| **Workers** | `workers=1` (in-memory state + one `/_chirp/live` pin) | `workers=N` + shared `SignalBackplane` |
+| **Workers** | `workers=1` (in-memory state + one `/_chirp/live` pin) | `workers=N` + `AppConfig(redis_url=...)` |
 | **State** | In-process wallet, trades, notifications, `SimFeed` | External store (DB/Redis) as source of truth |
-| **Signals** | `InProcessBackplane` (default in `backplane.py`) | `RedisBackplane` or equivalent fan-out |
+| **Signals** | Process-local memory through `App.emit` | Chirp private Redis backplane (`chirp[redis]`) |
 | **Secret** | Dev fallback when `env=development` | Required `CHIRP_SECRET_KEY` |
 
 See [`DESIGN.md`](DESIGN.md) §7, [`backplane.py`](backplane.py), and the site
@@ -268,10 +268,9 @@ config = replace(
 - **`workers=1` is the single-process default.** The demo holds *all* state in
   process memory — the wallet, trade store, notifications, the SimFeed, the demo
   account, and the signal bus — and the single `/_chirp/live` connection is pinned
-  to one worker. Scaling to `workers>1` is a **one-class swap**: implement the
-  `SignalBackplane` protocol in `backplane.py` (the in-process default ships
-  today; `RedisBackplane` is stubbed with wiring notes) **and** move stores into
-  an external source-of-truth — the backplane carries fan-out, not ledger state.
+  to one worker. Scaling to `workers>1` requires `CHIRP_REDIS_URL`, a shared
+  `CHIRP_SECRET_KEY`, the `chirp[redis]` extra, **and** moving stores into an
+  external source-of-truth — the backplane carries fan-out, not ledger state.
   Each `@app.derived` signal must stay a *pure* function of its input signal
   values so deriveds stay correct once events cross process boundaries.
 - `CHIRP_SECRET_KEY` signs sessions + CSRF. A dev fallback keeps local runs
@@ -297,7 +296,7 @@ app.py            # App setup: secure stack (Session→Auth→CSRF→SecurityHea
                   #   mutation routes (deposit / trade / cancel / convert / watchlist / notifications-read),
                   #   live signals (balance / ticker / notifications + derived badge & announce),
                   #   per-market SSE stream, /logout, mount_pages
-backplane.py      # SignalBackplane protocol + InProcessBackplane default + RedisBackplane stub
+backplane.py      # App-owned publication seam; App.emit selects memory/Redis transport
 navigation.py     # Route-context nav model: RouteState (path-prefix *_active props) → shell_navigation()
 wallet.py         # In-memory $MEOW wallet; backs /deposit + buys, fans out as the `balance` signal
 trade_store.py    # Thread-safe trade backend: validate + atomic race-safe fills + resting limit orders

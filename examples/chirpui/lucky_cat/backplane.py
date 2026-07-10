@@ -1,19 +1,8 @@
-"""DOMAIN — signal fan-out boundary for Lucky Cat.
+"""DOMAIN — Lucky Cat's mutation-to-signal publication seam.
 
-The ``SignalBackplane`` protocol and the shipped ``InProcessBackplane``
-implementation: a transport-agnostic seam between mutation routes in ``app.py``
-and the framework's ``app.emit`` fan-out over ``/_chirp/live``. Routes call
-``get_backplane().publish(name, value)`` instead of ``app.emit`` directly so a
-production deploy can swap in a shared bus without rewriting handlers.
-
-The default ``InProcessBackplane`` delegates to the bound ``App.emit`` — the
-current single-worker behavior (``workers=1`` in ``app.py``). A ``RedisBackplane``
-skeleton is stubbed for the multi-worker path described in the live-SSE-topics RFC
-§12; wire it when ``workers>1`` and pair it with a shared ``AccountStore`` /
-external state store (the backplane carries notifications, not source-of-truth).
-
-Pure stdlib for the in-process path; ``RedisBackplane`` would reuse
-``chirp[redis]`` when implemented.
+Both adapters delegate to ``App.emit``. Chirp itself selects process-local memory
+or its private Redis data plane from ``AppConfig.redis_url``; this example seam
+keeps route code transport-agnostic while external state remains app-owned.
 """
 
 import os
@@ -30,8 +19,7 @@ class SignalBackplane(Protocol):
     """Transport-agnostic signal fan-out boundary.
 
     ``publish`` pushes a new value for ``name`` to every ``signal(name)``
-    binding. The in-process impl calls ``App.emit``; a Redis impl would
-    ``PUBLISH`` to a shared channel so every worker's SSE connection wakes.
+    binding. Both example adapters call ``App.emit``; Chirp owns transport.
     """
 
     def publish(self, name: str, value: Any, *, audience_key: str = "") -> None:
@@ -50,33 +38,14 @@ class InProcessBackplane:
 
 
 class RedisBackplane:
-    """Stub for multi-worker signal fan-out over Redis pub/sub.
+    """Example label for ``App.emit`` when Chirp's private Redis plane is selected."""
 
-    NOT wired — Lucky Cat pins ``workers=1`` until a shared state store and this
-    backplane are both configured. To enable for ``workers>1``:
-
-    1. Set ``LUCKY_CAT_BACKPLANE=redis`` and provide ``REDIS_URL``.
-    2. Subscribe each worker's merge stream to ``signal:<name>`` channels and
-       call ``App.emit`` on receive (rendered values cross the wire per RFC §12).
-    3. Pair with a shared ``AccountStore`` — the backplane is fan-out transport,
-       not a ledger; wallet balance must live in Redis/Postgres too.
-
-    Reuses the ``chirp[redis]`` extra when implemented.
-    """
-
-    def __init__(self, *, redis_url: str, emit: _EmitFn) -> None:
-        self._redis_url = redis_url
+    def __init__(self, *, emit: _EmitFn) -> None:
         self._emit = emit
-        # self._client = redis.from_url(redis_url)
-        # self._pubsub = self._client.pubsub()
-        # wire subscribe loop -> self._emit(name, value) on each worker
 
     def publish(self, name: str, value: Any, *, audience_key: str = "") -> None:
-        """Publish to Redis AND the local bus (leader/worker topology TBD)."""
-        raise NotImplementedError(
-            "RedisBackplane is a skeleton only — set LUCKY_CAT_BACKPLANE=memory "
-            "(default) or implement subscribe wiring for workers>1"
-        )
+        """Delegate to Chirp, which renders and publishes through private Redis."""
+        self._emit(name, value, audience_key=audience_key)
 
 
 # ---------------------------------------------------------------------------
@@ -99,16 +68,16 @@ def bind_emit(emit: _EmitFn) -> None:
 def _build_backplane(emit: _EmitFn) -> SignalBackplane:
     source = os.environ.get("LUCKY_CAT_BACKPLANE", "memory").strip().lower()
     if source == "redis":
-        redis_url = os.environ.get("REDIS_URL", "").strip()
+        redis_url = os.environ.get("CHIRP_REDIS_URL", "").strip()
         if not redis_url:
             import logging
 
             logging.getLogger("lucky_cat.backplane").warning(
-                "LUCKY_CAT_BACKPLANE=redis but REDIS_URL is unset; "
+                "LUCKY_CAT_BACKPLANE=redis but CHIRP_REDIS_URL is unset; "
                 "falling back to InProcessBackplane."
             )
             return InProcessBackplane(emit)
-        return RedisBackplane(redis_url=redis_url, emit=emit)
+        return RedisBackplane(emit=emit)
     return InProcessBackplane(emit)
 
 

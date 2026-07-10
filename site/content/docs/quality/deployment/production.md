@@ -269,12 +269,16 @@ clone-and-run offline. That is a **demo boundary**, not a framework ceiling.
 |---------|--------------------------|------------|
 | Workers | `1` | `N` with a shared signal backplane |
 | State | In-process stores | External source of truth (DB/Redis) |
-| Signal fan-out | `InProcessBackplane` | Shared bus (e.g. Redis — see signal RFC §12) |
+| Signal fan-out | Process-local memory | Private Redis backplane via `redis_url` |
 | Secret | Dev fallback in `development` | Required `CHIRP_SECRET_KEY` |
 
 Multi-worker production needs both external state **and** a shared backplane so
 `/_chirp/live` connections and `app.emit` fan-out stay coherent across processes.
-See the Lucky Cat `DESIGN.md` §7 and `backplane.py` seam for the worked example.
+Install `chirp[redis]`, set `CHIRP_REDIS_URL` plus a shared
+`CHIRP_SECRET_KEY`, and keep SSR state in an external store. Redis signal
+delivery is at-most-once and intentionally adds no replay or distributed source
+leadership. See the Lucky Cat `DESIGN.md` §7 and `backplane.py` seam for the
+worked example.
 
 ## Advanced
 

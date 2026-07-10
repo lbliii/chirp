@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from chirp.health import HealthCheck
     from chirp.live_blocks import LiveBlockSpec
     from chirp.pages.reactive.bus import ReactiveBus
+    from chirp.realtime.signal_backplane import _SignalBackplaneDescriptor
     from chirp.realtime.signals import SignalRegistry
     from chirp.settings.registry import SettingsRegistry
 
@@ -286,6 +287,8 @@ class RuntimeAppState:
     debug_wiring: RuntimeDebugWiring = field(default_factory=RuntimeDebugWiring)
     hypermedia_program: HypermediaProgram | None = None
     htmx_manifest: HtmxProvisioningManifest | None = None
+    #: Internal frozen signal transport selection; not a public inspection API.
+    _signal_backplane_descriptor: _SignalBackplaneDescriptor | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -348,3 +351,5 @@ class ContractCheckSnapshot:
     _hypermedia_program: HypermediaProgram | None = None
     #: Internal frozen htmx provisioning decision. Not a public inspection API.
     _htmx_manifest: HtmxProvisioningManifest | None = None
+    #: Internal frozen signal transport selection; not exposed to custom checks.
+    _signal_backplane_descriptor: _SignalBackplaneDescriptor | None = None
