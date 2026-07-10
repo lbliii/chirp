@@ -1,0 +1,1 @@
+**Private durable-job Phase 1** — add a reviewable Postgres migration and an internal, parameterized store proof for JSON-safe enqueue, atomic capacity-limited claims, lease-token fencing, retry/exhaustion, queue-scoped idempotency, and revisioned progress. No public job API, executor, AppConfig field, automatic DDL, or SQLite parity is introduced.

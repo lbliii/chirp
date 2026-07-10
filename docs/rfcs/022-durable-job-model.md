@@ -1,24 +1,27 @@
 # RFC 022: Durable job model
 
-**Status:** Proposed
+**Status:** Accepted — Phase 1 private store implemented
 
 **Issue:** [#615](https://github.com/lbliii/chirp/issues/615)
 
 **Parent saga:** [#614](https://github.com/lbliii/chirp/issues/614)
 
-**Last audited:** 2026-07-09
+**Last audited:** 2026-07-10
 
-**Shipping impact:** None. This RFC does not add a public API, database table,
-migration, runtime executor, AppConfig field, CLI command, contract category,
-severity change, scheduler, cancellation protocol, or non-Postgres backend.
+**Shipping impact:** Private data surface only. Issue #677 adds a private
+Postgres store, three internal tables through a package-shipped migration, and
+live database proof. It does not add a public API, runtime executor, AppConfig
+field, CLI command, contract category, severity change, scheduler,
+cancellation protocol, or non-Postgres backend.
 
 ## Summary
 
-Chirp should eventually provide a small Postgres-backed durable job primitive
+Chirp's Phase 1 proof provides a small private Postgres-backed durable store
 for work that must survive process restart and be claimed safely across
-instances. It is a job store and executor, not a workflow engine.
+instances. Later phases add definitions and an executor. The intended product
+is a job store and executor, not a workflow engine.
 
-The first implementation should provide:
+The accepted model provides:
 
 - typed, JSON-safe payload snapshots associated with stable handler identities;
 - queue-scoped idempotency keys and explicit at-least-once semantics;
@@ -34,25 +37,27 @@ never create or alter its tables automatically. A first executor runs in the
 application deployment and uses the database for durability and coordination;
 it does not require Redis or a separate worker service.
 
-This RFC records semantics and proof obligations only. Exact Python names,
-module placement, SQL schema, default values, contract categories, lifecycle
-wiring, and compatibility status remain implementation-review decisions.
+Phase 1 records its private Python names, module placement, SQL schema, and
+bounded store defaults below. Public registration, contract categories,
+lifecycle wiring, executor behavior, and compatibility status remain later
+implementation-review decisions.
 
 ## Current implementation audit
 
-This section describes `main` at `063cb23f`. It does not describe shipped job
-behavior.
+This section describes the Phase 1 implementation from issue #677 against
+`main` at `d0cfba96`.
 
-### No first-party durable-job runtime
+### Private Phase 1 store, no executor
 
-There is no `JobStore`, job-definition registry, enqueue operation, claim loop,
-or durable-job contract rule in `src/chirp/`. The README currently says that
-background jobs integrate at framework seams rather than claiming a built-in
-job system.
+`src/chirp/data/_jobs.py` now contains the private `PostgresJobStore` proof.
+It can validate the reviewed schema, enqueue JSON-safe snapshots, claim with
+`FOR UPDATE SKIP LOCKED`, renew leases, update fenced progress, and settle
+success, retry, or terminal failure. It is intentionally absent from both
+`chirp.__all__` and `chirp.data.__all__`.
 
-`App.render()` mentions background jobs as one possible caller of the existing
-template-rendering helper. That helper freezes the app and renders Chirp return
-values; it does not persist, claim, retry, lease, or execute work.
+There is still no public job definition, handler registry, claim loop,
+executor, or durable-job contract rule. `App.render()` remains only a
+rendering helper; it does not persist, claim, retry, lease, or execute work.
 
 ### Database and transaction foundation
 
@@ -77,8 +82,34 @@ in version order, records checksums, and rejects edits to applied migrations.
 operation. App startup can also apply the configured migration directory unless
 the existing skip-migrations policy delegates that work to deployment.
 
-The durable-job schema should use this migration surface. “Use the database”
-does not mean that a store constructor may run `CREATE TABLE IF NOT EXISTS`.
+The durable-job schema uses this migration surface through
+`src/chirp/data/migrations/jobs/001_durable_jobs.sql`. The store constructor
+and runtime methods issue no DDL; missing schema version 1 fails with the exact
+migration path and `chirp migrate` guidance.
+
+### Phase 1 implementation decisions
+
+- `_chirp_job_schema` carries the exact private schema version;
+  `_chirp_job_queues` owns persisted queue capacity; `_chirp_jobs` stores the
+  immutable request snapshot and fenced mutable lifecycle.
+- A locked queue row serializes capacity decisions. Each claim reconciles its
+  counter from unexpired running rows before selecting one candidate with
+  `FOR UPDATE SKIP LOCKED`; expired leases therefore release capacity without
+  cross-instance oversubscription.
+- Job IDs and lease tokens are UUIDs. Definition, queue, owner, idempotency,
+  progress, payload, failure, attempts, priority, delay, lease, backoff, and
+  capacity inputs are bounded before SQL. Payloads are canonical JSON-safe
+  values with a 64 KiB encoded limit.
+- Default private policy is a 30-second lease, queue capacity 1, priority 0,
+  three attempts, one-second exponential backoff, and a 300-second backoff
+  cap. These are Phase 1 implementation values, not approved public API
+  defaults.
+- Advisory progress is the bounded `status` / `step` / `total` document and a
+  monotonically increasing revision. It never changes lifecycle state.
+- Store SQL bypasses the generic database echo path while retaining the same
+  pool and transaction boundaries. Database failures use a fixed redacted
+  message so payloads, keys, progress, and failure values are not logged or
+  copied into framework errors.
 
 ### Lifecycle and free-threading boundary
 
@@ -214,7 +245,7 @@ errors to retry forever.
 
 ### Immutable and mutable facts
 
-The physical schema is deferred, but its logical facts divide cleanly:
+The Phase 1 physical schema follows this logical split:
 
 | Immutable after enqueue | Mutable under fenced transitions |
 | --- | --- |
@@ -452,14 +483,14 @@ the first job slice through that dependency.
 
 ## Rollout
 
-### Phase 0: current RFC
+### Phase 0: RFC — complete
 
 - record existing data, migration, lifecycle, contract, and progress seams;
 - define at-least-once state, lease, retry, idempotency, capacity, and progress
   invariants; and
 - make no behavior change.
 
-### Phase 1: private Postgres store
+### Phase 1: private Postgres store — complete in #677
 
 - approve exact provisional module, records, SQL migration, and defaults;
 - implement enqueue, atomic claim, fenced renew/settle, retry, and progress;
@@ -555,30 +586,23 @@ need a Postgres-first proof before a second backend can claim the same contract.
 Rejected. There are no DAGs, child workflows, compensation, scheduler,
 cancellation state, arbitrary result documents, or workflow JSON API.
 
-## Open questions requiring maintainer check-in
+## Open questions requiring later maintainer check-in
 
 These decisions touch Stop And Ask surfaces and are not approved by this RFC:
 
-1. What provisional module, registration form, enqueue form, and import path
-   express definitions without creating a stable top-level API?
-2. What exact SQL tables, column types, indexes, migration ownership, and schema
-   version identify the first Postgres store?
-3. What are the defaults and allowed bounds for attempts, backoff, priority,
-   lease duration, heartbeat interval, payload/progress size, polling, drain,
-   and queue concurrency?
-4. Does queue capacity use slot rows, a locked counter row, or an advisory-lock
-   protocol, and how is capacity recovered after expiry?
-5. Does executor ownership attach to app lifespan, Pounce worker lifecycle, or
+1. What public/provisional registration and enqueue form expresses definitions
+   without turning the private Phase 1 records into a compatibility promise?
+2. Does executor ownership attach to app lifespan, Pounce worker lifecycle, or
    a separate component?
-6. What payload constraint compiler and version/upcast policy are authoritative?
-7. Which failures are non-retryable, and what bounded failure metadata is safe
-   to persist by default?
-8. How long do succeeded/failed jobs and idempotency keys remain retained, and
+3. What payload constraint compiler and version/upcast policy are authoritative?
+4. Which handler failures are non-retryable, and what bounded failure metadata
+   is safe to persist by default?
+5. How long do succeeded/failed jobs and idempotency keys remain retained, and
    who owns purge or manual replay?
-9. What future `app.check()` categories, subjects, severity, and migration
+6. What future `app.check()` categories, subjects, severity, and migration
    evidence make missing definitions/tables actionable without scanning live
    production rows?
-10. Is `status`/`step`/`total` the complete first progress schema, and how is
+7. Is `status`/`step`/`total` the long-term public progress schema, and how is
     compatibility with future Milo Progress versions reviewed without making
     durable-job semantics depend on a particular Milo revision?
 
@@ -600,15 +624,13 @@ These decisions touch Stop And Ask surfaces and are not approved by this RFC:
 - solving cross-instance SSE fan-out; or
 - claiming a throughput ceiling before measurement.
 
-## Collateral
+## Phase 1 collateral
 
-No changelog, public API, site, example, scaffold, CLI, migration, benchmark, or
-deployment collateral moves for this proposed RFC.
-
-An implementation would require, at minimum, a reviewed SQL migration, optional
-data documentation, public/provisional API status, contract category docs,
-live-Postgres and free-threaded tests, one product-shaped example, operational
-metrics and security guidance, a towncrier fragment, and measured graduation
-guidance. SQLite documentation must not imply parity until parity exists.
+Issue #677 ships the reviewed SQL migration, explicit internal API status,
+towncrier fragment, and live-Postgres/free-threaded tests. The PostgreSQL matrix
+and Python 3.14t gate both exercise the store. No site example, scaffold, CLI,
+contract category, benchmark claim, executor guidance, or generated site output
+moves because Phase 1 is private and does not execute handlers. SQLite
+documentation continues to make no durable-job parity claim.
 
 [issue-615-decision]: https://github.com/lbliii/chirp/issues/615#issuecomment-4929195371

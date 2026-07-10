@@ -251,7 +251,12 @@ jobs:
       - name: PostgreSQL round-trip tests
         env:
           CHIRP_TEST_PG_DSN: postgresql://chirp:chirp@localhost:5432/chirp_test
-        run: uv run pytest tests/test_schema_introspect.py tests/test_pelt/test_connection_integration.py -q --tb=short --timeout=60
+        run: >-
+          uv run pytest
+          tests/test_schema_introspect.py
+          tests/test_pelt/test_connection_integration.py
+          tests/test_jobs_postgres.py
+          -q --tb=short --timeout=60
 
       - name: Pelt benchmark smoke
         env:
@@ -273,6 +278,20 @@ jobs:
   data-pg-gil-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: chirp
+          POSTGRES_PASSWORD: chirp
+          POSTGRES_DB: chirp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v7
 
@@ -297,7 +316,13 @@ jobs:
         env:
           PYTHON_GIL: "0"
           PYTHONWARNINGS: error
-        run: uv run pytest tests/test_pelt/test_data_pg_gil.py tests/test_pelt/test_concurrency_stress.py -q --tb=short --timeout=60
+          CHIRP_TEST_PG_DSN: postgresql://chirp:chirp@localhost:5432/chirp_test
+        run: >-
+          uv run pytest
+          tests/test_pelt/test_data_pg_gil.py
+          tests/test_pelt/test_concurrency_stress.py
+          tests/test_jobs_postgres.py
+          -q --tb=short --timeout=60
 
   # Cross-version compatibility between Chirp and chirp-ui (issue #157).
   # Catches same-author upstream breaks before they ship as a release regression.

@@ -130,7 +130,12 @@ python-preference = "only-managed"
 where = ["src"]
 
 [tool.setuptools.package-data]
-chirp = ["py.typed", "templating/macros/**/*.html", "server/devtools/js/*.js"]
+chirp = [
+    "py.typed",
+    "templating/macros/**/*.html",
+    "server/devtools/js/*.js",
+    "data/migrations/**/*.sql",
+]
 
 # =============================================================================
 # Ruff — Linter & Formatter
