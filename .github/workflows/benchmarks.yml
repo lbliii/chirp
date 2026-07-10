@@ -101,7 +101,7 @@ jobs:
       - name: Update benchmark PR comment
         if: github.event_name == 'pull_request' && always()
         continue-on-error: true
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require("fs");
