@@ -204,6 +204,7 @@ _CATEGORY_CONCERNS: dict[str, str] = {
     "live_block_unreachable_route": "OOB / Suspense / SSE",
     "signal_dead_binding": "OOB / Suspense / SSE",
     "signal_orphan": "OOB / Suspense / SSE",
+    "signal_bus_single_worker": "Realtime",
     # Forms / layouts / accessibility
     "form": "Forms",
     "form_contract": "Forms",

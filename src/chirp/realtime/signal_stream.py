@@ -32,7 +32,9 @@ from collections.abc import AsyncIterator
 
 from chirp.app.state import PendingRoute
 from chirp.http.request import Request
+from chirp.http.response import Response
 from chirp.realtime.events import EventStream, _SignalUpdate
+from chirp.realtime.signal_globals import current_signal_audience
 from chirp.realtime.signals import SignalRegistry, _bus_scope
 
 logger = logging.getLogger("chirp.signals")
@@ -63,9 +65,10 @@ def make_signal_stream(
 
     async def generate() -> AsyncIterator[_SignalUpdate]:
         # One asyncio.Queue fans in every subscribed scope's ChangeEvents.
-        merged: asyncio.Queue[str] = asyncio.Queue()
+        merged: asyncio.Queue[str | _SignalUpdate | Exception] = asyncio.Queue()
         subscriber_tasks: list[asyncio.Task[None]] = []
         source_tasks: list[asyncio.Task[None]] = []
+        remote_tasks: list[asyncio.Task[None]] = []
 
         async def _drain_scope(name: str) -> None:
             audience = registry.audience_of(name)
@@ -79,6 +82,7 @@ def make_signal_stream(
             if spec is None or spec.source is None:
                 return
             aud = audience_key if registry.audience_of(name) == "session" else ""
+            scope_label = registry.audience_of(name)
             failures = 0
             # Restart loop: one bad tick (a transient source error) must not kill
             # the signal for the life of the connection. A fresh spec.source()
@@ -90,7 +94,7 @@ def make_signal_stream(
                 try:
                     async for value in spec.source():
                         # Route through emit so derived cascade + cache stay coherent.
-                        registry.emit(name, value)
+                        registry.emit_local(name, value, audience_key=aud)
                         failures = 0
                     return
                 except asyncio.CancelledError:
@@ -102,7 +106,7 @@ def make_signal_stream(
                             "signal source %r (audience=%s) failed %d times consecutively; "
                             "giving up — its bindings will not update on this connection",
                             name,
-                            aud or "global",
+                            scope_label,
                             failures,
                         )
                         return
@@ -111,7 +115,7 @@ def make_signal_stream(
                         "signal source %r (audience=%s) failed; restarting in %.1fs "
                         "(attempt %d/%d)",
                         name,
-                        aud or "global",
+                        scope_label,
                         backoff,
                         failures,
                         _MAX_SOURCE_RESTARTS,
@@ -119,8 +123,17 @@ def make_signal_stream(
                     )
                     await asyncio.sleep(backoff)
 
+        async def _drain_remote() -> None:
+            try:
+                async for update in registry.subscribe_backplane(names, audience_key=audience_key):
+                    merged.put_nowait(update)
+            except Exception as exc:
+                merged.put_nowait(exc)
+
         try:
             subscriber_tasks.extend(asyncio.create_task(_drain_scope(name)) for name in names)
+            if registry.distributed:
+                remote_tasks.append(asyncio.create_task(_drain_remote()))
             # Start async sources only for the requested primary signals.
             source_tasks.extend(
                 asyncio.create_task(_pump_source(spec.name))
@@ -129,18 +142,23 @@ def make_signal_stream(
             )
 
             while True:
-                name = await merged.get()
+                item = await merged.get()
+                if isinstance(item, Exception):
+                    raise item
+                if isinstance(item, _SignalUpdate):
+                    yield item
+                    continue
+                name = item
                 audience = registry.audience_of(name)
                 aud = audience_key if audience == "session" else ""
-                value = registry.cached_value(name, audience_key=aud)
-                rendered = registry.render_for_emit(name, value)
+                rendered = registry.cached_rendered(name, audience_key=aud)
                 if rendered is None:
                     continue
                 yield _SignalUpdate(name=name, data=rendered)
         finally:
-            for task in (*subscriber_tasks, *source_tasks):
+            for task in (*subscriber_tasks, *source_tasks, *remote_tasks):
                 task.cancel()
-            for task in (*subscriber_tasks, *source_tasks):
+            for task in (*subscriber_tasks, *source_tasks, *remote_tasks):
                 with contextlib.suppress(asyncio.CancelledError, Exception):
                     await task
 
@@ -156,20 +174,41 @@ def make_signal_pending_route(registry: SignalRegistry) -> PendingRoute:
     block-addressable), mirroring other SSE routes.
     """
 
-    def _resolve_topics(raw: str | None) -> tuple[str, ...]:
+    def _resolve_topics(raw: str | None, *, supplied: bool) -> tuple[str, ...]:
         available = registry.names
+        if not supplied:
+            return tuple(sorted(available))
         if not raw:
-            return tuple(sorted(available))
+            raise ValueError("topics must name at least one registered signal")
         requested = [t.strip() for t in raw.split(",") if t.strip()]
-        # Only stream topics that actually exist (drop unknown query noise).
-        scoped = tuple(sorted(t for t in requested if t in available))
-        if not scoped:
-            return tuple(sorted(available))
-        return registry.expand_connection_topics(scoped)
+        unknown = sorted(set(requested) - available)
+        if unknown:
+            raise ValueError(f"unknown signal topic(s): {', '.join(unknown)}")
+        if not requested:
+            raise ValueError("topics must name at least one registered signal")
+        return registry.expand_connection_topics(requested)
 
-    def _handler(request: Request) -> EventStream:
-        topics = _resolve_topics(request.query.get("topics"))
-        audience_key = (request.query.get("aud") or "").strip()
+    def _handler(request: Request) -> EventStream | Response:
+        if "aud" in request.query:
+            return Response(
+                "The aud query parameter is not accepted; signal audiences come from "
+                "trusted server session state.",
+                status=400,
+                content_type="text/plain; charset=utf-8",
+            )
+        try:
+            topics = _resolve_topics(
+                request.query.get("topics"), supplied="topics" in request.query
+            )
+        except ValueError as exc:
+            return Response(str(exc), status=400, content_type="text/plain; charset=utf-8")
+        audience_key = current_signal_audience().strip()
+        if any(registry.audience_of(name) == "session" for name in topics) and not audience_key:
+            return Response(
+                "The requested session-scoped signal topics are not authorized for this request.",
+                status=403,
+                content_type="text/plain; charset=utf-8",
+            )
         return make_signal_stream(registry, topics, audience_key=audience_key)
 
     return PendingRoute(

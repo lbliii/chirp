@@ -217,4 +217,5 @@ class TestSignalEmitTraceHeader:
         finally:
             request_var.reset(token)
         payload = json.loads(base64.b64decode(encoded))
-        assert payload == [{"name": "balance", "audience_key": "k1", "scope": "session"}]
+        assert payload == [{"name": "balance", "scope": "session"}]
+        assert "k1" not in encoded

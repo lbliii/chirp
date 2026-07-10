@@ -1,9 +1,4 @@
-"""SignalBackplane seam tests for Lucky Cat (#295).
-
-The scaling story is visible without a working Redis deploy: a
-``SignalBackplane`` protocol, the in-process default, and a stubbed Redis impl
-that documents the ``workers>1`` wiring path.
-"""
+"""Signal publication seam tests for Lucky Cat (#295, #699)."""
 
 from __future__ import annotations
 
@@ -25,12 +20,18 @@ class TestSignalBackplane:
         backplane.publish("balance", 42)
         assert seen == [("balance", 42)]
 
-    def test_redis_backplane_is_a_skeleton(self) -> None:
+    @pytest.mark.issue(699)
+    def test_redis_label_delegates_to_framework_emit(self) -> None:
         from backplane import RedisBackplane
 
-        bp = RedisBackplane(redis_url="redis://localhost:6379/0", emit=lambda *_: None)
-        with pytest.raises(NotImplementedError, match="skeleton only"):
-            bp.publish("ticker", {"symbol": "BTC-MEOW"})
+        seen: list[tuple[str, object]] = []
+
+        def emit(name: str, value: object, *, audience_key: str = "") -> None:
+            seen.append((name, value))
+
+        bp = RedisBackplane(emit=emit)
+        bp.publish("ticker", {"symbol": "BTC-MEOW"})
+        assert seen == [("ticker", {"symbol": "BTC-MEOW"})]
 
     def test_get_backplane_defaults_to_in_process(self, monkeypatch) -> None:
         import backplane
@@ -54,10 +55,10 @@ class TestSignalBackplane:
         backplane.reset()
         backplane.bind_emit(lambda *_: None)
         monkeypatch.setenv("LUCKY_CAT_BACKPLANE", "redis")
-        monkeypatch.delenv("REDIS_URL", raising=False)
+        monkeypatch.delenv("CHIRP_REDIS_URL", raising=False)
         bp = backplane.get_backplane()
         assert isinstance(bp, backplane.InProcessBackplane)
-        assert any("REDIS_URL is unset" in record.message for record in caplog.records)
+        assert any("CHIRP_REDIS_URL is unset" in record.message for record in caplog.records)
 
     def test_publish_before_bind_raises(self, monkeypatch) -> None:
         import backplane

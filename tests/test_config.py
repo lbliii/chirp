@@ -64,6 +64,16 @@ class TestAppConfig:
         assert cfg.view_transitions is False
         assert cfg.static_context is None
 
+    @pytest.mark.issue(699)
+    def test_redis_url_is_redacted_from_repr(self) -> None:
+        cfg = AppConfig(
+            redis_url="redis://user:password@private.example/0",
+            secret_key="private-secret",
+        )
+        assert "redis://" not in repr(cfg)
+        assert "password" not in repr(cfg)
+        assert "private-secret" not in repr(cfg)
+
     def test_production_proxy_and_rate_limit_defaults(self) -> None:
         cfg = AppConfig()
 

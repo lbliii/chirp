@@ -1031,13 +1031,10 @@ class TestSessionScopedStores:
 
     @pytest.mark.issue(315)
     async def test_two_sessions_receive_independent_signal_sse_events(self, example_app) -> None:
-        """#315: session-scoped signals fan only to the matching /_chirp/live?aud=…
-        connection — a deposit in session A must not surface on session B's SSE."""
+        """#315: server-authorized session signals isolate two live connections."""
         import asyncio
 
-        import session_store
-
-        async def listen_for_deposit(client, cookie: str, key: str, amount: str):
+        async def listen_for_deposit(client, cookie: str, amount: str):
             async def deposit_after_subscribe() -> None:
                 await asyncio.sleep(0.05)
                 await csrf_post(
@@ -1050,7 +1047,7 @@ class TestSessionScopedStores:
 
             return await asyncio.gather(
                 client.sse(
-                    f"/_chirp/live?topics=balance&aud={key}",
+                    "/_chirp/live?topics=balance",
                     max_events=1,
                     headers=_cookie_header(cookie),
                 ),
@@ -1061,17 +1058,10 @@ class TestSessionScopedStores:
             cookie_a = await _login(client_a)
             cookie_b = await _login(client_b)
             await warm_authed_store(client_a, cookie_a, cookie_name=_SESSION_COOKIE)
-            keys_a = session_store.client_keys()
-            assert len(keys_a) == 1
-            key_a = next(iter(keys_a))
-
             await warm_authed_store(client_b, cookie_b, cookie_name=_SESSION_COOKIE)
-            keys_b = session_store.client_keys()
-            assert len(keys_b) == 2
-            key_b = next(k for k in keys_b if k != key_a)
 
-            result_a, _ = await listen_for_deposit(client_a, cookie_a, key_a, "250")
-            result_b, _ = await listen_for_deposit(client_b, cookie_b, key_b, "100")
+            result_a, _ = await listen_for_deposit(client_a, cookie_a, "250")
+            result_b, _ = await listen_for_deposit(client_b, cookie_b, "100")
 
         joined_a = "".join(e.data for e in result_a.events if e.data)
         joined_b = "".join(e.data for e in result_b.events if e.data)
@@ -3162,9 +3152,12 @@ class TestNotificationsBell:
         scoped to the notifications topics (the old separate /notifications/stream
         route is gone). Scoping to ?topics=notifications opens the EventStream."""
         async with TestClient(example_app) as client:
+            cookie = await _login(client)
+            await warm_authed_store(client, cookie, cookie_name=_SESSION_COOKIE)
             result = await client.sse(
                 "/_chirp/live?topics=notifications,notif_badge,notif_announce",
                 max_events=2,
+                headers=_cookie_header(cookie),
             )
         assert result.status == 200
         assert result.headers.get("content-type") == "text/event-stream"
@@ -3178,14 +3171,11 @@ class TestNotificationsBell:
     ) -> None:
         """Over enough ticks the price-alert loop fans out scoped ``notifications``
         events (dropdown list body) and derived ``notif_badge`` in the same cascade."""
-        import session_store
-
         async with TestClient(example_app) as client:
             cookie = await _login(client)
             await warm_authed_store(client, cookie, cookie_name=_SESSION_COOKIE)
-            aud = session_store.latest_client_key()
             result = await client.sse(
-                f"/_chirp/live?topics=notifications,notif_badge&aud={aud}",
+                "/_chirp/live?topics=notifications,notif_badge",
                 max_events=40,
                 headers=_cookie_header(cookie),
             )

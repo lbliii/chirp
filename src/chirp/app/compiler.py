@@ -542,12 +542,19 @@ class AppCompiler:
         # pay nothing — no route, no globals, no ReactiveBus.
         signal_registry = self._mutable.signal_registry
         if signal_registry is not None and not signal_registry.empty:
+            from chirp.realtime.signal_backplane import compile_signal_backplane_plan
             from chirp.realtime.signal_globals import (
                 SIGNAL_STREAM_PREFIX,
                 make_signal_globals,
             )
             from chirp.realtime.signal_stream import make_signal_pending_route
 
+            backplane_plan = compile_signal_backplane_plan(
+                redis_url=self._config.redis_url,
+                secret_key=self._config.secret_key,
+            )
+            signal_registry.bind_backplane(backplane_plan)
+            self._runtime._signal_backplane_descriptor = backplane_plan.descriptor
             _reject_reserved_prefix_collisions(self._mutable.pending_routes, SIGNAL_STREAM_PREFIX)
             self._mutable.pending_routes.append(make_signal_pending_route(signal_registry))
             for name, fn in make_signal_globals(

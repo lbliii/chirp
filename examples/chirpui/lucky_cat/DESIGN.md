@@ -517,7 +517,7 @@ forced an earlier `net_worth` derived to be dropped — it had to read the trade
 store.) When you add a derived, make its source signal's value carry everything
 the derived needs.
 
-### Why `workers=1` (default today — scale via the backplane seam)
+### Why `workers=1` (default today — scale with Redis plus shared state)
 
 The example pins `workers=1` in `app.py` (overriding the CPU-count default). That
 is the **single-process default** for an in-memory demo, not a framework
@@ -528,18 +528,15 @@ backplane:
    log, the SimFeed, AND the signal bus (the reactive bus behind `@app.signal`).
    Multiple OS-process workers would each hold a SEPARATE copy, so a deposit on
    one worker would be invisible to a request served by the next.
-2. **The `/_chirp/live` connection is pinned to one worker.** With >1 worker, a
-   page load that lands on a worker whose event loop is tied up serving a
-   long-lived signal connection stalls — the "white screen" / freeze.
+2. **The `/_chirp/live` connection is pinned to one worker.** Without Redis, an
+   emit handled by a different process cannot reach that connection.
 
-Scaling is a **one-class swap**, not an out-of-scope rewrite. Lucky Cat routes
-mutations through `backplane.get_backplane().publish(name, value)` instead of
-calling `app.emit` directly. The shipped default is `InProcessBackplane` (wraps
-`App.emit` — today's behavior). For `workers>1`, implement the
-`SignalBackplane` protocol with a shared bus (`RedisBackplane` is stubbed in
-`backplane.py` with wiring notes) **and** move wallet/trade/notifications into
-an external store — the backplane carries fan-out notifications, not
-source-of-truth state. See the signal RFC for the full production path.
+Lucky Cat routes mutations through `backplane.get_backplane().publish(...)`,
+which delegates to `App.emit`. Chirp selects its private Redis data plane from
+`AppConfig.redis_url`; no public bus protocol or custom adapter is needed. For
+`workers>1`, install `chirp[redis]`, configure `CHIRP_REDIS_URL` plus a shared
+`CHIRP_SECRET_KEY`, **and** move wallet/trade/notifications into an external
+store — signal Redis carries rendered fan-out, not source-of-truth state.
 
 Keep this example at `workers=1` until both pieces are configured. The pure-derived
 contract above is the discipline that keeps derived signals correct once events
@@ -623,8 +620,8 @@ deploy image (which drops `argon2-cffi`).
   `referenced=True` on htmx-only routes; every signal `sse-swap` has a registered
   producer — the `signal_dead_binding` rule).
 - **`workers=1`** stays set (§7) — the in-memory state + the single `/_chirp/live`
-  connection require single-process **until** a `SignalBackplane` impl and external
-  store are wired (see `backplane.py`).
+  connection require single-process **until** Chirp Redis and an external state
+  store are configured.
 - **Public market pages stay public** (`/`, `/markets/{symbol}`, `/search`) and
   **account pages stay `@login_required`** (§8). The topbar's account chrome and
   the `watchlist_star` key off `current_user()`; login/logout return `FormAction`

@@ -18,7 +18,6 @@ class SignalEmitRecord:
     """One signal fan-out recorded during a mutation request."""
 
     name: str
-    audience_key: str
     scope: str
 
     def payload(self) -> dict[str, Any]:
@@ -42,7 +41,7 @@ def record_signal_emit(
     scope = "session" if audience_key else "global"
     trace = req._cache.setdefault(SIGNAL_EMIT_TRACE_KEY, [])
     if isinstance(trace, list):
-        trace.append(SignalEmitRecord(name=name, audience_key=audience_key, scope=scope))
+        trace.append(SignalEmitRecord(name=name, scope=scope))
 
 
 def get_signal_emit_trace(request: Any) -> tuple[SignalEmitRecord, ...]:

@@ -220,6 +220,7 @@ allowed-unresolved-imports = [
     "webauthn.helpers.structs",
     "webauthn.helpers.exceptions",
     "dotenv",
+    "redis",
     "redis.asyncio",
     "opentelemetry",
     "opentelemetry.trace",

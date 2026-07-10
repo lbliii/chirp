@@ -59,9 +59,8 @@ _SIGNAL_CONNECT_OPEN_HTMX4 = '<div data-chirp-signal-connect="" data-chirp-htmx4
 #: renders (free-threading) never leak topics across each other.
 _referenced: contextvars.ContextVar[set[str]] = contextvars.ContextVar("chirp_signals_referenced")
 
-#: Per-request audience key for session-scoped signals (the visitor's store key).
-#: ``signal_connect()`` appends ``?aud=…`` so ``/_chirp/live`` fans session signals
-#: only to the matching connection. Empty means global-only bindings on this page.
+#: Per-request audience key for session-scoped SSR and server-authorized SSE.
+#: It is never serialized into the browser URL. Empty means global-only bindings.
 _signal_audience: contextvars.ContextVar[str] = contextvars.ContextVar(
     "chirp_signal_audience", default=""
 )
@@ -118,7 +117,7 @@ def _referenced_names() -> set[str]:
 
 
 def _connect_query() -> str:
-    """Build the ``/_chirp/live`` query string from bound topics + audience."""
+    """Build the public ``/_chirp/live`` query from bound topic names only."""
     parts: list[str] = []
     names = set(_referenced_names())
     registry = _active_registry()
@@ -130,9 +129,6 @@ def _connect_query() -> str:
             names = set(registry.expand_connection_topics(names))
     if names:
         parts.append(f"topics={','.join(sorted(names))}")
-    aud = current_signal_audience()
-    if aud:
-        parts.append(f"aud={escape(aud, quote=True)}")
     if not parts:
         return ""
     return "?" + "&".join(parts)
