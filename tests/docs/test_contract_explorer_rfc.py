@@ -8,14 +8,15 @@ _ROOT = Path(__file__).resolve().parents[2]
 _RFC = _ROOT / "docs" / "rfcs" / "021-contract-explorer.md"
 
 
-@pytest.mark.issue(337)
-def test_contract_explorer_rfc_is_explicitly_non_shipping() -> None:
+@pytest.mark.issue(337, 652, 653)
+def test_contract_explorer_rfc_records_private_implementation_scope() -> None:
     text = _RFC.read_text(encoding="utf-8")
 
-    assert "**Status:** Proposed" in text
-    assert "**Shipping impact:** None" in text
+    assert "**Status:** Accepted; private static projection implemented by #652" in text
+    assert "finding-binding proof completed by #653" in text
+    assert "**Shipping impact:** Private debug/test projection only" in text
     assert "does not add a CLI flag" in text
-    assert "No changelog: proposed RFC only" in text
+    assert "No changelog: #652 and #653 add private debug/test projection" in text
 
 
 @pytest.mark.issue(337)
@@ -27,6 +28,7 @@ def test_contract_explorer_rfc_cites_current_authorities() -> None:
         "src/chirp/app/hypermedia_program_compiler.py",
         "src/chirp/cli/_check.py",
         "src/chirp/contracts/serialize.py",
+        "src/chirp/contracts/explorer_projection.py",
         "src/chirp/cli/_routes.py",
         "src/chirp/server/transition_trace.py",
         "src/chirp/testing/transitions.py",
@@ -53,6 +55,7 @@ def test_contract_explorer_rfc_separates_static_findings_and_evidence() -> None:
 @pytest.mark.issue(337)
 def test_contract_explorer_rfc_rejects_unsafe_execution_and_public_drift() -> None:
     text = _RFC.read_text(encoding="utf-8")
+    prose = " ".join(text.split())
 
     assert "No automatic route fuzzing" in text
     assert "never infer that GET/HEAD is side-effect-free" in text
@@ -62,3 +65,4 @@ def test_contract_explorer_rfc_rejects_unsafe_execution_and_public_drift() -> No
     assert "Explorer route" in text
     assert "No route executes during app freeze" in text
     assert "requires its own compatibility and severity review" in text
+    assert "No message token or substring participates in correlation" in prose

@@ -225,6 +225,66 @@ def test_missing_finalized_checks_are_unavailable_not_clean(tmp_path: Path) -> N
     assert "contract_findings_and_coverage:unavailable" in projection.analysis_gaps
 
 
+@pytest.mark.issue(653)
+def test_duplicate_messages_never_create_a_prose_to_node_join(tmp_path: Path) -> None:
+    app = _app_with_topology(tmp_path)
+    app.freeze()
+    program = app._runtime_state.hypermedia_program
+    assert program is not None
+    duplicate_message = "GET /events renders page.html content."
+    result = CheckResult(
+        issues=[
+            ContractIssue(
+                Severity.ERROR,
+                "duplicate_message",
+                duplicate_message,
+                route="/events",
+                template="page.html",
+                details="Exact structured location.",
+            ),
+            ContractIssue(
+                Severity.WARNING,
+                "duplicate_message",
+                duplicate_message,
+                details="No structured location.",
+            ),
+        ]
+    )
+
+    projection = build_explorer_projection(program, result)
+
+    exact = next(finding for finding in projection.findings if finding.route == "/events")
+    unlocated = next(finding for finding in projection.findings if finding.route is None)
+    assert exact.binding == "bound"
+    assert exact.route_node_ids
+    assert exact.template_node_ids
+    assert unlocated.binding == "unbound"
+    assert unlocated.route_node_ids == ()
+    assert unlocated.template_node_ids == ()
+    assert exact.message == unlocated.message == duplicate_message
+    assert sorted(
+        (
+            issue.severity.value,
+            issue.category,
+            issue.message,
+            issue.route,
+            issue.template,
+            issue.details,
+        )
+        for issue in result.issues
+    ) == sorted(
+        (
+            finding.severity,
+            finding.category,
+            finding.message,
+            finding.route,
+            finding.template,
+            finding.details,
+        )
+        for finding in projection.findings
+    )
+
+
 @pytest.mark.issue(652)
 def test_equivalent_apps_produce_byte_stable_projections(tmp_path: Path) -> None:
     first = _app_with_topology(tmp_path / "first", reverse=False)
