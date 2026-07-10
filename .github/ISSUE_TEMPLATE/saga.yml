@@ -1,0 +1,85 @@
+name: Saga
+description: Cross-cutting strategic thread — decompose into epics as GitHub sub-issues
+title: "[Saga] "
+labels:
+  - saga
+  - roadmap
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Tracking:** GitHub issues are authoritative. Create **epics as sub-issues** — not markdown task lists in this body.
+
+        **Closure:** Sagas close when their epic children close. PRs should use `Advances-Epic: #N` on epics; reserve `Closes #N` for leaf tasks.
+
+        Read [`docs/backlog-automation.md`](https://github.com/lbliii/chirp/blob/main/docs/backlog-automation.md).
+
+  - type: textarea
+    id: north_star
+    attributes:
+      label: North star
+      description: Strategic outcome this saga proves across multiple epics.
+    validations:
+      required: true
+
+  - type: textarea
+    id: program_dependency
+    attributes:
+      label: Program dependencies
+      description: Cross-repo blockers, upstream sagas, or sequencing gates.
+      placeholder: |
+        Milo foundation: https://github.com/lbliii/milo-cli/issues/72
+        Compiler saga #503 must be closed before public inspection work ships.
+    validations:
+      required: false
+
+  - type: textarea
+    id: release_gates
+    attributes:
+      label: Release gates
+      description: Ordered gates that must pass before the saga can close.
+      placeholder: |
+        1. Dogfood Milo across the `chirp` command tree with compatibility receipts.
+        2. Structured developer surface callable via CLI, MCP, and `llms.txt`.
+        3. Flagship proof example green across browser, htmx, CLI, and checks.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workstreams
+    attributes:
+      label: Workstreams
+      description: Epic-sized themes to open as sub-issues. Link issue numbers after creating them.
+    validations:
+      required: true
+
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Architectural boundaries
+      description: What this repo owns vs upstream/downstream packages.
+    validations:
+      required: false
+
+  - type: textarea
+    id: required_proof
+    attributes:
+      label: Required proof
+      description: Cross-epic evidence — canaries, examples, conformance matrices.
+    validations:
+      required: false
+
+  - type: textarea
+    id: success_signal
+    attributes:
+      label: Success signal
+      description: How we know an external adopter could succeed on this stack.
+    validations:
+      required: true
+
+  - type: textarea
+    id: not_now
+    attributes:
+      label: Not now
+    validations:
+      required: false

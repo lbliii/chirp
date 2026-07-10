@@ -1,0 +1,73 @@
+name: Epic
+description: Major initiative — create GitHub sub-issues for tasks, not body checklists
+title: "Epic: "
+labels:
+  - epic
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Tracking:** GitHub issues are authoritative. Create **tasks as GitHub sub-issues** immediately after opening this epic — do not use `- [ ]` lists here.
+
+        **Closure:** Epics close when sub-issues close. PRs should use `Advances-Epic: #N` rather than `Closes #N` unless this epic is the only deliverable.
+
+        Read [`docs/backlog-automation.md`](https://github.com/lbliii/chirp/blob/main/docs/backlog-automation.md).
+
+  - type: input
+    id: parent
+    attributes:
+      label: Parent saga
+      description: "e.g. #584 — https://github.com/lbliii/chirp/issues/584"
+      placeholder: "#584"
+    validations:
+      required: false
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What is true when this epic is done?
+      placeholder: |
+        Boosted shell navigation never blanks the inner outlet; `chirp check` catches shell/fragment target mismatches statically.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Problem / context
+      description: User-visible risk, downstream pressure, or why now.
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and related work
+      description: Other issues, RFCs, cross-repo work, or steward domains this epic relies on.
+      placeholder: |
+        - #652 topology projection
+        - `docs/rfcs/021-contract-explorer.md`
+        - Elbysodic consume after release
+    validations:
+      required: false
+
+  - type: textarea
+    id: exit_criteria
+    attributes:
+      label: Exit criteria
+      description: Epic-level done signal — downstream proof and/or all sub-issues closed.
+      placeholder: |
+        - [ ] Elbysodic repro navigates cleanly with boost enabled
+        - [ ] `chirp check` catches the mismatch class
+        - [ ] App-side workaround removed
+    validations:
+      required: true
+
+  - type: textarea
+    id: not_in_scope
+    attributes:
+      label: Not in scope
+      description: What child issues or future work must explicitly avoid.
+    validations:
+      required: false

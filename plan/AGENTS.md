@@ -14,6 +14,10 @@ accepted findings from future work.
 
 ## Protect
 
+- **GitHub issues own active work.** `plan/roadmap.md`, `.context/todos.md`,
+  and other repo planning files index and link issues. They do not duplicate
+  scope, tasks, acceptance criteria, or proof commands — that copy rots. Read
+  the linked issue bodies on <https://github.com/lbliii/chirp/issues>.
 - **Plans are not shipped behavior.** They need an explicit status signal; when
   a completed-folder artifact preserves its original draft header, roadmap or
   companion context must make completion clear.
@@ -67,6 +71,8 @@ When this domain changes, check:
 - Hide rejected steward findings.
 - Combine unrelated roadmap items because they share a file.
 - Preserve stale plans without status updates.
+- Duplicate open-issue scope, checklists, or proof in repo files when the
+  GitHub issue already carries them.
 
 ## Own
 
