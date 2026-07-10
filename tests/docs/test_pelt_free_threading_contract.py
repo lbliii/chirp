@@ -14,7 +14,7 @@ _CURRENT_DRIVER_DOCS = (
 )
 
 
-@pytest.mark.issue(259)
+@pytest.mark.issue(259, 695)
 def test_pelt_evidence_maps_every_concurrency_gate() -> None:
     text = _EVIDENCE.read_text()
 
@@ -22,6 +22,7 @@ def test_pelt_evidence_maps_every_concurrency_gate() -> None:
         "test_should_parallelize_requires_threshold_and_nogil",
         "test_parallel_row_decode_overlaps_on_native_threads",
         "test_codec_registry_concurrent_writes_publish_untorn_snapshots",
+        "test_dynamic_codec_registries_are_connection_local",
         "test_pool_checkout_is_exclusive_under_task_contention",
         "test_pool_does_not_republish_connection_until_reset_finishes",
         "test_error_drains_ready_frame_before_rollback_and_reuse",
@@ -67,7 +68,7 @@ def test_live_postgres_ci_covers_13_through_18() -> None:
     assert "compatibility lane" in evidence
 
 
-@pytest.mark.issue(260)
+@pytest.mark.issue(260, 695)
 def test_data_pg_docs_publish_driver_and_performance_boundaries() -> None:
     database = _CURRENT_DRIVER_DOCS[1].read_text()
     evidence = _EVIDENCE.read_text()
@@ -79,4 +80,6 @@ def test_data_pg_docs_publish_driver_and_performance_boundaries() -> None:
     assert "do not import `chirp.data.drivers._pelt`" in database
     assert "`db.stream()` owns one pooled connection" in database
     assert "`db.execute_many()` is currently a convenience loop" in database
+    assert "server-assigned enum, array, range, and composite OIDs" in database
+    assert "unexpected unknown binary data fails" in database
     assert "does not scale with pool size" in evidence

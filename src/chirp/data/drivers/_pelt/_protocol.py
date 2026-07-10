@@ -751,6 +751,7 @@ class ExtendedQueryProtocol:
         *,
         statement: str,
         params: Sequence[bytes | None] = (),
+        result_formats: Sequence[int] = (),
         portal: str = "",
         max_rows: int = 0,
     ) -> bytes:
@@ -770,7 +771,12 @@ class ExtendedQueryProtocol:
         self._row_description = None
         self._open_portal = portal
         return (
-            _builder.build_bind(portal=portal, statement=statement, params=params)
+            _builder.build_bind(
+                portal=portal,
+                statement=statement,
+                params=params,
+                result_formats=result_formats,
+            )
             + _builder.build_execute(portal=portal, max_rows=max_rows)
             + _builder.build_sync()
         )

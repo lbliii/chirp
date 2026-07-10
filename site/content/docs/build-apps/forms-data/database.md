@@ -383,6 +383,28 @@ await db.fetch(User, "SELECT * FROM users WHERE id = $1", 42)
 ```
 ::::
 
+:::{dropdown} Advanced: PostgreSQL result formats and dynamic types
+:icon: database
+
+Pelt's simple-query path receives PostgreSQL text results. Parameterized,
+prepared, and streamed queries use the extended protocol and negotiate each
+result column independently: proven numeric, temporal, UUID, bytea, JSON,
+array, range, and composite codecs request binary, while text-like columns,
+scalar enums, and unknown types stay text.
+
+For server-assigned enum, array, range, and composite OIDs, each connection does
+a bounded, schema-qualified `pg_catalog` lookup the first time it sees the type,
+then reuses the resolved codec or remembered text fallback. An unsupported OID
+is never deliberately requested as binary; unexpected unknown binary data fails
+with an actionable protocol error instead of being exposed as ambiguous bytes.
+
+This means parameterized array/range/composite reads can return typed Python
+values where a simple text query returns PostgreSQL's faithful string. Pelt's
+frozen range and month-bearing interval wrappers remain provisional behind the
+private `data-pg` seam, so application code should consume their values without
+importing `chirp.data.drivers._pelt` directly.
+:::{/dropdown}
+
 ### JSON columns — `json_path`
 
 Extracting a key out of a JSON column is the one place the dialects genuinely diverge: SQLite wants `json_extract(col, '$.key')`, PostgreSQL wants `col->>'key'`. Hand-branching on the driver at every call site is exactly the leak `json_path` exists to stop. It returns a raw SQL **expression fragment** for the active dialect — drop it straight into a `Query.where()` or raw-SQL string:
@@ -423,7 +445,7 @@ For Chirp's broader free-threading posture, see [[docs/about/thread-safety|Threa
 :::{dropdown} Advanced: pelt on free-threaded Python (3.14t)
 :icon: cpu
 
-Chirp's `data-pg` backend is **pelt**, an in-tree pure-Python PostgreSQL driver with no runtime dependency behind the `data-pg` extra. A connection and its prepared-statement cache have one checked-out owner; the shared codec registry publishes immutable snapshots under a short lock. Pool reset I/O completes before a connection becomes available again.
+Chirp's `data-pg` backend is **pelt**, an in-tree pure-Python PostgreSQL driver with no runtime dependency behind the `data-pg` extra. A connection, its prepared-statement cache, dynamic-type ledger, and database-specific codec registry have one checked-out owner; registry readers use immutable snapshots while a short lock publishes new codecs. Pool reset I/O completes before a connection becomes available again.
 
 CI imports the backend with `PYTHON_GIL=0` and warnings promoted to errors, then runs contention and decode-overlap stress tests. A separate PostgreSQL 17 job proves wire-level queries, concurrent checked-out caches, and failed-transaction rollback before reuse. These are correctness gates, not a production throughput benchmark; measure your own workload before choosing pool size. The auditable evidence map lives in `docs/pelt-free-threading.md` in the source repository. See [[docs/about/thread-safety|Thread Safety]] for Chirp's broader free-threading posture.
 :::{/dropdown}
