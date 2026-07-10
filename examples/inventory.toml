@@ -334,6 +334,17 @@ readme = "present"
 test_entrypoint = "examples/standalone/llm_streaming_kida"
 
 [[examples]]
+path = "standalone/milo_mcp_apps"
+lane = "standalone"
+status = "experimental"
+tier = 3
+extras = []
+network = "none"
+capabilities = ["contracts", "pages", "tools"]
+readme = "present"
+test_entrypoint = "examples/standalone/milo_mcp_apps"
+
+[[examples]]
 path = "standalone/mutation_result"
 lane = "standalone"
 status = "supporting"
