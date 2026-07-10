@@ -1,6 +1,6 @@
 # RFC: `live()` — SSE Topic Primitive (Declare-Once, Bind-Many)
 
-**Status**: Partially implemented. The single-node primitive shipped as `signal()` (`@app.signal` / `@app.derived` / `app.emit` + `signal()` / `signal_block()` / `signal_connect()` globals + the `/_chirp/live` merge stream + `rules_signals` contract; `src/chirp/realtime/signals.py`, `signal_globals.py`, `signal_stream.py`), with Lucky Cat migrated onto one connection. The §1–11 design below predates that build and uses the pre-ship working name `live()`; the shipped surface is `signal()` (see §12 for the as-built names). **Section 12 (multi-worker `SignalBus` backplane + the pure-derived contract) is a NOT-NOW DESIGN — not implemented and not scheduled** (see the status banner at the head of §12). It is the opt-in production upgrade: a new `SignalBus` plugin protocol, a `signal_bus` `AppConfig` field + `set_signal_bus` setter (reusing the existing `chirp[redis]` extra), and a `signal_bus_single_worker` contract rule — all root `AGENTS.md` stop-and-ask surfaces. Must route through realtime, contracts, and app/state stewards before any backplane code lands. Stays in `plan/drafted/` until accepted.
+**Status**: Historical, partially implemented design. The single-node primitive shipped as `signal()` (`@app.signal` / `@app.derived` / `app.emit` + `signal()` / `signal_block()` / `signal_connect()` globals + the `/_chirp/live` merge stream + `rules_signals` contract; `src/chirp/realtime/signals.py`, `signal_globals.py`, `signal_stream.py`), with Lucky Cat migrated onto one connection. The §1–11 design below predates that build and uses the pre-ship working name `live()`; it is retained as a receipt, not current API guidance. **The public/plugin/config proposal in §12 was not accepted.** [RFC 023](../../docs/rfcs/023-private-signal-backplane.md), accepted by issue #678, now owns the bounded private memory/Redis multi-worker design. No backplane runtime is shipped yet.
 **Date**: 2026-06-12
 **Scope**: `src/chirp/realtime/`, `src/chirp/app/` (registry + state + compiler), `src/chirp/contracts/rules_sse.py` (+ a new `rules_live_topics.py`), `src/chirp/templating/macros/chirp/sse.html`, `examples/chirpui/lucky_cat/`
 **Related**: `plan/drafted/rfc-shared-store.md` (Option C — SSE-broadcast store; this RFC supersedes that phase), `plan/drafted/epic-fragment-only-sse.md`, `plan/drafted/epic-reactive-phase2.md`, `pounce-0-7-adoption.md` (HTTP/2 transport), chirp issue **#238** (dead-ticker class)
@@ -647,19 +647,21 @@ to 4 to **1**; boosted navigation always has free sockets.
 
 ## 12. Multi-Worker Backplane & the Pure-Derived Contract
 
-> ## ⚠ STATUS: NOT-NOW DESIGN — NOTHING IN §12 IS SHIPPED
+> ## ⚠ STATUS: SUPERSEDED PROPOSAL — NOTHING IN §12 IS SHIPPED
 >
-> **This section is a planning artifact, not documentation for existing
-> behavior.** No `SignalBus` protocol, no adapter-selection seam, no
-> `RedisSignalBus`, and no `signal_bus` / durable-mode config exist in the tree
-> today. Do **not** cite §12 as a feature; do **not** scaffold against it.
+> **This section is a historical planning artifact, not documentation for
+> existing or accepted behavior.** Its public `SignalBus`, new `AppConfig`
+> field, setter, transparent reconnect, and durable-mode proposals were rejected
+> for the first implementation. [RFC 023](../../docs/rfcs/023-private-signal-backplane.md)
+> is the accepted design. No adapter runtime exists in the tree today. Do **not**
+> cite this section as a feature or scaffold against it.
 >
 > | | |
 > |---|---|
-> | **Section status** | Drafted design — **not implemented**, not scheduled |
-> | **Folder** | `plan/drafted/` (stays here until accepted; do **not** move to `plan/completed/`) |
+> | **Section status** | Superseded by RFC 023 — **not implemented** |
+> | **Folder** | `plan/drafted/` (historical pre-acceptance receipt) |
 > | **Shipped today** | Only the **single-node** `signal()` primitive (§1–11 + §12.1's "shipped" rows). The backplane below is the opt-in upgrade. |
-> | **Gate** | Realtime **+** app/state **+** contracts steward sign-off, plus public-API & changelog collateral, **before any backplane code lands** (see §12.7) |
+> | **Gate** | Runtime implementation child [#699](https://github.com/lbliii/chirp/issues/699), using RFC 023's proof and collateral |
 >
 > **Status carry-over.** Section 1–11 describe the single-node `signal()`
 > primitive. That primitive **shipped** in the build session that produced this
