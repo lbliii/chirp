@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Backlog automation guide
+    url: https://github.com/lbliii/chirp/blob/main/docs/backlog-automation.md
+    about: How issues tie to acceptance tests, PR closure, and reconciliation
+  - name: Browse open issues
+    url: https://github.com/lbliii/chirp/issues
+    about: Check for duplicates before opening a new issue
+  - name: Contributing guide
+    url: https://github.com/lbliii/chirp/blob/main/CONTRIBUTING.md
+    about: PR linking, closure gate, and preflight checks

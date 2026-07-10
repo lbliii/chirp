@@ -1,50 +1,18 @@
 # Chirp Release Roadmap
 
-Status: active next-release roadmap for the 0.7.x line.
+Status: release-gate reference and backlog index — not an active task list.
 
-Authoritative planning lives in `plan/roadmap.md`. This root file is the
-release-manager view: what should land next, what proof closes the release, and
-what stays out of scope.
+**Authoritative backlog:** <https://github.com/lbliii/chirp/issues>  
+**Active maintainer batch:** `.context/todos.md` (links only)  
+**Historical synthesis:** `plan/roadmap.md`
 
-## Current Ground Truth
+Read GitHub issues for what to build next, scope, and acceptance. Package
+version: `pyproject.toml` and `CHANGELOG.md`.
 
-- Latest released version: `0.7.0` (`CHANGELOG.md`, tag `v0.7.0`).
-- Current package version: `0.7.0` in `pyproject.toml`.
-- **Live backlog is authoritative.** Do not trust a static "no open issues"
-  count in this file — it goes stale silently. The source of truth for open
-  work is the GitHub backlog and `plan/roadmap.md`:
-  - Open issues: <https://github.com/lbliii/chirp/issues>
-  - Open PRs: <https://github.com/lbliii/chirp/pulls>
-  - Planning detail and ranking: `plan/roadmap.md`
-- Current release-prep branch: `codex/next-release-roadmap`, with native
-  DevTools debug runtime and request-aware `_actions.py` dispatch prepared for
-  `0.7.1`.
+## Backlog
 
-## 0.7.1 Candidate Scope
-
-The next release should stay patch-sized unless additional user-visible API
-work is accepted. The current candidate is:
-
-1. Ship native DevTools debug runtime follow-through already on `main`.
-2. Ship request-aware filesystem `_actions.py` dispatch so action handlers and
-   request-aware `app.provide()` factories preserve per-request service scope.
-3. Keep planning collateral honest for the post-0.7 roadmap.
-4. Verify release gates, compile the changelog, and prepare the site release
-   page before tagging.
-
-If tenant/base-path URL helpers, new contract categories, or optional-extension
-APIs are added, promote the work to a minor release plan before implementation.
-
-## Next Priorities After 0.7.1
-
-1. Fragment/SSE example audit and browser smoke.
-2. Contract and reactive docs parity.
-3. Mounted page contract confidence for downstream product-shaped apps.
-4. Request URL scope RFC decision before code.
-5. Production form and CSRF proof.
-6. App-shell, OOB, and SSE reconnect proof.
-7. Diagnostics and compact product-shaped fixtures.
-8. Extension contract maturity without making optional packages core.
+- Open issues: <https://github.com/lbliii/chirp/issues>
+- Open PRs: <https://github.com/lbliii/chirp/pulls>
 
 ## Release Gates
 

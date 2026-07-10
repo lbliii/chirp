@@ -1,0 +1,118 @@
+name: Task
+description: Actionable leaf work — scope, dependencies, proof, acceptance criteria
+title: "Task: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Tracking:** This issue body is the task spec. Repo planning files only link here.
+
+        **Closure:** `Closes #N` requires `@pytest.mark.issue(N)` test(s) — or `Acceptance: n/a (reason)` in the PR for docs-only work. See [`docs/backlog-automation.md`](https://github.com/lbliii/chirp/blob/main/docs/backlog-automation.md).
+
+        Set title to `Task: …` and add a `priority:P*` label (or legacy `P*`) matching the dropdown below.
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0
+        - P1
+        - P2
+        - P3
+    validations:
+      required: true
+
+  - type: input
+    id: parent
+    attributes:
+      label: Parent epic
+      description: Epic or saga this task burns down.
+      placeholder: "#337"
+    validations:
+      required: true
+
+  - type: textarea
+    id: depends_on
+    attributes:
+      label: Depends on
+      description: Other issues that must land first. Link issue numbers explicitly.
+      placeholder: |
+        - #652 topology projection
+        - #647 intent capture
+    validations:
+      required: false
+
+  - type: input
+    id: rfc
+    attributes:
+      label: RFC or design doc (if any)
+      description: In-repo path — do not duplicate RFC scope here.
+      placeholder: "docs/rfcs/021-contract-explorer.md"
+    validations:
+      required: false
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: One sentence — what is true when this issue closes?
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Concrete changes included in this issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Boundaries / not in this issue
+      description: Explicit exclusions to keep the PR focused.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proof
+    attributes:
+      label: Required proof
+      description: Commands and tests that must pass. Name `@pytest.mark.issue(N)` test(s) you will add.
+      placeholder: |
+        - `uv run pytest tests/contracts/test_explorer_projection.py -q`
+        - `@pytest.mark.issue(N)` covers exact attachment and unbound findings
+        - `uv run ruff check .` and `uv run ty check src/chirp/`
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checklist a reviewer can verify. Prefer testable statements.
+      placeholder: |
+        - [ ] Exact route/template identity binding works for mounted apps
+        - [ ] Unbound findings stay explicit; no prose matching
+        - [ ] Finding codes and severities unchanged
+    validations:
+      required: true
+
+  - type: textarea
+    id: collateral
+    attributes:
+      label: Collateral
+      description: Docs, examples, changelog, public API review — if any.
+    validations:
+      required: false
+
+  - type: textarea
+    id: approval
+    attributes:
+      label: Dependencies / approval
+      description: RFC sign-off, design check-in, or maintainer decision required before implementation?
+    validations:
+      required: false

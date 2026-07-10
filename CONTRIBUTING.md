@@ -72,8 +72,8 @@ The **live GitHub backlog is authoritative** for open work:
 
 - Issues: <https://github.com/lbliii/chirp/issues>
 - Pull requests: <https://github.com/lbliii/chirp/pulls>
+- **New issues:** use a template under `.github/ISSUE_TEMPLATE/` (Saga, Epic,
+  Task, RFC / research, Bug). See [`docs/backlog-automation.md`](docs/backlog-automation.md).
 
-Planning detail and ranking live in `plan/roadmap.md`. Do not rely on any
-static "no open issues" count baked into a Markdown file — those go stale
-silently (a `roadmap-staleness` pre-commit hook guards against re-introducing
-one).
+Planning indexes (`plan/roadmap.md`, `.context/todos.md`) link issues only —
+they do not duplicate task specs.

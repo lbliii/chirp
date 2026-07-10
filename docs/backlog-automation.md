@@ -2,6 +2,10 @@
 
 > Make "done" a fact a machine derives, not a checkbox a human ticks.
 
+**Issue templates:** `.github/ISSUE_TEMPLATE/` — use **Saga**, **Epic**, **Task**,
+**RFC / research**, or **Bug** when opening work. Templates link here; do not
+duplicate scope in repo planning files.
+
 In a fast, agent-driven repo, PRs merge faster than anyone reconciles the
 issues and epics that spawned them — so the tracker rots. (A June 2026 sweep
 found **13 epics fully shipped yet still open**, with stale checkboxes.) The
@@ -89,8 +93,35 @@ python scripts/reconcile_backlog.py --apply     # also (idempotently) labels iss
 ## Rollout
 
 1. Land this PR — nothing becomes blocking; the gate/sweep are inert until used.
-2. Prefer **GitHub sub-issues** over markdown `- [ ] #N` checklists in epics, so
-   parent progress is maintained by GitHub, not by hand.
+2. Open new work through `.github/ISSUE_TEMPLATE/` (Saga, Epic, Task, RFC /
+   research, Bug). Prefer **GitHub sub-issues** over markdown `- [ ]` checklists
+   in sagas and epics, so parent progress is maintained by GitHub, not by hand.
 3. Tag acceptance tests with `@pytest.mark.issue` as issues are worked.
 4. Once adoption is broad, mark **Issue closure gate** as a required status check
    in branch protection to make the forcing function binding.
+
+## Issue templates
+
+| Template | When to use | Default labels | Body shape (Furatena + Chirp) |
+| --- | --- | --- | --- |
+| **Saga** | Cross-cutting strategic thread | `saga`, `roadmap` | North star, release gates, workstreams, success signal |
+| **Epic** | Major initiative under a saga | `epic` | Parent saga, outcome, dependencies, **exit criteria** |
+| **Task** | Actionable leaf work | (add `P*` + domain labels) | Parent epic, **depends on**, outcome, scope, proof, acceptance |
+| **RFC / research** | Design before implementation | `rfc`, `research` | What, why, research questions, promotion criteria |
+| **Bug** | Verified defect or regression | `bug`, `correctness` | Repro, expected/actual, regression proof |
+
+Hierarchy: **Saga → Epic → Task** as GitHub sub-issues. RFC issues may spawn an
+`implementation-epic` and task children when promoted.
+
+Suggested manual labels after opening (namespaced style used in Furatena/Elbysodic;
+Chirp also keeps legacy flat `P1`, `hypermedia`, etc.):
+
+| Family | Examples |
+| --- | --- |
+| Priority | `P0`–`P3` (or `priority:p0` when migrating) |
+| Domain | `hypermedia`, `contracts`, `streaming`, `ai`, `dx`, … |
+| Workflow | `ready`, `research`, `decision-needed`, `upstream-blocked` |
+| Automation | `merged-pending-close`, `acceptance-tracked`, `stale-epic-review` |
+
+All templates link to this document for closure conventions. Blank issues are
+disabled — pick a template or ask a maintainer.

@@ -1,0 +1,98 @@
+name: RFC / research
+description: Design exploration — not shipped behavior until promoted to implementation children
+title: "[P3] RFC: "
+labels:
+  - rfc
+  - research
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Status:** Research until promoted on GitHub (`ready` label or `implementation-epic` children).
+
+        **Tracking:** Accepted RFC prose lives in `docs/rfcs/`. This issue tracks the decision — not duplicate scope in repo files.
+
+        Horizon parent: [#335](https://github.com/lbliii/chirp/issues/335) · [`docs/backlog-automation.md`](https://github.com/lbliii/chirp/blob/main/docs/backlog-automation.md)
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P2
+        - P3
+    validations:
+      required: true
+
+  - type: input
+    id: parent
+    attributes:
+      label: Parent saga
+      placeholder: "#335"
+    validations:
+      required: false
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What
+      description: What capability or contract are we exploring?
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why only Chirp / why now
+      description: Hypermedia-native advantage or downstream pressure.
+    validations:
+      required: true
+
+  - type: textarea
+    id: depends_on
+    attributes:
+      label: Depends on
+      description: Issues or shipped foundation required before this RFC can close.
+    validations:
+      required: false
+
+  - type: textarea
+    id: research_questions
+    attributes:
+      label: Research questions
+      description: Open decisions to settle before implementation children open.
+      placeholder: |
+        - [ ] What is the public API shape?
+        - [ ] Which categories become deploy-blocking vs warn-only?
+        - [ ] What proof matrix closes the RFC?
+    validations:
+      required: true
+
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Non-goals
+    validations:
+      required: true
+
+  - type: textarea
+    id: success_criteria
+    attributes:
+      label: Success criteria
+      description: Promotion gate — RFC accepted and implementation children opened.
+      placeholder: |
+        - [ ] RFC merged to `docs/rfcs/`
+        - [ ] Steward sign-off recorded
+        - [ ] Implementation epic + task sub-issues opened with proof commands
+    validations:
+      required: true
+
+  - type: textarea
+    id: related
+    attributes:
+      label: Related issues and stewards
+      placeholder: |
+        - #337 Contract Explorer
+        - `src/chirp/contracts/AGENTS.md`
+    validations:
+      required: false

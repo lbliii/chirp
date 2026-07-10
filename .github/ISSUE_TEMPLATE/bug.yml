@@ -1,0 +1,92 @@
+name: Bug
+description: Verified defect or production-readiness regression
+title: "fix: "
+labels:
+  - bug
+  - correctness
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Closure:** `Closes #N` must ship `@pytest.mark.issue(N)` regression test(s). See [`docs/backlog-automation.md`](https://github.com/lbliii/chirp/blob/main/docs/backlog-automation.md).
+
+        Include a minimal repro — failing test, example, or exact steps.
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0
+        - P1
+        - P2
+        - P3
+    validations:
+      required: true
+
+  - type: input
+    id: parent
+    attributes:
+      label: Parent epic (if any)
+      placeholder: "#585"
+    validations:
+      required: false
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What breaks, for whom, and when?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Failing test name, example path, or step-by-step repro.
+      placeholder: |
+        1. `uv run pytest tests/... -k ...`
+        2. Or: boosted navigation in `examples/chirpui/forum_shell` with ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: User impact
+      description: Visible DOM corruption, silent empty swap, data loss, security, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proof
+    attributes:
+      label: Required proof to close
+      description: Regression test(s) and commands. Name the `@pytest.mark.issue(N)` test you will add.
+      placeholder: |
+        - `@pytest.mark.issue(N)` regression in `tests/contracts/...`
+        - `uv run pytest tests/... -q`
+    validations:
+      required: true
+
+  - type: textarea
+    id: related
+    attributes:
+      label: Related issues
+    validations:
+      required: false
