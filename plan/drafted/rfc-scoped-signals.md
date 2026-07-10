@@ -1,9 +1,10 @@
 # RFC — Scoped (per-session / per-connection) signals
 
-**Status**: DRAFT / NOT-NOW DESIGN — not implemented, not scheduled. Companion to
-`rfc-live-sse-topics.md` (which owns the single-node `signal()` primitive and the
-multi-*worker* backplane in its §12). This RFC covers a different axis: a signal
-whose value is **per user**, not global.
+**Status**: Historical, partially implemented design. Session audiences,
+audience-keyed values, derived inheritance, and the `signal_scope` checks shipped;
+per-connection scope remains not now. The single-node history lives in
+`rfc-live-sse-topics.md`; [RFC 023](../../docs/rfcs/023-private-signal-backplane.md)
+owns the accepted, not-yet-shipped multi-worker data plane.
 
 ## Problem
 
@@ -60,14 +61,13 @@ audience of a value (default: the global scope `""`, today's behaviour).
 This changes the **core data model** of every signal (cache key, emit signature,
 bus scope, stream subscription) that the shipped `balance` / `ticker` /
 `notifications` signals and the reactive lobby all depend on. Per the
-`rfc-live-sse-topics.md` §12 gate, signal-core changes route through the realtime +
+[RFC 023](../../docs/rfcs/023-private-signal-backplane.md) gate, signal-core changes route through the realtime +
 app/state + contracts stewards with public-API + changelog collateral before
 landing. Cramming it into the lobby PR would make a large, risky change and couple a
 showcase to an unproven core change. Ship the lobby + the small, additive fixes
 (`signal_attrs`, emit dedup) first; land scoped signals as its own reviewed PR.
 
-## Interaction with §12 (multi-worker backplane)
+## Interaction with RFC 023 (multi-worker backplane)
 
-Orthogonal but composable: a scope key is just part of the bus topic, so a future
-`SignalBus` backplane (§12) fans **scoped** topics across workers unchanged. Design
-the scope-key dimension so it is backplane-agnostic (the key is opaque to the bus).
+Orthogonal but composable: a scope key is an input to RFC 023's opaque,
+server-authorized broker subject. The browser never supplies or sees that key.

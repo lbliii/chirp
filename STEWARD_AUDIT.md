@@ -1,5 +1,30 @@
 # Steward Audit
 
+## Issue #678: Private Multi-Worker Signal Backplane (2026-07-10)
+
+Realtime, contracts, planning, and narrative-docs stewards reviewed the proposed
+multi-worker signal data plane independently. Accepted findings are recorded in
+`docs/rfcs/023-private-signal-backplane.md`; the public `SignalBus`, new
+`AppConfig` field, public setter, transparent reconnect, append delivery, and
+control-plane proposals remain deferred.
+
+Two stewards independently found that the shipped `/_chirp/live?aud=…` shape
+must not cross into a broker boundary. The Convergence Rule promotes that
+accepted audience-authority finding to P0. RFC 023 requires server-derived
+audience identity, opaque exact Redis subjects, unknown/unauthorized topic
+rejection, and no raw audience or payload in URLs, logs, traces, or errors.
+
+Global sweep command:
+
+```text
+rg -n "aud=|query\\.get\\([\\\"']aud|audience_key|signal:aud:|_bus_scope\\(" src tests docs examples site plan -g '*.py' -g '*.md' -g '*.html'
+```
+
+The sweep found the current URL construction/handler, contract wording,
+DevTools trace record, focused tests, Lucky Cat tests, and site source that must
+move together in the runtime child. Generated `site/public/` matches were noted
+but remain generated output, not hand-edited source.
+
 This file records the Phase 4 self-audit for the steward network bootstrap.
 The audit used parallel grouped steward agents covering all scoped stewards.
 One grouped agent returned no machine-verified P0/P1/P2 findings before

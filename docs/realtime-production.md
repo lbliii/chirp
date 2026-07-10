@@ -102,8 +102,9 @@ connection ties up a worker so page loads that land there can stall.
 This is correct for a single-user demo, an internal tool, or any one-process
 deployment. **Multi-worker realtime needs a shared bus backplane** (Redis /
 Postgres pub-sub) plus an external state store so every worker sees the same emits
-and current values. That pluggable multi-worker `SignalBus` is designed but not
-shipped — see `plan/drafted/rfc-live-sse-topics.md` (§12); the surface is
+and current values. The private multi-worker memory/Redis data plane has an
+accepted design but is not shipped — see
+[`RFC 023`](rfcs/023-private-signal-backplane.md); the surface is
 classified **Provisional** in `docs/public-api.md` until it lands. If you need
 cross-worker realtime today, use an `EventStream` over a product-owned durable
 cursor (see *Event Identity And Replay* below), where your store is the backplane.

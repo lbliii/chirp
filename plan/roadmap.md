@@ -25,7 +25,9 @@ acceptance. Do not duplicate that material here; it rots.
 - [#446](https://github.com/lbliii/chirp/issues/446) and children [#447–#458](https://github.com/lbliii/chirp/issues/446) are GF — do not absorb into maintainer batches.
 - Horizon issues under [#335](https://github.com/lbliii/chirp/issues/335) are research until promoted on GitHub.
 - Chirp-ui-owned work belongs in the `chirp-ui` repository.
-- SignalBus-dependent items stay blocked until the external contract is ready.
+- Signal-backplane runtime items follow the accepted private contract in
+  [`docs/rfcs/023-private-signal-backplane.md`](../docs/rfcs/023-private-signal-backplane.md);
+  public or control-plane dependents remain blocked.
 
 ## Current Read
 
