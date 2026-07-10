@@ -1,13 +1,15 @@
 # RFC 019: Live-preserving template reload
 
-**Status:** Proposed
+**Status:** Accepted — offline planner foundation implemented; browser patching
+and continuity canary pending
 
 **Issue:** [#341](https://github.com/lbliii/chirp/issues/341)
 
-**Last audited:** 2026-07-08
+**Last audited:** 2026-07-09
 
-**Shipping impact:** None. This RFC does not change `AppConfig`, CLI behavior,
-template syntax, render semantics, DevTools, or browser reload behavior.
+**Shipping impact:** None. The internal planner is not wired into the reload
+channel. This RFC does not change `AppConfig`, CLI behavior, template syntax,
+render semantics, DevTools, or browser reload behavior.
 
 ## Summary
 
@@ -148,6 +150,36 @@ Add a future debug-only template reload planner with three outcomes:
 
 The existing full reload remains the universal fallback and the behavior until
 a separately reviewed implementation ships.
+
+The [maintainer decision for issue #341][issue-341-decision] approves only the
+bounded planner and browser-canary phases described here. That approval does
+not extend to a new renderer, public API, `AppConfig` or CLI surface, broader
+dependency inference, or revision-aware Suspense changes. Those remain
+separate design decisions.
+
+### Implemented planner foundation
+
+`src/chirp/templating/dev_template_reload.py` now provides the offline Phase 1
+foundation:
+
+- an immutable, source-backed inventory compiled from the frozen hypermedia
+  program and fragment-target registry;
+- explicit Kida cache invalidation followed by real manifest recompilation;
+- separate changed, added, and removed block classification;
+- redacted `patch`, `diagnose`, and `reload` plans with no HTML, context, or
+  credentials;
+- fail-closed route, target-count, connection-owner, shell, Suspense, safe-GET,
+  and htmx-adapter gates; and
+- a per-planner lock and monotonic revisions so concurrent edits cannot publish
+  duplicate revision IDs.
+
+The planner is intentionally not connected to `dev_browser_reload.py`. The
+existing `reload`/`css` EventStream and full-document reload behavior are
+unchanged. Real nested Kida blocks currently change ancestor hashes too, so
+the planner conservatively selects `reload` when more than one block hash
+changes. Authoritative ancestor pruning, browser DOM evidence, response
+validation, DevTools records, and the five-edit Lucky Cat continuity canary
+remain required before browser patching can ship.
 
 ## Change detection
 
@@ -351,12 +383,14 @@ observable and cannot silently reuse a prior success identifier.
 - define conservative eligibility and failure behavior; and
 - ship no behavior change.
 
-### Phase 1: planner without browser mutation
+### Phase 1: planner without browser mutation — foundation implemented
 
-- compile the debug-only logical template inventory;
-- classify real edits as patch, diagnose, or reload;
-- expose decisions in tests/DevTools while still performing full reload; and
-- measure false patch eligibility against Forum Shell and Lucky Cat.
+- compile the debug-only logical template inventory — helper implemented;
+- classify real edits as patch, diagnose, or reload — implemented and tested;
+- expose decisions in DevTools while still performing full reload — pending;
+  and
+- measure false patch eligibility against Forum Shell and Lucky Cat — nested
+  ancestor-hash fallback recorded; broader measurement pending.
 
 This phase touches compiler/debug wiring and requires a separate implementation
 review.
@@ -436,5 +470,8 @@ cannot be safely mutated piecemeal. Pounce process reload remains authoritative.
 
 ## Collateral
 
-No changelog: proposed RFC only. Site, example, scaffold, public API, migration,
-and release collateral wait for a separately approved implementation.
+No changelog: internal planner foundation only, with no shipped browser
+behavior. Site, example, scaffold, public API, migration, and release
+collateral wait for browser integration.
+
+[issue-341-decision]: https://github.com/lbliii/chirp/issues/341#issuecomment-4929173683
