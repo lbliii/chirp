@@ -1,1 +1,1 @@
-Raise the optional UI, docs, development, and generated scaffold floor to `chirp-ui>=0.11.3` so Bengal sites inherit adaptive pagination, searchable tracking-free link destinations, canonical source provenance, and the tagged-PDF proof contract.
+Raise the optional UI, docs, development, and generated scaffold floor to `chirp-ui>=0.11.4` so Bengal sites inherit adaptive pagination, searchable tracking-free link destinations, canonical source provenance, and warning-free tagged-PDF emphasis semantics.
