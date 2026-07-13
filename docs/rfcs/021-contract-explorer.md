@@ -1,6 +1,7 @@
 # RFC 021: Contract Explorer
 
-**Status:** Proposed
+**Status:** Accepted; private static projection implemented by #652 and exact
+finding-binding proof completed by #653
 
 **Issue:** [#337](https://github.com/lbliii/chirp/issues/337)
 
@@ -10,7 +11,7 @@
 
 **Last audited:** 2026-07-08
 
-**Shipping impact:** None. This RFC does not add a CLI flag, public graph or
+**Shipping impact:** Private debug/test projection only. This RFC does not add a CLI flag, public graph or
 inspection type, serialized schema, route, AppConfig field, contract category,
 severity change, deploy gate, fuzzer, HTML artifact, or DevTools behavior.
 
@@ -81,6 +82,24 @@ first Explorer must not guess an exact graph-node join from prose.
 `src/chirp/cli/_routes.py` now supplies one structured route table across human
 CLI, programmatic, MCP, and llms.txt use. It intentionally exposes only method,
 path, handler label, and route name. It is not a compiler graph export.
+
+### Private static projection
+
+Issue #652 implements `src/chirp/contracts/explorer_projection.py` as a private,
+frozen, slotted projection over one frozen `HypermediaProgram` and one finalized
+`CheckResult`. It copies route, template, block, target, transition, finding,
+coverage, and explicit analysis-gap facts into deterministically sorted tuples.
+It does not accept an `App`, load a template, inspect a mutable registry, or
+execute a handler.
+
+Finding binding uses only the structured `ContractIssue.route` and
+`ContractIssue.template` fields. A location that selects one node is `bound`, a
+method-ambiguous path is `ambiguous`, and an absent or unknown location is
+`unbound`. Issue #653 locks the important negative case: two findings may have
+identical text containing real route and template names, yet the finding without
+structured location remains unbound. No message token or substring participates
+in correlation. The projection preserves the finalized category, severity,
+message, route, template, details, and coverage values unchanged.
 
 ### Runtime transition evidence
 
@@ -472,7 +491,7 @@ gate green.
 - reject automatic route execution; and
 - ship no behavior.
 
-### Phase 1: private immutable projection
+### Phase 1: private immutable projection — implemented by #652 and #653
 
 - copy supported compiler topology into private explorer records;
 - attach finalized findings without guessed prose-to-node joins;
@@ -583,11 +602,13 @@ repairs, but code mutation remains an explicit developer/agent workflow.
 
 ## Collateral and status
 
-This RFC is canonical design research only. It needs no README, public API,
-site, example, scaffold, migration, benchmark, or changelog update because it
-ships no behavior and documents no available command.
+This RFC is the canonical design and private implementation record. It needs no
+README, public API, site, example, scaffold, migration, benchmark, or changelog
+update because the projection has no public consumer or available command.
 
-No changelog: proposed RFC only.
+No changelog: #652 and #653 add private debug/test projection and regression
+proof only; they add no public API, CLI, configuration, route, severity change,
+or production behavior.
 
 ## Decision gates for implementation
 
