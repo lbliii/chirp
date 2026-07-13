@@ -1,6 +1,7 @@
 # RFC 020: Intent Timeline
 
-**Status:** Accepted; private capture foundation implemented by #647
+**Status:** Accepted; private capture foundation implemented by #647 and
+private artifact/comparator implemented by #648
 
 **Issue:** [#336](https://github.com/lbliii/chirp/issues/336)
 
@@ -87,6 +88,32 @@ request IDs, links SSE children to their typed response, and exposes explicit
 count/byte truncation state. It still remains one process-local app capture; browser
 scoping, artifacts, comparison, and additional transport correlation belong to
 #648–#650.
+
+### Versioned private artifact and comparator
+
+Issue #648 implements the private observation-only artifact in
+`src/chirp/server/intent_replay.py`. The `.chirp-replay` envelope is exact and
+versioned as `chirp.intent-timeline/1`; it accepts only `kind="observation"`
+with `public-safe-v1` redaction. It contains created-with Chirp version,
+optional program fingerprint, explicit truncation metadata, and typed request,
+render-intent, response, SSE, or diagnostic events.
+
+The loader accepts at most 1 MiB and 500 events, requires unique contiguous
+sequence values and valid earlier parent links, and rejects unknown versions,
+kinds, channels, detail variants, missing/extra fields, non-finite numbers,
+absolute template paths, query-bearing route patterns, and forbidden
+body/HTML/header/cookie/session/auth/context/data fields. Errors name the
+artifact and JSON field path without echoing a rejected value. Absolute wall
+clock is not persisted.
+
+The private semantic comparator treats route/mode, return/render intent,
+block/target, status, compiled transitions, lifecycle facts, causal parent,
+ordering, truncation, and program fingerprint as authoritative. It normalizes
+only elapsed time, opaque capture request IDs, per-event absolute sequence
+values, capture source, and Chirp patch-version differences. Loading and comparison
+perform no imports, requests, route calls, DOM writes, or application mutation.
+No CLI, public testing type, top-level export, production ingestion, or
+artifact compatibility promise is added.
 
 ### Browser DevTools history
 
@@ -583,8 +610,9 @@ debug/test infrastructure, so it needs no README, public API, site, example,
 scaffold, migration, benchmark, or changelog update and documents no available
 command.
 
-No changelog: #647 changes private debug/test capture internals only and adds no
-public API, configuration, CLI, or production behavior.
+No changelog: #647 and #648 change private debug/test capture internals only and
+add no public API, configuration, CLI, production behavior, route execution, or
+artifact compatibility promise.
 
 ## Decision gates for implementation
 
