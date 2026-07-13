@@ -2,7 +2,7 @@
 
 These exercise :func:`build_codec_plan`: a mixed-type ``RowDescription`` must produce one correct
 ``(bytes | None) -> Any`` decoder per column, SQL NULL must decode to ``None``, an unregistered
-OID must hit the fail-soft text/binary fallback (never crash the row path), and a parametric
+OID must preserve text but reject unsupported binary bytes, and a parametric
 ``int4[]`` column must round-trip through the plan against the element codec resolved from the
 registry snapshot.
 
@@ -26,6 +26,8 @@ from chirp.data.drivers._pelt._codecs import (
     OID_TEXT,
     build_codec_plan,
     build_default_registry,
+    result_format_codes,
+    with_result_formats,
 )
 from chirp.data.drivers._pelt._codecs_array import OID_ARRAY_INT4
 from chirp.data.drivers._pelt._codecs_composite_range_enum import OID_INT4RANGE, Range
@@ -34,6 +36,7 @@ from chirp.data.drivers._pelt._codecs_numeric import OID_NUMERIC
 from chirp.data.drivers._pelt._codecs_temporal import OID_DATE
 from chirp.data.drivers._pelt._codecs_uuid_bytea import OID_UUID
 from chirp.data.drivers._pelt._messages import DataRow, FieldDescription, RowDescription
+from chirp.data.drivers._pelt.errors import ProtocolError
 
 # Wire format codes carried in FieldDescription.format_code / Bind.
 _FMT_TEXT = 0
@@ -147,16 +150,18 @@ def test_null_columns_decode_to_none_regardless_of_type():
     assert plan[2](None) is None
 
 
-# --- unregistered OID: fail-soft fallback ------------------------------------
-@pytest.mark.issue(255)
-def test_unregistered_binary_oid_falls_back_to_raw_bytes():
+# --- unregistered OID: text fallback, fail-loud binary -----------------------
+@pytest.mark.issue(255, 695)
+def test_unregistered_binary_oid_fails_loud_with_recovery_hint():
     snap = DEFAULT_REGISTRY.snapshot()
     unknown_oid = 999_999  # not in pg_type and definitely not registered
     assert snap.get(unknown_oid) is None
     plan = build_codec_plan(RowDescription(fields=(_field(unknown_oid, fmt=_FMT_BINARY),)), snap)
-    raw = b"\xde\xad\xbe\xef"
-    # Binary fallback hands the bytes back verbatim — never crashes, never guesses a type.
-    assert plan[0](raw) == raw
+    with pytest.raises(ProtocolError, match="without a registered binary decoder") as caught:
+        plan[0](b"\xde\xad\xbe\xef")
+    assert caught.value.code == "PELT_PROTO_DESYNC"
+    assert caught.value.hint is not None
+    assert "Request text format" in caught.value.hint
     assert plan[0](None) is None
 
 
@@ -168,17 +173,17 @@ def test_unregistered_text_oid_falls_back_to_utf8():
     assert plan[0](None) is None
 
 
-@pytest.mark.issue(255)
-def test_unknown_type_does_not_crash_the_row_path():
-    # An entire row of unknown types must decode without raising.
+@pytest.mark.issue(255, 695)
+def test_unknown_type_text_is_preserved_while_binary_is_rejected():
     snap = DEFAULT_REGISTRY.snapshot()
     row_desc = RowDescription(
         fields=(_field(700001, fmt=_FMT_BINARY), _field(700002, fmt=_FMT_TEXT))
     )
     plan = build_codec_plan(row_desc, snap)
     row = DataRow(values=(b"\x00\x01", b"plain text"))
-    decoded = tuple(decode(raw) for decode, raw in zip(plan, row.values, strict=True))
-    assert decoded == (b"\x00\x01", "plain text")
+    with pytest.raises(ProtocolError):
+        plan[0](row.values[0])
+    assert plan[1](row.values[1]) == "plain text"
 
 
 # --- parametric: int4[] resolves its element codec and round-trips -----------
@@ -243,19 +248,39 @@ def test_int4range_column_round_trips_through_the_plan():
 
 
 # --- parametric fallback: array element codec missing → text fallback --------
-@pytest.mark.issue(255)
-def test_array_with_unresolvable_element_falls_back_not_crashes():
-    # A registry stripped of int4 cannot resolve the _int4 element codec; the plan must fall back
-    # to the binary raw-bytes lane rather than raising while building or decoding.
+@pytest.mark.issue(255, 695)
+def test_array_with_unresolvable_element_rejects_binary_bytes():
     bare = build_default_registry()
     # Build a snapshot that lacks int4 by using a registry where we never registered it: emulate
     # by snapshotting then deleting is impossible (MappingProxyType is read-only), so use a
     # hand-built dict snapshot missing OID_INT4 but keeping the array OID mapping in play.
     snap = {oid: codec for oid, codec in bare.snapshot().items() if oid != OID_INT4}
     plan = build_codec_plan(RowDescription(fields=(_field(OID_ARRAY_INT4),)), snap)
-    raw = b"\x00\x00\x00\x00"  # arbitrary bytes; fallback returns them verbatim, no crash
-    assert plan[0](raw) == raw
+    with pytest.raises(ProtocolError, match="without a registered binary decoder"):
+        plan[0](b"\x00\x00\x00\x00")
     assert plan[0](None) is None
+
+
+@pytest.mark.issue(695)
+def test_result_formats_are_explicit_and_copied_onto_execution_description():
+    snapshot = DEFAULT_REGISTRY.snapshot()
+    declared = RowDescription(
+        fields=(
+            _field(OID_INT4, fmt=_FMT_TEXT, name="integer"),
+            _field(OID_TEXT, fmt=_FMT_TEXT, name="text"),
+            _field(OID_ARRAY_INT4, fmt=_FMT_TEXT, name="array"),
+            _field(999_999, fmt=_FMT_TEXT, name="unknown"),
+        )
+    )
+
+    formats = result_format_codes(declared, snapshot)
+    execution = with_result_formats(declared, formats)
+
+    assert formats == (1, 0, 1, 0)
+    assert tuple(field.format_code for field in declared.fields) == (0, 0, 0, 0)
+    assert tuple(field.format_code for field in execution.fields) == formats
+    with pytest.raises(ValueError, match="does not match"):
+        with_result_formats(declared, (1,))
 
 
 # --- plan is reusable across rows --------------------------------------------

@@ -107,9 +107,18 @@ def build_bind(
     portal: str = "",
     statement: str = "",
     params: Sequence[bytes | None] = (),
+    result_formats: Sequence[int] = (),
 ) -> bytes:
-    """Extended-protocol ``Bind`` (tag ``'B'``). Text-format params/results for the E1 spine;
-    per-codec binary formats arrive in epic E2."""
+    """Extended-protocol ``Bind`` (tag ``'B'``).
+
+    Parameters remain text encoded. ``result_formats`` is empty for PostgreSQL's
+    all-text default, one code for every result column, or a one-code
+    all-columns shortcut. Codes are validated before framing so malformed
+    negotiation never reaches the socket.
+    """
+    if any(code not in (0, 1) for code in result_formats):
+        msg = "result format codes must be 0 (text) or 1 (binary)"
+        raise ValueError(msg)
     b = MessageBuilder()
     b.write_cstring(portal)
     b.write_cstring(statement)
@@ -121,7 +130,9 @@ def build_bind(
         else:
             b.write_int32(len(value))
             b.write_bytes(value)
-    b.write_int16(0)  # zero result format codes → all results in text format
+    b.write_int16(len(result_formats))
+    for code in result_formats:
+        b.write_int16(code)
     return frame(_TAG_BIND, b.getvalue())
 
 

@@ -65,6 +65,27 @@ def test_build_extended_protocol_messages_are_tagged():
     assert builder.build_terminate() == b"X" + (4).to_bytes(4, "big")
 
 
+@pytest.mark.issue(695)
+def test_build_bind_encodes_explicit_per_column_result_formats():
+    body = (
+        b"\x00"  # unnamed portal
+        b"statement\x00"
+        + (0).to_bytes(2, "big")  # text parameters
+        + (0).to_bytes(2, "big")  # no parameter values
+        + (3).to_bytes(2, "big")
+        + (1).to_bytes(2, "big")
+        + (0).to_bytes(2, "big")
+        + (1).to_bytes(2, "big")
+    )
+
+    assert builder.build_bind(
+        statement="statement",
+        result_formats=(1, 0, 1),
+    ) == builder.frame(b"B", body)
+    with pytest.raises(ValueError, match=r"0 .* or 1"):
+        builder.build_bind(result_formats=(2,))
+
+
 @pytest.mark.issue(269)
 def test_build_describe_rejects_bad_kind():
     with pytest.raises(ValueError, match="'S' or 'P'"):

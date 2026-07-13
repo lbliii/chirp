@@ -14,6 +14,8 @@ import pytest
 from chirp.data.database import Database
 from chirp.data.drivers._pelt import connection as pelt_connection
 from chirp.data.drivers._pelt import pool as pelt_pool
+from chirp.data.drivers._pelt._codecs_composite_range_enum import Range
+from chirp.data.drivers._pelt._codecs_temporal import Interval
 from chirp.data.drivers._pelt.errors import PostgresError
 from chirp.data.drivers._pelt.types import PoolConfig
 
@@ -273,6 +275,115 @@ async def test_live_array_and_range_types_preserve_text_when_binary_is_not_reque
         "numbers": "{1,2,NULL}",
         "span": "[1,4)",
     }
+
+
+@requires_pg
+@pytest.mark.issue(695)
+async def test_live_extended_query_negotiates_dynamic_types_and_text_fallback() -> None:
+    """Server-assigned OIDs drive one mixed Bind without changing cached declaration facts."""
+    assert PG_DSN is not None
+    conn = await pelt_pool.connect(PG_DSN)
+    sql = """
+        SELECT
+            $1::int4 AS integer,
+            'happy'::pelt_695_mood AS mood,
+            ARRAY['happy'::pelt_695_mood, NULL, 'sad'::pelt_695_mood] AS moods,
+            ROW(9, 'sad')::pelt_695_card AS card,
+            '[happy,sad]'::pelt_695_mood_range AS mood_span,
+            '0/16B6C50'::pg_lsn AS opaque_known_to_postgres
+    """
+    try:
+        await conn.execute(
+            "DROP TYPE IF EXISTS pelt_695_mood_range, pelt_695_card, pelt_695_mood CASCADE"
+        )
+        await conn.execute("CREATE TYPE pelt_695_mood AS ENUM ('happy', 'sad')")
+        await conn.execute("CREATE TYPE pelt_695_card AS (rank int4, mood pelt_695_mood)")
+        await conn.execute("CREATE TYPE pelt_695_mood_range AS RANGE (subtype=pelt_695_mood)")
+
+        first = await conn.fetchrow(sql, 7)
+        statement = conn._protocol.cache.get(sql, ())
+        attempted = frozenset(conn._catalog_attempted_oids)
+        second = await conn.fetchrow(sql, 8)
+        reused = conn._protocol.cache.get(sql, ())
+
+        assert first is not None
+        assert dict(first) == {
+            "integer": 7,
+            "mood": "happy",
+            "moods": ["happy", None, "sad"],
+            "card": (9, "sad"),
+            "mood_span": Range("happy", "sad", lower_inc=True, upper_inc=True),
+            "opaque_known_to_postgres": "0/16B6C50",
+        }
+        assert second is not None
+        assert second["integer"] == 8
+        assert statement is not None
+        assert reused is statement
+        assert statement.row_description is not None
+        assert tuple(field.format_code for field in statement.row_description.fields) == (
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
+        assert conn._active_row_description is not None
+        assert tuple(field.format_code for field in conn._active_row_description.fields) == (
+            1,
+            0,
+            1,
+            1,
+            1,
+            0,
+        )
+        assert frozenset(conn._catalog_attempted_oids) == attempted
+        fields_by_name = {field.name: field for field in statement.row_description.fields}
+        registry = conn._registry.snapshot()
+        assert registry[fields_by_name["mood"].type_oid].prefers_binary is False
+        for name in ("moods", "card", "mood_span"):
+            assert registry[fields_by_name[name].type_oid].prefers_binary is True
+        assert registry.get(fields_by_name["opaque_known_to_postgres"].type_oid) is None
+        result_oids = {field.type_oid for field in fields_by_name.values()}
+        assert result_oids <= conn._catalog_attempted_oids | set(conn._registry.snapshot())
+    finally:
+        await conn.execute(
+            "DROP TYPE IF EXISTS pelt_695_mood_range, pelt_695_card, pelt_695_mood CASCADE"
+        )
+        await conn.close()
+
+
+@requires_pg
+@pytest.mark.issue(695)
+@pytest.mark.parametrize(
+    "interval_style",
+    ["sql_standard", "postgres", "postgres_verbose", "iso_8601"],
+)
+async def test_live_binary_interval_is_independent_of_interval_style(
+    interval_style: str,
+) -> None:
+    assert PG_DSN is not None
+    conn = await pelt_pool.connect(PG_DSN)
+    sql = """
+        SELECT
+            $1::int4 AS marker,
+            INTERVAL '1 year 2 months 3 days 04:05:06.123456' AS span
+    """
+    try:
+        await conn.execute(f"SET IntervalStyle TO '{interval_style}'")
+        row = await conn.fetchrow(sql, 1)
+    finally:
+        await conn.close()
+
+    assert row is not None
+    assert row["marker"] == 1
+    assert row["span"] == Interval(
+        months=14,
+        days=3,
+        microseconds=((4 * 60 + 5) * 60 + 6) * 1_000_000 + 123_456,
+    )
+    assert conn._active_row_description is not None
+    assert tuple(field.format_code for field in conn._active_row_description.fields) == (1, 1)
 
 
 @requires_pg

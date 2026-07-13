@@ -2,10 +2,11 @@
 
 A :class:`Codec` knows how to encode a Python value to wire bytes and decode wire bytes back,
 in both binary and text formats. The :class:`CodecRegistry` maps PostgreSQL type OIDs to
-codecs; it is the one genuinely shared-mutable structure in the hot path, so it is
-``threading.Lock``-guarded, exposes reads as a :class:`types.MappingProxyType` snapshot, and
-**fails loud** on a conflicting re-registration (never last-wins) — the chirp ``shapes``
-registry discipline.
+codecs. A live connection owns a database-specific registry so server-assigned OIDs never
+cross sessions; registries remain ``threading.Lock``-guarded for safe publication, expose reads
+as a :class:`types.MappingProxyType` snapshot, and **fail loud** on a conflicting
+re-registration (never last-wins) — the chirp ``shapes`` registry discipline. The process-wide
+default supplies immutable built-in facts to module consumers and fresh-registry construction.
 
 The E1 spine shipped only the hottest OIDs (ints, text, bool, floats). The E2 long tail —
 ``numeric``, the temporal family, ``uuid``/``bytea``, ``json``/``jsonb``, and the parametric
@@ -29,12 +30,12 @@ from __future__ import annotations
 
 import struct
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable, Mapping, Sequence
 
     from chirp.data.drivers._pelt._messages import FieldDescription, RowDescription
 
@@ -42,6 +43,8 @@ if TYPE_CHECKING:
     # clear of the ``_codecs`` ↔ codec-family import cycle; declare it here so it is statically
     # visible to type checkers and ``from ._codecs import DEFAULT_REGISTRY`` callers.
     DEFAULT_REGISTRY: CodecRegistry
+
+from chirp.data.drivers._pelt.errors import ProtocolError
 
 # --- common type OIDs (from pg_type.dat) ------------------------------------
 OID_BOOL = 16
@@ -279,9 +282,9 @@ def __getattr__(name: str) -> Any:
     process-wide default a one-liner for callers while staying cycle-safe under any import order.
 
     The build is double-checked-lock guarded so concurrent first accesses on free-threaded
-    workers materialize exactly one registry. Treated read-only after creation; apps register
-    extra codecs on a fresh :func:`build_default_registry` (e.g. per-DB enums / composites at
-    connect time).
+    workers materialize exactly one registry. Treated read-only after creation; connections
+    register extra codecs on a fresh :func:`build_default_registry` for per-database enums,
+    arrays, ranges, and composites.
     """
     if name == "DEFAULT_REGISTRY":
         global _DEFAULT_REGISTRY
@@ -330,13 +333,14 @@ def _range_element_oid_map() -> Mapping[int, int]:
     }
 
 
-def _binary_text_fallback(data: bytes) -> bytes:
-    """Binary-format fallback for an unregistered OID: hand back the raw column bytes verbatim.
-
-    The driver cannot know the Python shape of an unknown binary type, so it surfaces the bytes
-    unchanged rather than guessing (or crashing) — the caller can decode them out-of-band.
-    """
-    return data
+def _unsupported_binary_fallback(data: bytes) -> Any:
+    """Reject binary bytes for an OID without a proven decoder."""
+    del data
+    msg = "PostgreSQL returned binary data for a type without a registered binary decoder"
+    raise ProtocolError(
+        msg,
+        hint="Request text format for the column or register a codec for its server-assigned OID.",
+    )
 
 
 def _text_utf8_fallback(data: bytes) -> str:
@@ -388,8 +392,57 @@ def _column_decoder(
             return lambda data: crange.decode_range(data, decode_elem)
 
     # Unknown OID (or a parametric column we cannot resolve / a text-format parametric column):
-    # the fail-soft text/binary fallback. An unresolved type never crashes the row.
-    return _binary_text_fallback if binary else _text_utf8_fallback
+    # preserve the faithful UTF-8 fallback for text. Binary data has no safe generic Python
+    # interpretation, so fail loud if the server contradicts pelt's text negotiation.
+    return _unsupported_binary_fallback if binary else _text_utf8_fallback
+
+
+def result_format_codes(
+    row_desc: RowDescription,
+    registry_snapshot: Mapping[int, Codec],
+) -> tuple[int, ...]:
+    """Choose one explicit result format per described column.
+
+    A registered codec opts into binary through ``prefers_binary``. Known
+    parametric arrays and ranges opt in when their element codec is available.
+    Every unresolved OID stays text, preserving PostgreSQL's lossless output
+    fallback instead of requesting undecodable bytes.
+    """
+    array_elements = _array_element_oid_map()
+    range_elements = _range_element_oid_map()
+    formats: list[int] = []
+    for field in row_desc.fields:
+        codec = registry_snapshot.get(field.type_oid)
+        if codec is not None:
+            formats.append(1 if codec.prefers_binary else 0)
+            continue
+        element_oid = array_elements.get(field.type_oid)
+        if element_oid is None:
+            element_oid = range_elements.get(field.type_oid)
+        formats.append(1 if element_oid in registry_snapshot else 0)
+    return tuple(formats)
+
+
+def with_result_formats(
+    row_desc: RowDescription,
+    formats: Sequence[int],
+) -> RowDescription:
+    """Copy a statement description with the formats selected by ``Bind``."""
+    if len(formats) != len(row_desc.fields):
+        msg = (
+            f"result format count {len(formats)} does not match "
+            f"row-description field count {len(row_desc.fields)}"
+        )
+        raise ValueError(msg)
+    if any(code not in (0, 1) for code in formats):
+        msg = "result format codes must be 0 (text) or 1 (binary)"
+        raise ValueError(msg)
+    return type(row_desc)(
+        fields=tuple(
+            replace(field, format_code=code)
+            for field, code in zip(row_desc.fields, formats, strict=True)
+        )
+    )
 
 
 def build_codec_plan(

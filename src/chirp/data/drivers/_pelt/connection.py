@@ -18,7 +18,14 @@ from typing import Any
 import anyio
 from anyio import EndOfStream
 
-from chirp.data.drivers._pelt import _builder, _codecs, _params, _runtime, _transport
+from chirp.data.drivers._pelt import (
+    _builder,
+    _codecs,
+    _params,
+    _runtime,
+    _transport,
+    _type_discovery,
+)
 from chirp.data.drivers._pelt._protocol import (
     CommandCompleteEvent,
     DataRowEvent,
@@ -174,12 +181,14 @@ class Connection:
 
     __slots__ = (
         "_active_row_description",
+        "_catalog_attempted_oids",
         "_closed",
         "_config",
         "_listener_tg",
         "_listener_tg_cm",
         "_listeners",
         "_protocol",
+        "_registry",
         "_stream",
     )
 
@@ -195,6 +204,10 @@ class Connection:
         self._config = config
         self._closed = False
         self._active_row_description = None
+        self._registry = _codecs.build_default_registry()
+        # Per-connection and single-owner: catalog misses are remembered so an
+        # unsupported OID remains a cheap text fallback on later executions.
+        self._catalog_attempted_oids: set[int] = set()
         self._listeners: dict[str, list[Callable[[Connection, int, str, str], None]]] = {}
         self._listener_tg: Any = None
         self._listener_tg_cm: Any = None
@@ -312,15 +325,30 @@ class Connection:
         max_rows: int,
     ) -> tuple[_QueryResult, bool]:
         statement = await self._ensure_prepared(sql, ())
+        execution_description = None
+        result_formats: tuple[int, ...] = ()
+        if statement.row_description is not None:
+            await self._ensure_result_codecs(statement.row_description)
+            result_formats = _codecs.result_format_codes(
+                statement.row_description,
+                self._registry.snapshot(),
+            )
+            execution_description = _codecs.with_result_formats(
+                statement.row_description,
+                result_formats,
+            )
         wire_params = tuple(_params.encode_param(p) for p in params)
         outbound = self._protocol.send_bind_execute(
             statement=statement.name,
             params=wire_params,
+            result_formats=result_formats,
             max_rows=max_rows,
         )
-        if statement.row_description is not None:
-            self._protocol.seed_row_description(statement.row_description)
-            self._active_row_description = statement.row_description
+        if execution_description is not None:
+            self._protocol.seed_row_description(execution_description)
+            self._active_row_description = execution_description
+        else:
+            self._active_row_description = None
         events = await self._roundtrip(outbound)
         return self._collect_query_result(events)
 
@@ -342,6 +370,34 @@ class Connection:
             elif isinstance(event, RowDescriptionEvent):
                 self._protocol.record_row_description(sql, param_oids, event.description)
         return self._protocol.cache.get(sql, param_oids) or statement
+
+    async def _ensure_result_codecs(self, description: Any) -> None:
+        """Discover server-assigned result OIDs once for this connection."""
+        known = self._registry.snapshot()
+        pending = {
+            field.type_oid
+            for field in description.fields
+            if field.type_oid not in known and field.type_oid not in self._catalog_attempted_oids
+        }
+        discovered: dict[int, _type_discovery.TypeMetadata] = {}
+        while pending:
+            batch = tuple(sorted(pending))
+            result = await self._execute_simple(_type_discovery.build_type_catalog_query(batch))
+            metadata = _type_discovery.parse_type_catalog_rows(result.rows)
+            self._catalog_attempted_oids.update(batch)
+            for item in metadata:
+                discovered[item.oid] = item
+            known = self._registry.snapshot()
+            pending = {
+                dependency
+                for item in metadata
+                for dependency in item.dependencies
+                if dependency not in known and dependency not in self._catalog_attempted_oids
+            }
+        _type_discovery.register_type_codecs(
+            self._registry,
+            tuple(discovered.values()),
+        )
 
     async def _roundtrip(
         self,
@@ -426,7 +482,7 @@ class Connection:
         suspended = False
         codec_plan: tuple[Any, ...] | None = None
         column_names: tuple[str, ...] = ()
-        registry = _codecs.DEFAULT_REGISTRY.snapshot()
+        registry = self._registry.snapshot()
 
         for event in events:
             if isinstance(event, RowDescriptionEvent):

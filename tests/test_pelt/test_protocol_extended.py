@@ -232,6 +232,28 @@ def test_prepare_then_execute_round_trip_with_params():
     assert proto.state is ProtocolState.READY
 
 
+@pytest.mark.issue(695)
+def test_bind_execute_forwards_mixed_result_format_selection():
+    proto = ExtendedQueryProtocol()
+
+    out = proto.send_bind_execute(
+        statement="mixed",
+        params=(b"1",),
+        result_formats=(1, 0, 1),
+    )
+
+    assert out == (
+        _builder.build_bind(
+            portal="",
+            statement="mixed",
+            params=(b"1",),
+            result_formats=(1, 0, 1),
+        )
+        + _builder.build_execute(portal="", max_rows=0)
+        + _builder.build_sync()
+    )
+
+
 @pytest.mark.issue(256)
 def test_prepare_cache_hit_skips_wire_traffic():
     proto = ExtendedQueryProtocol()
