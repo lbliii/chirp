@@ -2,7 +2,7 @@
 
 Developed in-tree as a private subpackage (``chirp.data.drivers._pelt``) behind the
 ``data-pg`` seam, and designed to be lifted out to a standalone ``bengal-pelt`` package once
-mature (the seam then flips ``from . import _pelt`` → ``import pelt``). See the pelt saga
+mature (the seam then flips ``from . import _pelt`` → ``import bengal_pelt``). See the pelt saga
 (GitHub #252) and ``.context/pelt-design-conventions.md``.
 
 The in-tree package exposes config, errors, connection, pool, and construction helpers while

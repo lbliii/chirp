@@ -15,7 +15,10 @@ Pelt is currently a private, in-tree implementation behind Chirp's `data-pg`
 seam. It is pure Python and speaks the PostgreSQL wire protocol without libpq,
 psycopg, asyncpg, or a compiled runtime extension. Applications should use
 `chirp.data.Database`, not import `chirp.data.drivers._pelt`; the seam is the
-planned extraction boundary for a future standalone package.
+planned extraction boundary for the standalone `bengal-pelt` distribution and
+`bengal_pelt` import accepted in [RFC 024](rfcs/024-pelt-extraction.md). The RFC
+records a future move; the driver remains in-tree until its implementation issue
+ships.
 
 ## Evidence map
 
