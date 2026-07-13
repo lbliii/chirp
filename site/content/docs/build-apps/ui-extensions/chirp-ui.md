@@ -32,7 +32,7 @@ It gives you:
 ## Installation
 
 :::{since} 0.11.0
-The `chirp[ui]` extra pulls in `chirp-ui>=0.11.2`. Requires Python 3.14+.
+The `chirp[ui]` extra pulls in `chirp-ui>=0.11.3`. Requires Python 3.14+.
 :::
 
 :::{tab-set}

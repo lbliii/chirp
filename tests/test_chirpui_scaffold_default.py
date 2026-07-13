@@ -13,7 +13,7 @@ from chirp.cli.templates import PYPROJECT_TOML, V2_APP_CHIRPUI_PY
 @pytest.mark.issue(157)
 def test_scaffold_pyproject_declares_ui_extra() -> None:
     assert "[project.optional-dependencies]" in PYPROJECT_TOML
-    assert 'ui = ["chirp-ui>=0.11.2"]' in PYPROJECT_TOML
+    assert 'ui = ["chirp-ui>=0.11.3"]' in PYPROJECT_TOML
 
 
 @pytest.mark.issue(157)
