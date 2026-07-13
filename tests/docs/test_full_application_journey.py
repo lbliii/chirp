@@ -141,7 +141,7 @@ def test_compiler_product_story_is_aligned_and_source_backed() -> None:
     model = HYPERMEDIA_MODEL.read_text(encoding="utf-8")
     journey = JOURNEY.read_text(encoding="utf-8")
 
-    positioning = "full-stack Python hypermedia framework with a built-in contract compiler"
+    positioning = "hypermedia-native Python framework for server-rendered product UIs"
     assert positioning in readme
     assert positioning in " ".join(compiler.split())
     assert "Shipped compiler foundation and observable proof loop" in compiler

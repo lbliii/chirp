@@ -6,8 +6,8 @@
 
 ## Thesis
 
-Chirp is a full-stack Python hypermedia framework with a built-in contract
-compiler.
+Chirp is the hypermedia-native Python framework for server-rendered product UIs,
+with a built-in contract compiler.
 
 Developers write Python routes, typed return values, and HTML templates with
 named blocks. Chirp can compile those declarations and discoverable
@@ -42,24 +42,25 @@ freeze` static-export command.
 
 Use a three-layer message:
 
-1. **Outcome:** Build complete web applications in Python and HTML without a
-   SPA or JavaScript build pipeline.
-2. **Differentiator:** Chirp validates routes, templates, fragments, forms,
-   streaming, and live updates as one application contract.
+1. **Outcome:** Build dynamic product UIs in Python and HTML without a SPA,
+   duplicated partials, or a JavaScript build pipeline.
+2. **Differentiator:** One render surface serves pages, fragments, streaming,
+   and live updates, while Chirp validates their wiring as one application
+   contract.
 3. **Mechanism:** A built-in hypermedia application compiler turns typed return
    values and named template blocks into executable render plans.
 
 Recommended short description:
 
-> Chirp is a full-stack Python hypermedia framework with a built-in contract
-> compiler.
+> Chirp is the hypermedia-native Python framework for server-rendered product
+> UIs: one render surface, typed intent, and UI wiring checked before deploy.
 
 Recommended expanded description:
 
 > Chirp compiles Python routes, typed return values, and HTML templates into a
-> validated hypermedia application. Run the full application with databases,
-> mutations, streaming, and SSE; export static-compatible routes when you want
-> cheap static deployment.
+> validated hypermedia application. Use the same named blocks for pages,
+> fragments, streaming, and SSE; export static-compatible routes when static
+> deployment is useful.
 
 “Hypermedia engine” is accurate but less differentiated. “Hypermedia
 compiler” should be used when the surrounding copy makes clear that the output

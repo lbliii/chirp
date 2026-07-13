@@ -12,11 +12,11 @@ category: explanation
 
 ## Overview
 
-Chirp is a rendering layer, not a kitchen-sink framework. It deliberately leaves
-some jobs to other tools — an ORM, background jobs, WebSockets, an admin
-generator — and pairs every "no" with the tool you would reach for instead. This
-page is the honest map of those bright lines so you can decide whether Chirp
-fits.
+Chirp is an application framework for server-rendered Python UIs, not a
+kitchen-sink application platform. It deliberately leaves some jobs to other
+tools — an ORM, background jobs, WebSockets, an admin generator — and pairs
+every "no" with the tool you would reach for instead. This page is the honest
+map of those bright lines so you can decide whether Chirp fits.
 
 Every non-goal protects one property: the server holds **zero per-client view
 state**. A request renders HTML from data fetched for that request, and the

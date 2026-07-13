@@ -1,6 +1,6 @@
 ---
 title: Chirp
-description: A Python web framework for HTMX, HTML fragments, streaming HTML, and Server-Sent Events
+description: A hypermedia-native Python framework with typed returns and contract checks for server-rendered product UIs
 template: home.html
 weight: 100
 type: page
@@ -14,88 +14,98 @@ blob_background: true
 
 # CTA Buttons
 cta_buttons:
-  - text: Get Started
+  - text: Build the Five-Minute App
     url: /docs/get-started/
     style: primary
-  - text: API Reference
-    url: /docs/reference/
+  - text: See a Live Chirp App
+    url: https://luckycat-production.up.railway.app
     style: secondary
 
 show_recent_posts: false
 ---
 
-## Python Web Framework for HTML Over the Wire
+## One Template. Every Interaction. Checked Before Deploy.
 
-**HTMX. Fragments. Streaming. Server-Sent Events.**
+**Build dynamic Python UIs without building a SPA.**
 
-Chirp is a Python web framework built from scratch for HTML-over-the-wire
-applications. It serves full pages, fragments, streams, and real-time events through
-its built-in template engine, [kida](https://lbliii.github.io/kida).
+Chirp is the hypermedia-native Python framework for server-rendered product UIs.
+Typed route returns produce full pages, htmx fragments, streaming HTML, and live
+SSE updates from the same named template blocks. `chirp check` catches broken
+routes, blocks, and targets before users do.
 
 ```python
-from chirp import App, Template
+from chirp import App, Page, Request
 
 app = App()
 
-@app.route("/")
-def index():
-    return Template("index.html", title="Home")
-
-app.run()
+@app.route("/search")
+def search(request: Request):
+    query = request.query.get("q", "")
+    return Page("search.html", "results", query=query)
+    # Browser navigation -> full page
+    # htmx request      -> just the "results" block
 ```
+
+No SPA. No duplicated partials. No JavaScript build pipeline.
 
 ---
 
-## Why Use Chirp
+## Why Build With Chirp
 
 :::{cards}
 :columns: 2
 :gap: medium
 
-:::{card} Fragment Rendering
+:::{card} One Render Surface
 :icon: layers
-Render named template blocks independently. Full page on navigation, just the fragment
-on htmx requests. Same template, same data, different scope.
+Use the same named template blocks for full pages, htmx fragments, OOB updates,
+deferred content, and SSE payloads.
 :::{/card}
 
-:::{card} Streaming HTML
-:icon: zap
-Send the page shell first, then fill in content as data arrives. Progressive
-rendering over chunked transfer.
-:::{/card}
-
-:::{card} Server-Sent Events
-:icon: network
-Push kida-rendered HTML fragments to the browser in real time. Combined with htmx, this
-enables live UI updates with zero client-side JavaScript.
-:::{/card}
-
-:::{card} Typed Contracts
-:icon: shield
-`app.check()` validates every `hx-get`, `hx-post`, and `action` against the route table at startup. Broken references become compile-time errors, not runtime 404s.
-:::{/card}
-
-:::{card} Free-Threading Native
-:icon: cpu
-Designed for Python 3.14t from the first line. Framework-owned shared state uses frozen values,
-ContextVar isolation, and explicit locks, with covered paths exercised in free-threaded CI.
-:::{/card}
-
-:::{card} Kida Built In
+:::{card} Typed Intent
 :icon: code
-Same author, no seam. Fragment rendering, streaming templates, and filter registration
-are first-class features.
+Return `Page`, `Fragment`, `Suspense`, or `EventStream`. Chirp handles content
+negotiation and htmx awareness without manual response branching.
+:::{/card}
+
+:::{card} Verified UI Wiring
+:icon: shield
+`chirp check` validates routes, template blocks, htmx targets, OOB regions, and
+SSE wiring before users discover the mistake.
+:::{/card}
+
+:::{card} Streaming and Live Updates
+:icon: zap
+Send the shell first with `Suspense`, stream progressive HTML, or push rendered
+fragments after load with `EventStream` and SSE.
+:::{/card}
+
+:::{card} No Frontend Build Pipeline
+:icon: network
+Build interactive product surfaces with Python, HTML, CSS, htmx, and browser-native
+features. Add Alpine.js or isolated islands only where local state earns its keep.
+:::{/card}
+
+:::{card} Python 3.14 Native
+:icon: cpu
+Designed for Python 3.14 and free-threading. Covered framework paths are exercised
+in free-threaded CI with explicit state and concurrency boundaries.
 :::{/card}
 
 :::{/cards}
 
-## Common Use Cases
+## Where Chirp Fits
 
-- Building HTMX-driven apps without a SPA frontend
-- Serving server-rendered pages and HTML fragments from the same templates
-- Streaming HTML for dashboards, feeds, and AI responses
-- Delivering real-time updates with Server-Sent Events
-- Using browser-native UI features instead of framework-heavy client state
+- Authenticated SaaS and internal tools where HTML is the product surface
+- CRUD workflows that must work as plain forms and htmx-enhanced interactions
+- Live dashboards, feeds, and operational consoles
+- AI interfaces that stream tokens, tool activity, and rendered results
+- Teams that want server-owned UI without duplicating page and partial templates
+
+Chirp is deliberately focused. Choose an API-first framework when the primary
+product surface is JSON, or a batteries-included platform when you need a bundled
+ORM, generated admin, and its ecosystem. See [[docs/about/comparison|When to Use
+Chirp]] and [[docs/about/non-goals|Non-Goals]] for the honest boundaries.
 
 ---
 
@@ -118,18 +128,12 @@ No `make_response()`. No `jsonify()`. The type *is* the intent.
 
 ---
 
-## The Bengal Ecosystem
+## A Small Python Foundation
 
-A structured reactive stack — every layer written in pure Python for 3.14t free-threading.
+Chirp uses [Kida](https://lbliii.github.io/kida) for block-aware rendering and
+[Pounce](https://lbliii.github.io/pounce) as its ASGI server. They arrive as normal
+Python dependencies; you do not need to learn a larger ecosystem before building
+your first app. Read [[docs/about/ecosystem|the ecosystem map]] when you want the
+implementation details.
 
-| | | | |
-|--:|---|---|---|
-| **ᓚᘏᗢ** | [Bengal](https://github.com/lbliii/bengal) | Static site generator | [Docs](https://lbliii.github.io/bengal/) |
-| **∿∿** | [Purr](https://github.com/lbliii/purr) | Content runtime | — |
-| **⌁⌁** | **Chirp** | Web framework ← You are here | [Docs](https://lbliii.github.io/chirp/) |
-| **=^..^=** | [Pounce](https://github.com/lbliii/pounce) | ASGI server | [Docs](https://lbliii.github.io/pounce/) |
-| **)彡** | [Kida](https://github.com/lbliii/kida) | Template engine | [Docs](https://lbliii.github.io/kida/) |
-| **ฅᨐฅ** | [Patitas](https://github.com/lbliii/patitas) | Markdown parser | [Docs](https://lbliii.github.io/patitas/) |
-| **⌾⌾⌾** | [Rosettes](https://github.com/lbliii/rosettes) | Syntax highlighter | [Docs](https://lbliii.github.io/rosettes/) |
-
-Python-native. Free-threading ready. No npm required.
+**Python-native. Free-threading ready. No npm required.**
