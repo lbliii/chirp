@@ -47,7 +47,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ui = ["chirp-ui>=0.11.2"]
+ui = ["chirp-ui>=0.11.3"]
 auth = ["argon2-cffi>=23.1.0"]
 forms = ["python-multipart>=0.0.18"]
 """
