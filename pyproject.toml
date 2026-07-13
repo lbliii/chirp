@@ -73,7 +73,7 @@ ai-bedrock = ["botocore>=1.34", "httpx>=0.27.0"]
 markdown = ["patitas[syntax]>=0.4.0"]
 
 # chirp-ui component library (CSS, themes, layout macros)
-ui = ["chirp-ui>=0.11.3"]
+ui = ["chirp-ui>=0.11.4"]
 
 # Config from env (python-dotenv for local .env loading)
 config = ["python-dotenv>=1.0.0"]
@@ -299,7 +299,7 @@ exclude_lines = [
 docs = [
     "bengal>=0.5.0", # Legacy static site path (deprecated for Pages deploy)
     "lunr>=0.7.0",   # Pre-built search index
-    "chirp-ui>=0.11.3", # Bengal chirp-theme package (bengal.themes entry point)
+    "chirp-ui>=0.11.4", # Bengal chirp-theme package (bengal.themes entry point)
     "jsonschema>=4.0.0", # DCP catalog.json validation
 ]
 dev = [
@@ -326,7 +326,7 @@ dev = [
     "itsdangerous>=2.2.0",
     "webauthn>=2.8,<3",         # Lucky Cat passkey tests are part of the example suite
     "patitas[syntax]>=0.4.0",   # Markdown + syntax highlighting for ollama example tests
-    "chirp-ui>=0.11.3",         # Layout macros for llm_playground example tests
+    "chirp-ui>=0.11.4",         # Layout macros for llm_playground example tests
 ]
 browser = [
     "playwright==1.61.0",       # Chrome for Testing 149 WebMCP/fallback lane; install with: uv sync --group dev --group browser
