@@ -1,184 +1,45 @@
-# Steward: Security Primitives
+<!-- generated from .stewards/manifest.toml — edit the manifest, not this file -->
 
-You keep Chirp's security helpers small, explicit, and hard to misuse. This
-domain owns password hashing, login/logout helpers, role decorators, safe URL
-checks, lockout, and security audit events.
+# Steward: security
 
-Related: `AGENTS.md`, `docs/deployment/production.md`,
-`examples/standalone/auth/README.md`, auth hardening site docs.
+Keep authentication, authorization, audit, password, redirect, and lockout primitives explicit and hard to misuse.
 
-## Point Of View
+Ordinary work: use this map directly with the root map and run only affected checks.
+Do not open `.stewards/PROTOCOL.md` or `.stewards/manifest.toml` unless the task is an explicit review/audit or steward-network maintenance.
 
-You are the app author relying on narrow primitives and the user harmed by
-permissive helpers or misleading deployment advice.
+## Protects
 
-## Protect
+| Invariant | Sev | Backing | Proof / anchor |
+| --- | --- | --- | --- |
+| Imperative and declarative auth gates preserve canonical denial behavior and audit payload parity. | P0 | machine-backed | `uv run pytest tests/test_auth.py tests/test_auth_parity.py tests/test_auth_rate_limit.py tests/test_auth_scopes.py tests/test_passwords.py tests/test_safe_url.py tests/test_security_audit.py -q` (`security-suite`) |
+| All supported auth styles delegate to one enforce_auth implementation. | P0 | manual | src/chirp/security/auth_core.py · `def enforce_auth` |
+| Unauthenticated auth denial emits the canonical auth.require.unauthenticated event. | P0 | manual | src/chirp/security/auth_core.py · `auth.require.unauthenticated` |
 
-- **Security helpers are public.** `docs/public-api.md:36` lists auth/security
-  helpers as stable imports.
-- **Password hashing uses optional auth deps.** `pyproject.toml:50-51` keeps
-  `argon2-cffi` behind `auth`.
-- **Safe URL normalization is security-sensitive.** `tests/test_safe_url.py`
-  covers current redirect behavior; whitespace/encoding normalization must be
-  verified in source/tests before claiming it is guaranteed.
-- **Production secret key is required.** `src/chirp/config.py:294-301` rejects
-  empty production secrets.
-- **Audit events are explicit.** `src/chirp/security/audit.py` owns emitted
-  security event shape and sink registration.
-- **One shared auth gate, one canonical audit payload.** Both the imperative
-  decorators (`@login_required` / `@requires`) and the declarative
-  `RouteMeta.auth` gate (`chirp.pages.auth_gate.enforce_route_meta_auth`)
-  delegate to `chirp.security.auth_core.enforce_auth`. Downstream SIEM keys off
-  these `emit_security_event` payloads, so the two paths MUST stay byte-identical
-  per outcome. Do not let them drift again. The canonical payloads are:
+## Guardrails
 
-  | Outcome | `name` | `details` |
-  | --- | --- | --- |
-  | unauthenticated | `auth.require.unauthenticated` | `{}` |
-  | permission denied | `authz.permission.denied` | `{"missing": sorted([...])}` |
-  | missing permissions protocol | `authz.permission.denied` | `{"reason": "missing_permissions_protocol", "missing": sorted([...])}` |
-  | named-policy denied (RESOLVED policy returned falsy) | `authz.policy.denied` | `{"policy": <name>}` |
-  | scope denied (machine-auth axis) | `authz.scope.denied` | `{"missing": sorted([...])}` |
-  | missing scopes protocol | `authz.scope.denied` | `{"reason": "missing_scopes_protocol", "missing": sorted([...])}` |
+- Imperative decorators and declarative RouteMeta.auth delegate to one enforce_auth gate and preserve canonical audit payloads.
+- Unregistered named policy is misconfiguration: raise LookupError, emit no denial event.
+- Unauthenticated emits auth.require.unauthenticated with {}; permission denial emits authz.permission.denied with sorted missing names, or reason=missing_permissions_protocol plus sorted missing names.
+- A resolved falsy named policy emits authz.policy.denied with its referenced policy identifier; an unresolved name raises LookupError and emits nothing.
+- Machine scope denial emits authz.scope.denied with sorted missing names, or reason=missing_scopes_protocol plus sorted missing names; scope-name equality uses secrets.compare_digest.
+- http.request is a single-producer AuditMiddleware event whose details preserve status_code, trusted source_ip, user_agent, and request-level body/body_omitted semantics.
+- Bearer revocation checks fail open on store or claim errors; revoked events preserve jti or user_cutoff reason payloads and check errors expose only the exception class name.
 
-  `missing` is always a sorted `list[str]` (was a bare string on the declarative
-  path before unification). The permission-denied / missing-protocol / scope-denied
-  events also emit `_log.warning` via the `chirp.security` logger.
+## Edges
 
-  **`authz.scope.denied` is the MACHINE-AUTH axis** — distinct from
-  `authz.permission.denied` so SIEM can tell a machine-token scope denial
-  (webhook/cron/provisioning) from a human-permission denial. It is emitted by
-  the shared core's scope step (`enforce_auth`) when an `AuthSpec.scopes` gate is
-  declared and the resolved client (a
-  `chirp.middleware.auth.ClientWithScopes` / `MachineClient`) lacks the required
-  scope(s) under `spec.mode`. Scope enforcement is implicitly off (no gate runs)
-  when `spec.scopes` is empty. Scope-name equality is compared with
-  `secrets.compare_digest` (constant-time), never `==`. This event is in the
-  parity lock (`tests/test_auth_parity.py::TestAuditEventParity`) like the
-  permission/policy events; changing its name or `details` keys requires updating
-  that lock and the changelog.
+- integrated-by → **middleware** (auth and request pipeline)
+- verified-by → **contracts** (auth_spec and security rules)
 
-  **No `unresolved_policy` event exists.** An unresolved/unregistered policy NAME
-  is a MISCONFIGURATION, not a denial: the shared core raises `LookupError` ->
-  500 and emits NOTHING. The only `authz.policy.denied` is a RESOLVED policy
-  callable returning falsy. (The `auth_spec` startup check is the real guard.)
+## Owns
 
-  **The `policy` payload value is the policy IDENTIFIER as referenced**, which
-  differs by registration style *by construction* — do not claim byte-identical
-  `policy` values across styles unconditionally:
-  - declarative `AuthSpec(policy="name")` -> the REGISTERED NAME (`"name"`);
-  - imperative `@requires(policy=fn)` -> the function `fn.__name__`.
-  When a policy is registered under a name EQUAL to its callable's `__name__`,
-  the two paths' `authz.policy.denied` payloads ARE byte-identical — that exact
-  case is the parity lock below.
-
-  Parity is locked by `tests/test_auth_parity.py::TestAuditEventParity`
-  (unauthenticated, permission-denied, missing-protocol, and policy-denied with
-  matching `policy` value); changing any key here requires updating that lock and
-  the changelog.
-
-  **General HTTP request audit (`http.request`)** is a separate, single-producer
-  event emitted by the opt-in `AuditMiddleware`
-  (`src/chirp/middleware/audit.py`) — NOT part of the two-path auth-gate parity
-  lock above (there is only one producer, so there is nothing to keep
-  byte-identical *across paths*). It flows through the same
-  `emit_security_event` sink so audit + auth telemetry stay one pipeline. Its
-  payload (Option B — `SecurityEvent` shape unchanged, all new fields packed into
-  the free-form `details` dict; SIEM/`_log_sink` consumers see them as
-  `**event.details`):
-
-  | `name` | `details` keys |
-  | --- | --- |
-  | `http.request` | `status_code: int`, `source_ip: str`, `user_agent: str \| None`, plus (at `level="request"`+) `body: str \| None` and, on a streaming downgrade, `body_omitted: "streaming_response"` |
-
-  `source_ip` is always `request.trusted_client_ip`. Changing these `details`
-  keys requires updating `tests/test_security_audit.py` and the changelog.
-
-  **Bearer-path token revocation (`auth.token.revoked` /
-  `auth.token.revocation_check_error`)** are single-producer events emitted by
-  `AuthMiddleware._authenticate_token` when an optional
-  `AuthConfig.token_revocation_store` is wired (token branch only, after
-  `verify_token` returns a user). Like `auth.token.invalid` and
-  `auth.session.version_mismatch` they have ONE producer, so they are NOT part
-  of the two-path auth-gate parity lock above. Revocation **fails open** on any
-  store/claims error (token treated as not revoked). Canonical payloads:
-
-  | `name` | `details` |
-  | --- | --- |
-  | `auth.token.revoked` (per-token) | `{"reason": "jti", "jti": <jti>}` |
-  | `auth.token.revoked` (per-user cutoff) | `{"reason": "user_cutoff", "iat": <iat>, "revoked_at": <cutoff>}` |
-  | `auth.token.revocation_check_error` | `{"error": <ExceptionClassName>}` |
-
-  Both carry `user_id=<user.id>`. Changing these keys requires updating
-  `tests/test_auth.py` (the `@pytest.mark.issue(373)` revocation tests) and the
-  changelog.
-- **`RouteMeta.auth` is `str | AuthSpec | None` and stays serializable.**
-  `AuthSpec.policy` is a string NAME resolved against the app policy registry
-  (`app.register_policy(name, fn)`) via the `enforce_auth(policy_resolver=...)`
-  seam — never a `Callable`. The declarative gate's resolver fails loud
-  (`LookupError` -> 500) on an unregistered name; that misconfiguration is also a
-  startup `auth_spec` ERROR. `normalize_auth_spec` preserves the exact runtime
-  meaning of every legacy string value (`none`/`optional`/`""`/`None` open,
-  `required` authn-only, any other string a single required permission).
-- **`auth` is canonicalized once, at discovery.** Static `META` (and dynamic
-  `meta()` results, including dict `auth`) are normalized to a canonical
-  `AuthSpec | None` through one shared `chirp.pages.discovery.dict_to_route_meta`
-  / `normalize_route_meta` helper, so the per-request gate is allocation-free and
-  dynamic `meta()` structured auth is enforced identically to static `META` (do
-  not let those two parse paths diverge again — a dropped dynamic auth value is a
-  silent security gap).
-- **Permission/policy/scope registries are setup-only.**
-  `app.register_permission(name)` / `app.register_policy(name, fn)` /
-  `app.register_scope(name)` mutate `MutableAppState` and raise `RuntimeError`
-  after freeze (mirror `register_section`). They thread into
-  `ContractCheckSnapshot` so the registry-backed `auth_spec` check validates
-  every declared permission/policy/scope at startup. `register_scope` is the
-  machine-auth axis: an `AuthSpec.scopes` entry absent from a declared scope
-  registry is an env-aware `auth_spec` ERROR (opt-in like permissions).
-- **Lockout state has lifecycle risk.** Shared lockout/rate-limit maps need
-  cleanup or bounded-state reasoning.
-- **Helpers are primitives.** Do not turn this package into a full auth product.
-- **Security docs must not teach bypasses.** Ownership/authorization examples
-  must derive facts from server-side records, not user-controlled query params.
-
-## Contract Checklist
-
-When this domain changes, check:
-
-- `src/chirp/security/` — password, decorators, URLs, lockout, audit helpers.
-- `src/chirp/middleware/auth.py`, `sessions.py`, `auth_rate_limit.py`,
-  `csrf.py` — consult for primitive semantics; middleware owns pipeline order
-  and module defaults.
-- `src/chirp/__init__.py` and `docs/public-api.md` — stable exports.
-- Deployment/auth docs, scaffolded auth apps, examples, changelog.
-- `tests/test_auth.py`, `tests/test_auth_rate_limit.py`,
-  `tests/test_lockout.py`.
-- `tests/test_passwords.py`, `tests/test_safe_url.py`,
-  `tests/test_security_audit.py`, security header/session tests.
+- **code:** `src/chirp/security/`, `src/chirp/middleware/auth.py`
+- **tests:** `tests/test_auth.py`, `tests/test_auth_parity.py`, `tests/test_safe_url.py`, `tests/test_security_audit.py`
+- **docs:** `docs/deployment/production.md`, `examples/standalone/auth/`
 
 ## Advocate
 
-- **Safe URL fuzzing.** Add normalization tests for whitespace, encoded input,
-  tenant prefixes, and external URLs.
-- **State cleanup.** Lockout/rate-limit helpers need bounded-state or cleanup
-  proof.
-- **Missing-extra clarity.** Password helpers should say exactly how to install
-  the auth extra.
-- **Deployment checks.** Production security assumptions should be checkable
-  through CLI or `app.check()` where possible.
+- Parity locks, constant-time comparisons, bounded shared state, fuzzed safe URLs, and deployment checks.
 
 ## Do Not
 
-- Become a full auth framework with broad policy assumptions.
-- Add dependency-heavy default paths.
-- Trade correctness for convenience in URL/session/password helpers.
-- Publish security examples that rely on user-controlled authorization facts.
-
-## Own
-
-**Code:** `src/chirp/security/` and auth-adjacent middleware primitives.
-**Tests:** auth, password, safe URL, lockout, rate-limit, security audit,
-session security tests.
-**Docs:** deployment security, auth hardening, auth examples, public API docs.
-**Agent artifacts:** this file.
-**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.
+- Broaden policy assumptions, hide permissive fallbacks, or publish authorization examples based on user-controlled facts.

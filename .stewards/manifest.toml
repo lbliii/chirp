@@ -1,0 +1,1001 @@
+network = "Chirp"
+protocol = ".stewards/PROTOCOL.md"
+max_active_bytes = 24576
+coverage_roots = ["src/chirp"]
+
+pillars = [
+  "Chirp is hypermedia-native: typed return values connect server-rendered HTML to browser behavior without a parallel SPA or JSON architecture.",
+  "One template with named blocks serves full pages, htmx fragments, OOB updates, Suspense chunks, streaming HTML, and SSE payloads.",
+  "The public `from chirp import ...` surface, AppConfig, CLI, docs, examples, scaffolds, tests, and changelog move together.",
+  "Visible HTML corruption fails loud through rendering errors, app.check(), focused contract tests, and actionable diagnostics.",
+  "Optional extras remain optional, and shared runtime state is frozen, request-scoped, single-owner, or explicitly lock-guarded for free-threaded Python.",
+]
+
+search_policy = [
+  "At task start, read the root map before repository discovery; never locate instructions by inventorying every AGENTS.md in the repository.",
+  "Before reading or searching content beneath a path, open the nearest scoped map on that path; add another map only when the investigation crosses into its scope.",
+  "If the request names an exact file and symbol or link, inspect that target before searching elsewhere.",
+  "Search progressively: likely files, then filename or import discovery, then scoped content search; expand repository-wide only when scoped evidence fails or proves a cross-cutting dependency, and state the reason.",
+  "Treat 10 commands or 12 content-exposed files as a strategy checkpoint, never as a hard stopping limit.",
+  "For import, dependency, registration, or call-chain bugs, prove graph closure with a bounded static traversal: inspect ancestor package initializers, the target's module-level imports, and recursively only repository-local modules imported at module scope.",
+  "During graph traversal, stop at function and class bodies, TYPE_CHECKING blocks, and classified external dependencies; inspect callers and tests only after the import graph closes and only to verify the named public entry point.",
+  "Do not use repository-wide symbol, dependency, lockfile, documentation, or CI searches to establish import closure; a search budget cannot replace the bounded proof.",
+]
+
+operating_rules = [
+  "Do not take, implement, close, or batch-plan issues labeled `good first issue` or titled `[GF]`; they are reserved for external contributors.",
+  "The live GitHub issue graph is authoritative for active work, hierarchy, and blockers; roadmap prose, labels, markdown checklists, branches, and PR mentions do not replace native parent/sub-issue relationships.",
+  "For maintainer selection use `scripts/backlog.py next` and `scripts/backlog.py explain N`; selection is read-only, `ready` is leaf-only, and every unblocked parent reaches a ready leaf.",
+  "Backlog triggers retain their meaning: survey is read-only; next recommends; groom reconciles; cut decomposes into native sub-issues; reconcile verifies shipped behavior before closing.",
+  "`ask stewards`, `bugbash`, `review swarm`, `steward synthesis`, `audit docs`, `content audit`, and `accuracy pass` are explicit review triggers: open the protocol, consult independent affected maps, preserve dissent, and synthesize with evidence.",
+  "Behavioral issue closure needs `@pytest.mark.issue(N)` traceability or an explicit `Acceptance #N: n/a (<reason>)` receipt.",
+  "Generated output under `site/public/` and `site/.bengal/` is not source-of-truth; edit source content/config and build or record a no-build rationale.",
+  "Before finalizing agent-authored public files, remove customer names, private people or project names, private quotes, endpoints, and internal scale or cost figures.",
+  "For htmx, OOB, Suspense, SSE, or shell failures, use Chirp DevTools (`debug=True`, Ctrl+Shift+D, `window.ChirpHtmxDebug`) before guessing.",
+  "No silent except, unexplained type-ignore, vague error, speculative config, undocumented public behavior, or adjacent refactor unless it is the fix.",
+]
+
+stop_and_ask = [
+  "A change alters public API, return-type semantics, AppConfig, protocol shapes, CLI commands, scaffold defaults, optional extras, or compatibility tiers.",
+  "A change touches render plans, return types, OOB or Suspense block discovery, ancestor pruning, or BlockNotFoundError propagation.",
+  "A change alters app.check() severity or default contract semantics, security/auth payloads, cache keys, schema or migration output, lifecycle publication, or free-threading assumptions.",
+  "A sync fast-path change lacks a measurement plan, a bug cannot be reproduced, or test and code disagree.",
+  "When a public-contract change depends on unresolved product or API choices, identify only the minimum blocking decisions and stop before designing the API or its documentation, examples, scaffolds, benchmarks, and release collateral.",
+  "An irreversible operation, deletion, external write, or maintainer-only backlog decision is required.",
+]
+
+done_criteria = [
+  "Run `uv run ruff check .` and `uv run ruff format . --check` (or record a justified narrower docs-only check).",
+  "Run `uv run ty check src/chirp/` when Python source or public typing changes.",
+  "Run the narrowest relevant pytest targets first and `uv run pytest` for release-class changes; code coverage remains at least 80 percent.",
+  "Hypermedia changes include realistic tests for htmx and plain requests, missing blocks, sync and async paths, malformed forms, environment posture, and optional dependencies where relevant.",
+  "Public behavior moves with docs, examples, scaffolds/templates, benchmarks or no-impact rationale, and a changelog fragment when required.",
+  "Every accepted steward finding names proof and collateral or an explicit no-impact reason; user-facing errors name the surface to fix.",
+]
+
+[check.steward-tools]
+invoke = "uv run pytest tests/stewards -q"
+location = "tests/stewards/test_steward_tools.py"
+proof_contains = "test_repository_steward_network_is_current_and_covered"
+
+[check.public-contract]
+invoke = "uv run pytest tests/test_lazy_imports.py tests/test_public_api_docs.py -q"
+location = "tests/test_lazy_imports.py"
+proof_contains = "test_public_api_status_covers_all_exports"
+
+[check.config-contract]
+invoke = "uv run pytest tests/test_config.py -q"
+location = "tests/test_config.py"
+
+[check.app-lifecycle]
+invoke = "uv run pytest tests/test_app tests/test_app_bind_config.py tests/test_mount_app.py tests/test_url_for.py -q"
+location = "tests/test_app/test_freeze.py"
+
+[check.ai-suite]
+invoke = "uv run pytest tests/test_ai -q"
+location = "tests/test_ai/test_llm.py"
+
+[check.cache-suite]
+invoke = "uv run pytest tests/test_cache.py tests/contracts/test_cache_middleware_e2e.py -q"
+location = "tests/test_cache.py"
+
+[check.cli-suite]
+invoke = "uv run pytest tests/cli tests/test_cli.py tests/test_cli_check.py tests/test_cli_new.py tests/test_cli_resolve.py -q"
+location = "tests/test_cli.py"
+
+[check.contract-suite]
+invoke = "uv run pytest tests/contracts -q"
+location = "tests/contracts/test_checker_integration.py"
+
+[check.data-suite]
+invoke = "uv run pytest tests/test_data.py tests/test_query.py tests/test_query_builder.py tests/test_schema.py tests/test_pagination.py -q"
+location = "tests/test_data.py"
+
+[check.pelt-suite]
+invoke = "uv run pytest tests/test_pelt -q"
+location = "tests/test_pelt/test_framing.py"
+
+[check.docs-tooling]
+invoke = "uv run pytest tests/docs tests/test_search_index_v2.py tests/test_search_js_v2.py -q"
+location = "tests/docs/test_tools.py"
+
+[check.extension-suite]
+invoke = "uv run pytest tests/test_chirpui_boundary.py tests/test_chirpui_compat_ci.py tests/test_chirpui_scaffold_default.py -q"
+location = "tests/test_chirpui_boundary.py"
+
+[check.http-suite]
+invoke = "uv run pytest tests/test_request.py tests/test_response.py tests/test_headers.py tests/test_cookies.py tests/test_forms.py tests/test_sync_request.py -q"
+location = "tests/test_request.py"
+
+[check.i18n-suite]
+invoke = "uv run pytest tests/test_i18n.py tests/contracts/test_i18n_keys.py -q"
+location = "tests/test_i18n.py"
+
+[check.markdown-suite]
+invoke = "uv run pytest tests/test_markdown.py -q"
+location = "tests/test_markdown.py"
+
+[check.middleware-suite]
+invoke = "uv run pytest tests/test_cors.py tests/test_csrf.py tests/test_sessions.py tests/test_allowed_hosts.py tests/test_static.py tests/test_security_headers.py -q"
+location = "tests/test_csrf.py"
+
+[check.pages-suite]
+invoke = "uv run pytest tests/test_page_resolve.py tests/test_page_discovery_names.py tests/test_route_directory_contract_e2e.py tests/contracts/test_page_shell.py -q"
+location = "tests/test_page_resolve.py"
+
+[check.realtime-suite]
+invoke = "uv run pytest tests/test_sse_parser.py tests/test_sse_integration.py tests/test_sse_macros.py tests/contracts/test_sse.py -q"
+location = "tests/test_sse_integration.py"
+
+[check.routing-suite]
+invoke = "uv run pytest tests/test_route.py tests/test_router.py tests/test_params.py tests/test_url_for.py tests/test_mount_app.py tests/contracts/test_routes.py -q"
+location = "tests/test_route.py"
+
+[check.security-suite]
+invoke = "uv run pytest tests/test_auth.py tests/test_auth_parity.py tests/test_auth_rate_limit.py tests/test_auth_scopes.py tests/test_passwords.py tests/test_safe_url.py tests/test_security_audit.py -q"
+location = "tests/test_auth_parity.py"
+
+[check.server-suite]
+invoke = "uv run pytest tests/test_negotiation tests/test_response.py tests/test_sync_handler.py tests/test_sse_integration.py -q"
+location = "tests/test_negotiation/test_primitives.py"
+
+[check.templating-suite]
+invoke = "uv run pytest tests/templating tests/test_render_plan_fail_loud.py tests/test_suspense.py tests/test_scoped_oob.py tests/contracts/test_oob_pipeline_e2e.py -q"
+location = "tests/test_render_plan_fail_loud.py"
+
+[check.testing-suite]
+invoke = "uv run pytest tests/test_testing_helpers.py tests/test_sse_testing.py -q"
+location = "tests/test_testing_helpers.py"
+
+[check.tools-suite]
+invoke = "uv run pytest tests/test_tools -q"
+location = "tests/test_tools/test_schema.py"
+
+[check.validation-suite]
+invoke = "uv run pytest tests/test_validation.py tests/test_forms.py tests/contracts/test_forms.py -q"
+location = "tests/test_validation.py"
+
+[check.docs-drift]
+invoke = "uv run pytest tests/test_public_api_docs.py tests/docs/test_site_link_drift.py -q"
+location = "tests/test_public_api_docs.py"
+
+[check.examples-suite]
+invoke = "uv run pytest examples -q"
+location = "examples/standalone/hello/test_app.py"
+
+[check.site-drift]
+invoke = "uv run pytest tests/docs/test_site_link_drift.py -q"
+location = "tests/docs/test_site_link_drift.py"
+
+[check.benchmark-contract]
+invoke = "uv run pytest tests/test_benchmarks_core.py -q"
+location = "tests/test_benchmarks_core.py"
+proof_contains = "test_core_benchmarks_return_reproducible_json_shape"
+
+[check.changelog-draft]
+invoke = "uv run towncrier build --draft"
+location = "changelog.d/README.md"
+
+[check.full-tests]
+invoke = "uv run pytest tests -q"
+location = "tests/AGENTS.md"
+
+[check.ty]
+invoke = "uv run ty check src/chirp/"
+location = "pyproject.toml"
+
+[check.ruff]
+invoke = "uv run ruff check ."
+location = "pyproject.toml"
+
+[check.format]
+invoke = "uv run ruff format . --check"
+location = "pyproject.toml"
+
+[check.internal-suite]
+invoke = "uv run pytest tests/test_asgi.py tests/test_invoke_plan.py tests/test_headers.py -q"
+location = "tests/test_invoke_plan.py"
+
+[check.settings-suite]
+invoke = "uv run pytest tests/test_settings_registry.py -q"
+location = "tests/test_settings_registry.py"
+
+[[steward]]
+id = "root"
+path = "AGENTS.md"
+point_of_view = "Protect Chirp's hypermedia-native architecture and route work to the narrowest knowledgeable steward."
+edges = [
+  { to = "public", type = "governs", what = "public imports and configuration" },
+  { to = "templating", type = "governs", what = "single-template rendering contract" },
+  { to = "contracts", type = "verified-by", what = "startup contract checks" },
+  { to = "tests", type = "verified-by", what = "regression proof" },
+]
+
+[[steward]]
+id = "public"
+path = "src/chirp/AGENTS.md"
+point_of_view = "Keep the import path app authors memorize small, intentional, lazy, and documented."
+guardrails = [
+  "New top-level names move together across __all__, _LAZY_IMPORTS, _API_STATUS, public docs, tests, and changelog.",
+  "AppConfig remains frozen and slotted; new fields are public API and require environment-parity review.",
+]
+owns.code = ["src/chirp/*.py"]
+owns.tests = ["tests/test_lazy_imports.py", "tests/test_config.py", "tests/test_public_api_docs.py"]
+owns.docs = ["README.md", "docs/public-api.md", "docs/release-policy.md"]
+edges = [{ to = "docs", type = "explained-by", what = "public API and release policy" }]
+
+[[steward]]
+id = "internal"
+path = "src/chirp/_internal/AGENTS.md"
+point_of_view = "Keep shared ASGI shapes, invocation plans, context propagation, kwargs resolution, and multimap protocols private and behaviorally stable."
+guardrails = ["Internal helpers do not become convenience public exports.", "Invocation compilation preserves sync, async, dependency, and request-context semantics."]
+owns.code = ["src/chirp/_internal/"]
+owns.tests = ["tests/test_asgi.py", "tests/test_invoke_plan.py", "tests/test_headers.py"]
+owns.docs = []
+edges = [{ to = "public", type = "hidden-behind", what = "public call paths" }, { to = "server", type = "serves", what = "handler invocation" }]
+
+[[steward]]
+id = "settings"
+path = "src/chirp/settings/AGENTS.md"
+point_of_view = "Keep runtime-mutable operator settings explicit, typed, observable, and separate from frozen public AppConfig."
+guardrails = ["Settings mutation uses the registry/store lifecycle rather than weakening AppConfig immutability.", "File and database stores preserve revision and conflict behavior."]
+owns.code = ["src/chirp/settings/"]
+owns.tests = ["tests/test_settings_registry.py"]
+owns.docs = ["docs/"]
+edges = [{ to = "public", type = "separate-from", what = "frozen AppConfig" }, { to = "app", type = "observed-by", what = "runtime lifecycle" }]
+
+[[steward]]
+id = "app"
+path = "src/chirp/app/AGENTS.md"
+point_of_view = "Guard the boundary where setup-time mutation becomes immutable runtime truth."
+guardrails = [
+  "Freeze publishes a complete runtime state under the free-threaded lifecycle boundary.",
+  "Registration after freeze and serving a consumed mounted app fail loud.",
+]
+owns.code = ["src/chirp/app/"]
+owns.tests = ["tests/test_app/", "tests/test_mount_app.py", "tests/test_url_for.py"]
+owns.docs = ["docs/routing/mounting.md", "docs/rfcs/005-mount-app.md"]
+edges = [{ to = "routing", type = "publishes", what = "compiled routes" }, { to = "contracts", type = "snapshots", what = "stable check inputs" }]
+
+[[steward]]
+id = "http"
+path = "src/chirp/http/AGENTS.md"
+point_of_view = "Keep request, response, headers, cookies, forms, query, and sync primitives typed and predictable."
+guardrails = ["Repeated headers such as Set-Cookie never collapse through convenience mappings.", "Multipart parsing remains behind the forms extra."]
+owns.code = ["src/chirp/http/"]
+owns.tests = ["tests/test_request.py", "tests/test_response.py", "tests/test_forms.py"]
+owns.docs = ["docs/public-api.md"]
+edges = [{ to = "server", type = "transported-by", what = "negotiation and sender" }]
+
+[[steward]]
+id = "routing"
+path = "src/chirp/routing/AGENTS.md"
+point_of_view = "Keep path matching, route names, converters, mounting, and URL generation deterministic."
+guardrails = ["Ambiguous syntax, names, or match order fail loud rather than depending on fixture order."]
+owns.code = ["src/chirp/routing/", "src/chirp/app/url_for.py", "src/chirp/app/mount.py"]
+owns.tests = ["tests/test_route.py", "tests/test_router.py", "tests/test_url_for.py"]
+owns.docs = ["docs/routing/"]
+edges = [{ to = "pages", type = "receives", what = "filesystem-discovered registrations" }, { to = "app", type = "compiled-by", what = "freeze and mounting" }]
+
+[[steward]]
+id = "server"
+path = "src/chirp/server/AGENTS.md"
+point_of_view = "Preserve typed return intent from handler output through ASGI, htmx negotiation, sync handling, and bytes on the wire."
+guardrails = ["Dispatch order is user-visible.", "SSE and streaming HTML stay unbuffered and distinct.", "Debug internals never leak in production."]
+owns.code = ["src/chirp/server/"]
+owns.tests = ["tests/test_negotiation/", "tests/test_sync_handler.py", "tests/test_sse_integration.py"]
+owns.docs = ["docs/error-handling.md", "docs/devtools.md"]
+edges = [{ to = "templating", type = "executes", what = "render plans" }, { to = "http", type = "emits", what = "responses" }]
+
+[[steward]]
+id = "templating"
+path = "src/chirp/templating/AGENTS.md"
+point_of_view = "Protect one named-block template surface for pages, fragments, OOB, Suspense, streaming HTML, and SSE payloads."
+guardrails = ["Missing visible blocks fail with BlockNotFoundError rather than empty swaps.", "Layouts compose; page templates do not override sibling layout blocks.", "Stream, Suspense, and EventStream remain distinct contracts."]
+owns.code = ["src/chirp/templating/"]
+owns.tests = ["tests/templating/", "tests/test_suspense.py", "tests/contracts/test_oob_pipeline_e2e.py"]
+owns.docs = ["docs/hypermedia-footguns.md", "site/content/docs/build-apps/html-fragments/"]
+edges = [{ to = "contracts", type = "verified-by", what = "OOB, composition, and defer rules" }, { to = "server", type = "serialized-by", what = "negotiation" }]
+
+[[steward]]
+id = "contracts"
+path = "src/chirp/contracts/AGENTS.md"
+point_of_view = "Make broken hypermedia, route, security, form, and extension wiring fail at startup through actionable app.check() issues."
+guardrails = ["Severity, category, coverage, message, and location are product behavior.", "Checks use stable frozen snapshots and the HypermediaProgram rather than rescanning independent truth."]
+owns.code = ["src/chirp/contracts/"]
+owns.tests = ["tests/contracts/"]
+owns.docs = ["docs/hypermedia-footguns.md", "site/content/docs/quality/contracts-debugging/"]
+edges = [{ to = "contract_tests", type = "proved-by", what = "real broken-app fixtures" }, { to = "app", type = "consumes", what = "contract snapshots" }]
+
+[[steward]]
+id = "pages"
+path = "src/chirp/pages/AGENTS.md"
+point_of_view = "Keep filesystem route, context, action, section, shell, layout, and reactive conventions executable and safe."
+guardrails = ["Shell targets remain narrow and missing regions fail loud.", "Reactive shared state needs deterministic free-threaded race proof."]
+owns.code = ["src/chirp/pages/"]
+owns.tests = ["tests/test_page_resolve.py", "tests/test_route_directory_contract_e2e.py", "tests/contracts/test_page_shell.py"]
+owns.docs = ["docs/hypermedia-footguns.md", "site/content/docs/build-apps/pages-navigation/"]
+edges = [{ to = "routing", type = "registers", what = "filesystem routes" }, { to = "templating", type = "composes", what = "shell and layout plans" }]
+
+[[steward]]
+id = "middleware"
+path = "src/chirp/middleware/AGENTS.md"
+point_of_view = "Guard middleware order, request isolation, streaming compatibility, and secure defaults."
+guardrails = ["CSP relaxations remain narrowly scoped; script-src never gains unsafe-inline.", "Static files reject path and symlink traversal.", "Middleware does not buffer SSE or streaming HTML by accident."]
+owns.code = ["src/chirp/middleware/"]
+owns.tests = ["tests/test_csrf.py", "tests/test_sessions.py", "tests/test_static.py", "tests/test_security_headers.py"]
+owns.docs = ["docs/deployment/production.md"]
+edges = [{ to = "security", type = "uses", what = "auth, CSRF, session, and audit primitives" }, { to = "server", type = "wraps", what = "request pipeline" }]
+
+[[steward]]
+id = "security"
+path = "src/chirp/security/AGENTS.md"
+point_of_view = "Keep authentication, authorization, audit, password, redirect, and lockout primitives explicit and hard to misuse."
+guardrails = [
+  "Imperative decorators and declarative RouteMeta.auth delegate to one enforce_auth gate and preserve canonical audit payloads.",
+  "Unregistered named policy is misconfiguration: raise LookupError, emit no denial event.",
+  "Unauthenticated emits auth.require.unauthenticated with {}; permission denial emits authz.permission.denied with sorted missing names, or reason=missing_permissions_protocol plus sorted missing names.",
+  "A resolved falsy named policy emits authz.policy.denied with its referenced policy identifier; an unresolved name raises LookupError and emits nothing.",
+  "Machine scope denial emits authz.scope.denied with sorted missing names, or reason=missing_scopes_protocol plus sorted missing names; scope-name equality uses secrets.compare_digest.",
+  "http.request is a single-producer AuditMiddleware event whose details preserve status_code, trusted source_ip, user_agent, and request-level body/body_omitted semantics.",
+  "Bearer revocation checks fail open on store or claim errors; revoked events preserve jti or user_cutoff reason payloads and check errors expose only the exception class name.",
+]
+owns.code = ["src/chirp/security/", "src/chirp/middleware/auth.py"]
+owns.tests = ["tests/test_auth.py", "tests/test_auth_parity.py", "tests/test_safe_url.py", "tests/test_security_audit.py"]
+owns.docs = ["docs/deployment/production.md", "examples/standalone/auth/"]
+edges = [{ to = "middleware", type = "integrated-by", what = "auth and request pipeline" }, { to = "contracts", type = "verified-by", what = "auth_spec and security rules" }]
+
+[[steward]]
+id = "cache"
+path = "src/chirp/cache/AGENTS.md"
+point_of_view = "Keep performance from becoming stale, cross-user, cross-app, or wrong-render-intent HTML."
+guardrails = ["Cache keys include htmx/full-page, auth/session, route, query, and configured vary inputs.", "Redis stays optional and missing-extra failures are actionable."]
+owns.code = ["src/chirp/cache/"]
+owns.tests = ["tests/test_cache.py", "tests/contracts/test_cache_middleware_e2e.py"]
+owns.docs = ["README.md"]
+edges = [{ to = "server", type = "varies-by", what = "render intent" }, { to = "middleware", type = "integrates", what = "cache middleware" }]
+
+[[steward]]
+id = "data"
+path = "src/chirp/data/AGENTS.md"
+point_of_view = "Keep typed data helpers, parameterized queries, deterministic schema diffs, migrations, and pools useful without becoming an ORM."
+guardrails = ["Postgres support and drivers remain optional.", "Generated migrations remain deterministic and reviewable.", "Shared pools have explicit concurrency boundaries."]
+owns.code = ["src/chirp/data/"]
+owns.tests = ["tests/test_data.py", "tests/test_query.py", "tests/test_schema.py"]
+owns.docs = ["docs/deployment/railway.md"]
+edges = [{ to = "pelt", type = "adapts", what = "in-tree PostgreSQL driver" }, { to = "cli", type = "exposed-by", what = "migration commands" }]
+
+[[steward]]
+id = "pelt"
+path = "src/chirp/data/drivers/_pelt/AGENTS.md"
+point_of_view = "Preserve the pure-Python, libpq-free, free-threading-native PostgreSQL wire driver and its sans-I/O seam."
+guardrails = ["Sans-I/O modules touch no socket or anyio.", "Framing returns a message/length, incomplete input, or ProtocolError—never arbitrary failure.", "Never hold a lock across await or I/O.", "Pool and connection signatures remain compatible with Chirp's Database facade."]
+owns.code = ["src/chirp/data/drivers/_pelt/"]
+owns.tests = ["tests/test_pelt/"]
+owns.docs = ["tests/docs/test_pelt_conformance_contract.py"]
+edges = [{ to = "data", type = "implements", what = "PostgreSQL seam" }]
+
+[[steward]]
+id = "realtime"
+path = "src/chirp/realtime/AGENTS.md"
+point_of_view = "Keep post-load SSE updates reliable, correctly framed, bounded on errors, and cleaned up on disconnect."
+guardrails = ["EventStream is post-load SSE, not initial Stream or Suspense rendering.", "One event failure does not silently kill a long-lived stream."]
+owns.code = ["src/chirp/realtime/"]
+owns.tests = ["tests/test_sse_parser.py", "tests/test_sse_integration.py", "tests/contracts/test_sse.py"]
+owns.docs = ["docs/realtime-production.md"]
+edges = [{ to = "server", type = "transported-by", what = "SSE response handling" }, { to = "pages", type = "consumed-by", what = "reactive streams" }]
+
+[[steward]]
+id = "validation"
+path = "src/chirp/validation/AGENTS.md"
+point_of_view = "Keep form validation typed, unsurprising, and capable of returning useful 422 fragments without losing input."
+guardrails = ["Falsy valid values are not treated as missing.", "Rules reuse HTTP form binding rather than parsing requests independently."]
+owns.code = ["src/chirp/validation/"]
+owns.tests = ["tests/test_validation.py", "tests/test_forms.py", "tests/contracts/test_forms.py"]
+owns.docs = ["docs/forms-production.md"]
+edges = [{ to = "http", type = "binds", what = "form data" }, { to = "templating", type = "returns", what = "ValidationError" }]
+
+[[steward]]
+id = "testing"
+path = "src/chirp/testing/AGENTS.md"
+point_of_view = "Keep public TestClient and assertion helpers faithful to real routing, negotiation, middleware, rendering, and SSE behavior."
+guardrails = ["Fragment assertions reject full documents.", "Helpers use public app paths unless their names explicitly promise a lower-level shortcut."]
+owns.code = ["src/chirp/testing/"]
+owns.tests = ["tests/test_testing_helpers.py", "tests/test_sse_testing.py"]
+owns.docs = ["site/content/docs/quality/testing/"]
+edges = [{ to = "tests", type = "used-by", what = "public regression proof" }, { to = "server", type = "exercises", what = "real negotiation" }]
+
+[[steward]]
+id = "cli"
+path = "src/chirp/cli/AGENTS.md"
+point_of_view = "Keep commands, flags, diagnostics, freeze, migrations, and generated projects aligned with framework reality."
+guardrails = ["Every documented flag traces to parser implementation.", "Scaffolds boot and teach current secure return-type patterns.", "Generated output changes originate in templates."]
+owns.code = ["src/chirp/cli/", "src/chirp/freeze.py"]
+owns.tests = ["tests/cli/", "tests/test_cli.py", "tests/test_cli_new.py"]
+owns.docs = ["README.md"]
+edges = [{ to = "examples", type = "teaches", what = "scaffold patterns" }, { to = "contracts", type = "reports", what = "chirp check" }]
+
+[[steward]]
+id = "docs_tooling"
+path = "src/chirp/docs/AGENTS.md"
+point_of_view = "Keep the built-in docs plugin, autodoc, search metadata, frontmatter, and docs checks typed and reproducible."
+guardrails = ["Autodoc reflects registered state and docstrings rather than invented API.", "Search metadata ordering is deterministic."]
+owns.code = ["src/chirp/docs/"]
+owns.tests = ["tests/docs/", "tests/test_search_index_v2.py"]
+owns.docs = ["site/content/docs/quality/docs-plugin/"]
+edges = [{ to = "docs", type = "publishes", what = "source-backed documentation" }, { to = "site", type = "feeds", what = "search and metadata" }]
+
+[[steward]]
+id = "ai"
+path = "src/chirp/ai/AGENTS.md"
+point_of_view = "Keep LLM providers, structured output, and token streaming optional, offline-testable, and hypermedia-native."
+guardrails = ["AI dependencies remain optional and provider absence names the required install or configuration.", "Committed examples contain no keys, private prompts, or internal endpoints."]
+owns.code = ["src/chirp/ai/"]
+owns.tests = ["tests/test_ai/"]
+owns.docs = ["examples/standalone/llm_minimal/"]
+edges = [{ to = "realtime", type = "streams-through", what = "SSE when selected" }, { to = "markdown", type = "optionally-renders", what = "model output" }]
+
+[[steward]]
+id = "markdown"
+path = "src/chirp/markdown/AGENTS.md"
+point_of_view = "Keep Markdown rendering optional, explicit about safety, and aligned with examples that install the extra."
+guardrails = ["Markdown output never silently bypasses template safety.", "Trusted versus untrusted content assumptions remain documented."]
+owns.code = ["src/chirp/markdown/"]
+owns.tests = ["tests/test_markdown.py"]
+owns.docs = ["README.md"]
+edges = [{ to = "ai", type = "serves", what = "optional model-output rendering" }, { to = "security", type = "reviewed-by", what = "escaping assumptions" }]
+
+[[steward]]
+id = "i18n"
+path = "src/chirp/i18n/AGENTS.md"
+point_of_view = "Keep locale detection, catalogs, formatting, middleware, and template helpers optional and request-isolated."
+guardrails = ["Current locale never lives in a mutable global.", "ICU/gettext remains deferred; richer formatting uses the documented babel-alongside pattern."]
+owns.code = ["src/chirp/i18n/"]
+owns.tests = ["tests/test_i18n.py", "tests/contracts/test_i18n_keys.py"]
+owns.docs = ["site/content/"]
+edges = [{ to = "middleware", type = "detects-through", what = "cookies, headers, and URL" }, { to = "templating", type = "injects", what = "translation helpers" }]
+
+[[steward]]
+id = "ext"
+path = "src/chirp/ext/AGENTS.md"
+point_of_view = "Keep optional extension adapters useful without making chirp-ui or another integration redefine core Chirp."
+guardrails = ["Extension imports remain lazy or guarded.", "The UI extra and generated scaffold currently require chirp-ui>=0.11.2; future floor changes need changelog and scaffold/example proof.", "use_chirp_ui owns its Alpine and nonce-CSP wiring; changing it is a security-default change."]
+owns.code = ["src/chirp/ext/"]
+owns.tests = ["tests/test_chirpui_boundary.py", "tests/test_chirpui_compat_ci.py", "tests/test_chirpui_scaffold_default.py"]
+owns.docs = ["docs/rfcs/001-component-filter-contract.md"]
+edges = [{ to = "public", type = "exported-by", what = "optional bridge" }, { to = "security", type = "changes", what = "CSP defaults" }]
+
+[[steward]]
+id = "tools"
+path = "src/chirp/tools/AGENTS.md"
+point_of_view = "Keep MCP tool schema, registry, handler, and events typed, deterministic, frozen with the app, and safe to expose."
+guardrails = ["Schema fields trace to annotations, defaults, and docstrings.", "Protocol failures are shaped and actionable rather than vague 500s."]
+owns.code = ["src/chirp/tools/"]
+owns.tests = ["tests/test_tools/"]
+owns.docs = ["README.md"]
+edges = [{ to = "app", type = "freezes-with", what = "tool registry" }, { to = "server", type = "handled-by", what = "MCP transport" }]
+
+[[steward]]
+id = "tests"
+path = "tests/AGENTS.md"
+point_of_view = "Keep tests as executable bug reports through public paths, with deterministic offline and free-threaded proof."
+guardrails = ["Escaped bugs gain named regression tests.", "Network-dependent tests are isolated and explicitly marked.", "Coverage remains at least 80 percent for code changes."]
+owns.code = ["tests/"]
+owns.tests = ["tests/"]
+owns.docs = ["docs/plan-contract-tests-reliability.md"]
+edges = [{ to = "root", type = "verifies", what = "repository behavior" }, { to = "testing", type = "uses", what = "public helpers" }]
+
+[[steward]]
+id = "contract_tests"
+path = "tests/contracts/AGENTS.md"
+point_of_view = "Prove app.check() catches realistic broken routes, templates, OOB, Suspense, SSE, forms, shells, accessibility, and production safety."
+guardrails = ["Issue assertions protect category, severity, affected surface, and actionable next step.", "Fixtures model apps users could write and use TestClient or app.check()."]
+owns.code = ["tests/contracts/"]
+owns.tests = ["tests/contracts/"]
+owns.docs = ["docs/hypermedia-footguns.md"]
+edges = [{ to = "contracts", type = "proves", what = "end-to-end rule behavior" }]
+
+[[steward]]
+id = "docs"
+path = "docs/AGENTS.md"
+point_of_view = "Preserve source-backed architecture, public API, deployment, release, RFC, and migration explanations without presenting plans as shipped behavior."
+guardrails = ["Every public flag, field, name, and compatibility claim traces to code or focused proof.", "Performance, security, and production claims carry evidence and caveats."]
+owns.code = ["docs/"]
+owns.tests = ["tests/test_public_api_docs.py", "tests/docs/"]
+owns.docs = ["docs/", "README.md"]
+edges = [{ to = "site", type = "published-by", what = "Bengal content" }, { to = "changelog", type = "released-by", what = "user-visible changes" }]
+
+[[steward]]
+id = "site"
+path = "site/AGENTS.md"
+point_of_view = "Keep Bengal source content, navigation, search, assets, and release pages aligned without treating generated output as canonical source."
+guardrails = ["site/content and config are source; site/public and site/.bengal are generated.", "Release pages agree with CHANGELOG and release policy."]
+owns.code = ["site/content/", "site/config/", "site/assets/"]
+owns.tests = ["tests/docs/test_site_link_drift.py"]
+owns.docs = ["site/content/"]
+edges = [{ to = "docs", type = "publishes", what = "canonical prose" }, { to = "docs_tooling", type = "consumes", what = "search metadata" }]
+
+[[steward]]
+id = "examples"
+path = "examples/AGENTS.md"
+point_of_view = "Keep examples executable, offline-testable, dependency-complete, safe to copy, and aligned with scaffolds and public return types."
+guardrails = ["Standalone examples do not require chirp-ui shell delegation.", "Flagship examples teach through running code and keep comments within the documented budget.", "Good-first-issue work remains reserved for external contributors."]
+owns.code = ["examples/"]
+owns.tests = ["examples/"]
+owns.docs = ["examples/**/README.md"]
+edges = [{ to = "cli", type = "mirrors", what = "scaffold defaults" }, { to = "docs", type = "demonstrates", what = "copyable behavior" }]
+
+[[steward]]
+id = "benchmarks"
+path = "benchmarks/AGENTS.md"
+point_of_view = "Keep performance workloads, artifacts, comparisons, and claims reproducible, timestamped, versioned, and appropriately caveated."
+guardrails = ["Synthetic results are not presented as production throughput.", "Fast-path changes carry before/after evidence or explicit no-impact rationale."]
+owns.code = ["benchmarks/"]
+owns.tests = ["tests/test_benchmarks_core.py"]
+owns.docs = ["benchmarks/README.md", "docs/benchmark-*.md"]
+edges = [{ to = "server", type = "measures", what = "request and sync paths" }, { to = "docs", type = "supports", what = "performance claims" }]
+
+[[steward]]
+id = "changelog"
+path = "changelog.d/AGENTS.md"
+point_of_view = "Keep towncrier inputs small, valid, security-aware, and written in terms of user-visible impact."
+guardrails = ["Public API, scaffold, dependency-floor, and contract changes require fragments.", "Fragments do not begin with a Markdown list dash."]
+owns.code = ["changelog.d/"]
+owns.tests = ["scripts/check_changelog_fragments.py"]
+owns.docs = ["CHANGELOG.md", "docs/release-policy.md"]
+edges = [{ to = "docs", type = "releases", what = "public behavior" }]
+
+[[steward]]
+id = "plan"
+path = "plan/AGENTS.md"
+point_of_view = "Keep roadmap and backlog artifacts honest about status, native GitHub hierarchy, blockers, decisions, proof, and not-now scope."
+guardrails = ["GitHub issues own active work and parent/sub-issue relationships.", "Ready is leaf-only; good-first issues remain contributor work.", "Plans never masquerade as shipped documentation."]
+owns.code = ["plan/"]
+owns.tests = ["scripts/backlog.py"]
+owns.docs = ["plan/", "docs/rfcs/"]
+edges = [{ to = "root", type = "prioritizes", what = "future work" }, { to = "docs", type = "graduates-to", what = "shipped explanation" }]
+
+[[invariant]]
+id = "root-public-surface"
+steward = "root"
+statement = "The blessed public imports remain lazy, classified, and documented."
+severity = "P0"
+verification = "machine"
+enforced_by = "public-contract"
+
+[[invariant]]
+id = "root-contract-safety"
+steward = "root"
+statement = "app.check() contract rules retain end-to-end broken-app coverage."
+severity = "P0"
+verification = "machine"
+enforced_by = "contract-suite"
+
+[[invariant]]
+id = "root-typing"
+steward = "root"
+statement = "The shipped source tree remains clean under Chirp's Python 3.14 Ty contract."
+severity = "P1"
+verification = "machine"
+enforced_by = "ty"
+
+[[invariant]]
+id = "root-steward-network"
+steward = "root"
+statement = "Generated maps fail validation when stale, evidence-rotted, uncovered, over budget, or falsely wired to checks."
+severity = "P1"
+verification = "machine"
+enforced_by = "steward-tools"
+
+[[invariant]]
+id = "root-lint"
+steward = "root"
+statement = "Repository source, tests, examples, scripts, and governance tooling remain Ruff-clean."
+severity = "P1"
+verification = "machine"
+enforced_by = "ruff"
+
+[[invariant]]
+id = "root-format"
+steward = "root"
+statement = "Repository Python formatting remains stable under Ruff."
+severity = "P1"
+verification = "machine"
+enforced_by = "format"
+
+[[invariant]]
+id = "root-hypermedia-native"
+steward = "root"
+statement = "Typed return values and named blocks remain the architecture rather than a parallel SPA or JSON response layer."
+severity = "P0"
+verification = "manual"
+evidence_file = "README.md"
+anchor = "one-template/named-block render surface"
+
+[[invariant]]
+id = "public-export-parity"
+steward = "public"
+statement = "Every exported public name is lazy-importable and has one documented maturity classification."
+severity = "P0"
+verification = "machine"
+enforced_by = "public-contract"
+
+[[invariant]]
+id = "public-config-contract"
+steward = "public"
+statement = "AppConfig validation, environment loading, unknown-variable warnings, and production safety remain covered."
+severity = "P0"
+verification = "machine"
+enforced_by = "config-contract"
+
+[[invariant]]
+id = "public-lazy-registry"
+steward = "public"
+statement = "Top-level public exports move together across __all__, _LAZY_IMPORTS, and _API_STATUS."
+severity = "P1"
+verification = "manual"
+evidence_file = "src/chirp/__init__.py"
+anchor = "_LAZY_IMPORTS"
+
+[[invariant]]
+id = "internal-invocation-contract"
+steward = "internal"
+statement = "Private ASGI, invocation-plan, kwargs, context, and multimap helpers retain focused behavioral coverage."
+severity = "P1"
+verification = "machine"
+enforced_by = "internal-suite"
+
+[[invariant]]
+id = "settings-registry-contract"
+steward = "settings"
+statement = "Runtime settings parsing, registration, revision, storage, and change notification remain distinct from AppConfig."
+severity = "P1"
+verification = "machine"
+enforced_by = "settings-suite"
+
+[[invariant]]
+id = "app-freeze-publication"
+steward = "app"
+statement = "Registration, freeze, mounting, runtime publication, and URL generation retain lifecycle coverage."
+severity = "P0"
+verification = "machine"
+enforced_by = "app-lifecycle"
+
+[[invariant]]
+id = "app-freeze-lock"
+steward = "app"
+statement = "Free-threaded freeze publishes complete runtime state under an explicit lock boundary."
+severity = "P0"
+verification = "manual"
+evidence_file = "src/chirp/app/__init__.py"
+anchor = "_freeze_lock"
+
+[[invariant]]
+id = "http-public-primitives"
+steward = "http"
+statement = "Request, response, header, cookie, form, and sync primitives preserve public behavior."
+severity = "P0"
+verification = "machine"
+enforced_by = "http-suite"
+
+[[invariant]]
+id = "routing-determinism"
+steward = "routing"
+statement = "Route parsing, matching, naming, mounting, and URL generation remain deterministic and fail loud on ambiguity."
+severity = "P0"
+verification = "machine"
+enforced_by = "routing-suite"
+
+[[invariant]]
+id = "server-negotiation"
+steward = "server"
+statement = "Typed return values retain htmx, sync, streaming, SSE, response, and error negotiation semantics."
+severity = "P0"
+verification = "machine"
+enforced_by = "server-suite"
+
+[[invariant]]
+id = "server-vary-hx"
+steward = "server"
+statement = "Composition responses preserve render intent and vary on HX-Request where required."
+severity = "P0"
+verification = "manual"
+evidence_file = "src/chirp/server/negotiation.py"
+anchor = "HX-Request"
+
+[[invariant]]
+id = "templating-fail-loud"
+steward = "templating"
+statement = "Render plans, OOB blocks, Suspense, navigation swaps, and fragments fail loud instead of producing visible empty swaps."
+severity = "P0"
+verification = "machine"
+enforced_by = "templating-suite"
+
+[[invariant]]
+id = "templating-block-error"
+steward = "templating"
+statement = "A missing required named block raises BlockNotFoundError."
+severity = "P0"
+verification = "manual"
+evidence_file = "src/chirp/errors.py"
+anchor = "class BlockNotFoundError"
+
+[[invariant]]
+id = "contracts-real-app-proof"
+steward = "contracts"
+statement = "Contract rules retain real-app coverage across routes, templates, OOB, Suspense, SSE, forms, security, and extensions."
+severity = "P0"
+verification = "machine"
+enforced_by = "contract-suite"
+
+[[invariant]]
+id = "contracts-typed-results"
+steward = "contracts"
+statement = "Contract severities, issues, coverage, and results remain typed public behavior."
+severity = "P1"
+verification = "manual"
+evidence_file = "src/chirp/contracts/types.py"
+anchor = "class Severity"
+
+[[invariant]]
+id = "pages-route-shell"
+steward = "pages"
+statement = "Filesystem discovery, route-directory conventions, shell composition, and page contracts remain executable."
+severity = "P0"
+verification = "machine"
+enforced_by = "pages-suite"
+
+[[invariant]]
+id = "middleware-pipeline"
+steward = "middleware"
+statement = "Security, session, CSRF, CORS, host, static, and response middleware retain safe ordering and defaults."
+severity = "P0"
+verification = "machine"
+enforced_by = "middleware-suite"
+
+[[invariant]]
+id = "security-auth-parity"
+steward = "security"
+statement = "Imperative and declarative auth gates preserve canonical denial behavior and audit payload parity."
+severity = "P0"
+verification = "machine"
+enforced_by = "security-suite"
+
+[[invariant]]
+id = "security-shared-gate"
+steward = "security"
+statement = "All supported auth styles delegate to one enforce_auth implementation."
+severity = "P0"
+verification = "manual"
+evidence_file = "src/chirp/security/auth_core.py"
+anchor = "def enforce_auth"
+
+[[invariant]]
+id = "security-unauthenticated-event"
+steward = "security"
+statement = "Unauthenticated auth denial emits the canonical auth.require.unauthenticated event."
+severity = "P0"
+verification = "manual"
+evidence_file = "src/chirp/security/auth_core.py"
+anchor = "auth.require.unauthenticated"
+
+[[invariant]]
+id = "cache-variant-safety"
+steward = "cache"
+statement = "Cache backends and middleware preserve render, auth, route, query, and app-instance variance."
+severity = "P0"
+verification = "machine"
+enforced_by = "cache-suite"
+
+[[invariant]]
+id = "data-contract"
+steward = "data"
+statement = "Database, query, schema, migration, pagination, and mapping helpers retain deterministic typed behavior."
+severity = "P1"
+verification = "machine"
+enforced_by = "data-suite"
+
+[[invariant]]
+id = "pelt-sans-io"
+steward = "pelt"
+statement = "Pelt framing, messages, codecs, protocol, connection, and pool behavior retain focused coverage."
+severity = "P0"
+verification = "machine"
+enforced_by = "pelt-suite"
+
+[[invariant]]
+id = "pelt-framing-shape"
+steward = "pelt"
+statement = "Framing returns a parsed message and length, incomplete input, or ProtocolError for malformed input."
+severity = "P0"
+verification = "manual"
+evidence_file = "src/chirp/data/drivers/_pelt/_framing.py"
+anchor = "def parse_message"
+
+[[invariant]]
+id = "realtime-sse"
+steward = "realtime"
+statement = "SSE parsing, event formatting, streaming integration, macros, and startup contracts remain aligned."
+severity = "P0"
+verification = "machine"
+enforced_by = "realtime-suite"
+
+[[invariant]]
+id = "validation-forms"
+steward = "validation"
+statement = "Validation and form behavior distinguish missing, malformed, repeated, empty, and valid falsy values."
+severity = "P1"
+verification = "machine"
+enforced_by = "validation-suite"
+
+[[invariant]]
+id = "testing-public-paths"
+steward = "testing"
+statement = "Public test helpers exercise realistic negotiation, fragments, SSE wiring, and response intent."
+severity = "P1"
+verification = "machine"
+enforced_by = "testing-suite"
+
+[[invariant]]
+id = "cli-scaffold-contract"
+steward = "cli"
+statement = "CLI commands, checks, resolution, and generated project defaults retain focused coverage."
+severity = "P0"
+verification = "machine"
+enforced_by = "cli-suite"
+
+[[invariant]]
+id = "docs-tooling-contract"
+steward = "docs_tooling"
+statement = "Docs collection, autodoc, tools, frontmatter, links, and search formats remain deterministic and tested."
+severity = "P1"
+verification = "machine"
+enforced_by = "docs-tooling"
+
+[[invariant]]
+id = "ai-optional"
+steward = "ai"
+statement = "AI providers, structured output, approvals, and streaming remain offline-testable optional behavior."
+severity = "P1"
+verification = "machine"
+enforced_by = "ai-suite"
+
+[[invariant]]
+id = "markdown-optional"
+steward = "markdown"
+statement = "Markdown rendering and filters remain optional and explicit about dependency and safety behavior."
+severity = "P1"
+verification = "machine"
+enforced_by = "markdown-suite"
+
+[[invariant]]
+id = "i18n-request-isolation"
+steward = "i18n"
+statement = "Catalog, locale detection, middleware, formatting, and missing-key contracts retain request-scoped behavior."
+severity = "P1"
+verification = "machine"
+enforced_by = "i18n-suite"
+
+[[invariant]]
+id = "extension-boundary"
+steward = "ext"
+statement = "chirp-ui remains an optional, versioned bridge with tested runtime and import boundaries."
+severity = "P0"
+verification = "machine"
+enforced_by = "extension-suite"
+
+[[invariant]]
+id = "tools-contract"
+steward = "tools"
+statement = "Tool schemas, registry freeze, events, handler, client, and approvals remain typed and deterministic."
+severity = "P1"
+verification = "machine"
+enforced_by = "tools-suite"
+
+[[invariant]]
+id = "tests-full-suite"
+steward = "tests"
+statement = "Chirp's framework tests retain a single exact full-suite entrypoint."
+severity = "P1"
+verification = "machine"
+enforced_by = "full-tests"
+
+[[invariant]]
+id = "contract-tests-e2e"
+steward = "contract_tests"
+statement = "Realistic broken apps prove issue severity, category, location, and actionable guidance through app.check()."
+severity = "P0"
+verification = "machine"
+enforced_by = "contract-suite"
+
+[[invariant]]
+id = "docs-public-drift"
+steward = "docs"
+statement = "Public API and published site links remain synchronized with current source."
+severity = "P1"
+verification = "machine"
+enforced_by = "docs-drift"
+
+[[invariant]]
+id = "site-link-drift"
+steward = "site"
+statement = "Bengal source links remain valid and generated output stays outside canonical prose."
+severity = "P1"
+verification = "machine"
+enforced_by = "site-drift"
+
+[[invariant]]
+id = "examples-executable"
+steward = "examples"
+statement = "Examples remain executable documentation under the default offline pytest collection."
+severity = "P1"
+verification = "machine"
+enforced_by = "examples-suite"
+
+[[invariant]]
+id = "benchmark-reproducibility"
+steward = "benchmarks"
+statement = "Core benchmark outputs remain reproducible, versioned, failure-preserving, and explicit about Python GIL mode."
+severity = "P1"
+verification = "machine"
+enforced_by = "benchmark-contract"
+
+[[invariant]]
+id = "changelog-rendering"
+steward = "changelog"
+statement = "Towncrier fragments compile into the configured release-note structure."
+severity = "P1"
+verification = "machine"
+enforced_by = "changelog-draft"
+
+[[invariant]]
+id = "plan-issue-authority"
+steward = "plan"
+statement = "Active work and hierarchy remain authoritative in GitHub issues rather than duplicated roadmap checklists."
+severity = "P1"
+verification = "manual"
+evidence_file = "plan/roadmap.md"
+anchor = "GitHub"
+
+[[invariant]]
+id = "plan-live-hierarchy"
+steward = "plan"
+statement = "Every open unblocked parent reaches a ready leaf through live GitHub parent/sub-issue relationships."
+severity = "P1"
+verification = "none"
+
+[judgment.public]
+advocate = ["Strict drift checks for exports, maturity tiers, config fields, and optional missing-extra behavior."]
+do_not = ["Add convenience exports, speculative AppConfig fields, or mandatory dependencies for optional capabilities."]
+
+[judgment.app]
+advocate = ["Whole-state publication, complete contract snapshots, and deterministic mount/freeze diagnostics."]
+do_not = ["Add runtime mutation escape hatches or let checks observe half-published state."]
+
+[judgment.templating]
+advocate = ["DOM-level assertions and diagnostics naming template, block, target, route, and registration source."]
+do_not = ["Create a partials system, return empty swaps, or use inheritance to override sibling layout blocks."]
+
+[judgment.contracts]
+advocate = ["Checks that prevent visible corruption and tell developers exactly what to fix."]
+do_not = ["Become a preference linter, emit warnings users learn to ignore, or silently change severity."]
+
+[judgment.security]
+advocate = ["Parity locks, constant-time comparisons, bounded shared state, fuzzed safe URLs, and deployment checks."]
+do_not = ["Broaden policy assumptions, hide permissive fallbacks, or publish authorization examples based on user-controlled facts."]
+
+[judgment.pelt]
+advocate = ["Sans-I/O fuzzing, free-threaded stress tests, actionable PELT_* errors, and honest benchmark caveats."]
+do_not = ["Add compiled extensions, hold locks across I/O, or change the Database seam without coordinated proof."]
+
+[judgment.examples]
+advocate = ["Offline copy-paste paths that teach return types and feed safer patterns back into scaffolds."]
+do_not = ["Take good-first issues, hide optional dependencies, or commit secrets and private endpoints."]
+
+[judgment.benchmarks]
+advocate = ["Versioned artifacts with environment capture, failure preservation, and explicit synthetic-workload caveats."]
+do_not = ["Overclaim production performance or compare mismatched workloads and client limits."]
+
+[judgment.plan]
+advocate = ["Ranked executable leaf work with explicit proof, dependencies, dissent, blockers, and not-now scope."]
+do_not = ["Duplicate issue scope in roadmap files, mark parents ready, or present speculative plans as shipped behavior."]

@@ -1,75 +1,38 @@
-# Steward: Benchmarks
+<!-- generated from .stewards/manifest.toml — edit the manifest, not this file -->
 
-You keep performance claims measurable, reproducible, and caveated. This domain
-owns benchmark runners, synthetic workloads, comparison methodology, and release
-performance receipts.
+# Steward: benchmarks
 
-Related: `AGENTS.md`, `benchmarks/README.md`, `docs/benchmark-*.md`,
-`docs/release-policy.md`.
+Keep performance workloads, artifacts, comparisons, and claims reproducible, timestamped, versioned, and appropriately caveated.
 
-## Point Of View
+Ordinary work: use this map directly with the root map and run only affected checks.
+Do not open `.stewards/PROTOCOL.md` or `.stewards/manifest.toml` unless the task is an explicit review/audit or steward-network maintenance.
 
-You are the maintainer making performance claims and the reader deciding whether
-the benchmark applies to their workload.
+## Protects
 
-## Protect
+| Invariant | Sev | Backing | Proof / anchor |
+| --- | --- | --- | --- |
+| Core benchmark outputs remain reproducible, versioned, failure-preserving, and explicit about Python GIL mode. | P1 | machine-backed | `uv run pytest tests/test_benchmarks_core.py -q` (`benchmark-contract`) |
 
-- **Benchmark deps are optional.** `pyproject.toml:84-93` defines the
-  `benchmark` extra.
-- **Tasks are explicit.** `pyproject.toml:338-341` defines benchmark task
-  commands.
-- **Claims need methodology.** `benchmarks/README.md` and benchmark docs should
-  describe workload, environment, caveats, and runner.
-- **Synthetic means synthetic.** Do not imply real production throughput without
-  evidence.
-- **Artifacts need timestamps/config.** Release readiness docs should name the
-  command and output artifact.
-- **Performance changes need baselines.** Fast-path changes need before/after or
-  explicit no-impact rationale.
-- **Comparisons are fair.** Dependency versions, worker modes, and client limits
-  must be stated.
+## Guardrails
 
-## Contract Checklist
+- Synthetic results are not presented as production throughput.
+- Fast-path changes carry before/after evidence or explicit no-impact rationale.
 
-When this domain changes, check:
+## Edges
 
-- `benchmarks/` runners, fixtures, workload definitions, output formats.
-- `pyproject.toml` benchmark extra and `tool.poe.tasks`.
-- `docs/benchmark-*.md`, release readiness docs, README benchmark section.
-- CI/release docs when benchmark artifacts are part of release proof.
-- Benchmark tests such as `tests/test_benchmarks_core.py` when output schema
-  changes.
-- Changelog when benchmark suite or performance behavior changes.
+- measures → **server** (request and sync paths)
+- supports → **docs** (performance claims)
+
+## Owns
+
+- **code:** `benchmarks/`
+- **tests:** `tests/test_benchmarks_core.py`
+- **docs:** `benchmarks/README.md`, `docs/benchmark-*.md`
 
 ## Advocate
 
-- **Artifact schema stability.** JSON outputs should be versioned or tested.
-- **Environment capture.** Commands should record Python, worker mode, deps, and
-  client settings.
-- **Regression thresholds.** Core benchmark regressions should have a documented
-  review threshold.
-- **Caveat discipline.** Docs should say synthetic/internal regression workloads
-  unless a production study supports more.
-
-## Serve Peers
-
-- Tell `docs` and `site` when methodology, caveats, or release artifacts change.
-- Tell `server`, `http`, and `app` when performance evidence affects sync path,
-  routing, negotiation, or lifecycle decisions.
-- Tell `changelog.d` when benchmark-suite changes or measured regressions are
-  user-visible.
+- Versioned artifacts with environment capture, failure preservation, and explicit synthetic-workload caveats.
 
 ## Do Not
 
-- Overclaim performance from synthetic tests.
-- Compare against frameworks with mismatched workload or client settings.
-- Hide failed/slow benchmark runs.
-- Add benchmark dependencies to core install paths.
-
-## Own
-
-**Code:** `benchmarks/`.
-**Tests:** benchmark runner/output tests.
-**Docs:** benchmark README, benchmark deep dives, release readiness artifacts.
-**Agent artifacts:** this file.
-**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.
+- Overclaim production performance or compare mismatched workloads and client limits.

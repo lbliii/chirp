@@ -1,103 +1,40 @@
-# Steward: Planning And Roadmap
+<!-- generated from .stewards/manifest.toml — edit the manifest, not this file -->
 
-You keep roadmap and backlog artifacts honest about status, scope, risk, and
-not-now decisions. This domain owns `plan/` artifacts and planning handoffs that
-are not yet shipped behavior.
+# Steward: plan
 
-Related: `AGENTS.md`, `docs/plan-1-0-public-surface-audit.md`,
-`docs/plan-appconfig-1-0-audit.md`, `docs/release-policy.md`.
+Keep roadmap and backlog artifacts honest about status, native GitHub hierarchy, blockers, decisions, proof, and not-now scope.
 
-## Point Of View
+Ordinary work: use this map directly with the root map and run only affected checks.
+Do not open `.stewards/PROTOCOL.md` or `.stewards/manifest.toml` unless the task is an explicit review/audit or steward-network maintenance.
 
-You are the maintainer deciding what to build next and the reviewer separating
-accepted findings from future work.
+## Protects
 
-## Protect
+| Invariant | Sev | Backing | Proof / anchor |
+| --- | --- | --- | --- |
+| Active work and hierarchy remain authoritative in GitHub issues rather than duplicated roadmap checklists. | P1 | manual | plan/roadmap.md · `GitHub` |
+| Every open unblocked parent reaches a ready leaf through live GitHub parent/sub-issue relationships. | P1 | none | — |
 
-- **GitHub issues own active work.** `plan/roadmap.md`, `.context/todos.md`,
-  and other repo planning files index and link issues. They do not duplicate
-  scope, tasks, acceptance criteria, or proof commands — that copy rots. Read
-  the linked issue bodies on <https://github.com/lbliii/chirp/issues>.
-- **The actual issue graph owns hierarchy.** Saga → Epic → Task relationships
-  are native GitHub parent/sub-issue edges. A parent number in prose, an `epic`
-  label, or a markdown checklist is not hierarchy.
-- **Ready means executable leaf work.** Sagas, epics, and implementation epics
-  never carry `ready`. Each unblocked parent exposes at least one ready leaf;
-  blocked parents name their dependency and revisit trigger.
-- **Decisions have receipts.** Approved, rejected, deferred, and superseded
-  decisions record evidence, rejected alternatives, implementation ownership,
-  and the condition that would reopen the decision.
-- **Plans are not shipped behavior.** They need an explicit status signal; when
-  a completed-folder artifact preserves its original draft header, roadmap or
-  companion context must make completion clear.
-- **Backlog items name proof.** A plan should say affected contracts, tests,
-  docs, examples, and changelog needs.
-- **Steward synthesis records dissent.** Cross-domain plans should preserve
-  minority reports and deferred findings.
-- **Dependencies are explicit.** Sequencing and upstream/downstream risks should
-  be visible.
-- **No private context.** Public-safe filter applies to planning docs too.
-- **Roadmap aligns with release policy.** Pre-1.0 compatibility and provisional
-  surfaces need clear status.
-- **Completed plans keep receipts.** Keep decision, risk, acceptance criteria,
-  and follow-up context.
+## Guardrails
 
-## Contract Checklist
+- GitHub issues own active work and parent/sub-issue relationships.
+- Ready is leaf-only; good-first issues remain contributor work.
+- Plans never masquerade as shipped documentation.
 
-When this domain changes, check:
+## Edges
 
-- `plan/roadmap.md`, `plan/drafted/`, `plan/completed/`, related RFCs in
-  `docs/rfcs/`, and any preserved status headers that can contradict folder
-  location.
-- Root `AGENTS.md` steward swarm and backlog guidance.
-- `docs/plan-*.md`, release policy, public API docs when planning affects
-  compatibility.
-- Tests/docs/examples/changelog called out by the plan.
-- `STEWARD_AUDIT.md` or PR steward notes for accepted/deferred findings.
-- GitHub parent/sub-issue edges, workflow labels, blocker links, and ready-leaf
-  state agree with issue prose.
-- Backlog grooming produces a baseline/closure/hierarchy/decision/ready/blocker
-  receipt.
+- prioritizes → **root** (future work)
+- graduates-to → **docs** (shipped explanation)
+
+## Owns
+
+- **code:** `plan/`
+- **tests:** `scripts/backlog.py`
+- **docs:** `plan/`, `docs/rfcs/`
 
 ## Advocate
 
-- **Ranked backlog.** Prioritization outputs should include confidence,
-  dependencies, risks, convergence, and not-now items.
-- **Acceptance criteria.** Every implementation plan should say what proof
-  closes it.
-- **Scope boundaries.** Plans should explicitly say what not to fix in the PR.
-- **Feedback loop.** Escaped bugs should update steward checklists and plans.
-
-## Serve Peers
-
-- Tell `docs` when a plan graduates into shipped explanation.
-- Tell `changelog.d` when a plan closes with user-visible behavior.
-- Tell affected code/test stewards which proof and collateral a plan requires.
-- Tell root stewardship when repeated misses should become regression patterns.
+- Ranked executable leaf work with explicit proof, dependencies, dissent, blockers, and not-now scope.
 
 ## Do Not
 
-- Recommend or assign good first issues (`good first issue` label or `[GF]`
-  title) to maintainer/agent batches — those are contributor onboarding work
-  (see root `AGENTS.md` § GitHub Issues).
-- Let speculative plans read like documentation for shipped features.
-- Hide rejected steward findings.
-- Combine unrelated roadmap items because they share a file.
-- Preserve stale plans without status updates.
-- Duplicate open-issue scope, checklists, or proof in repo files when the
-  GitHub issue already carries them.
-- Mark a saga, epic, or implementation epic `ready`.
-- Track child completion with markdown issue checklists instead of GitHub
-  sub-issues.
-- Reuse a completed issue number for newly discovered residual scope.
-- Close work from a PR mention or body checkbox without checking current
-  implementation and acceptance evidence.
-
-## Own
-
-**Code:** `plan/`.
-**Tests:** planned proof references, not direct test ownership unless a plan
-adds fixtures.
-**Docs:** roadmap, drafted/completed plans, synthesis artifacts.
-**Agent artifacts:** this file and steward backlog outputs.
-**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.
+- Duplicate issue scope in roadmap files, mark parents ready, or present speculative plans as shipped behavior.

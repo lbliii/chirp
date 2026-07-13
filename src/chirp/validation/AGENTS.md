@@ -1,68 +1,30 @@
-# Steward: Validation
+<!-- generated from .stewards/manifest.toml — edit the manifest, not this file -->
 
-You keep form validation boring, typed, and compatible with Chirp's return
-types. This domain owns validation results, rules, and helper contracts that
-turn malformed user input into useful 422 fragments.
+# Steward: validation
 
-Related: `AGENTS.md`, `README.md`, `docs/forms-production.md`,
-`site/content/docs/build-apps/forms-data/forms-validation/`.
+Keep form validation typed, unsurprising, and capable of returning useful 422 fragments without losing input.
 
-## Point Of View
+Ordinary work: use this map directly with the root map and run only affected checks.
+Do not open `.stewards/PROTOCOL.md` or `.stewards/manifest.toml` unless the task is an explicit review/audit or steward-network maintenance.
 
-You are the route author validating forms and the user who needs field-specific
-errors without losing entered values.
+## Protects
 
-## Protect
+| Invariant | Sev | Backing | Proof / anchor |
+| --- | --- | --- | --- |
+| Validation and form behavior distinguish missing, malformed, repeated, empty, and valid falsy values. | P1 | machine-backed | `uv run pytest tests/test_validation.py tests/test_forms.py tests/contracts/test_forms.py -q` (`validation-suite`) |
 
-- **Validation result shells are frozen.** `src/chirp/validation/result.py`
-  defines frozen/slotted result objects; nested mappings are mutable unless the
-  source changes.
-- **Public helpers are exported.** `src/chirp/validation/__init__.py:35-47`
-  lists `validate`, `required`, `email`, numeric, length, and choice rules.
-- **Falsy valid values stay valid.** Empty/missing/malformed/falsy values need
-  distinct tests and messages.
-- **Validation integrates with return types.** `ValidationError` is a stable
-  return type in `docs/public-api.md:31`.
-- **Rules do not parse forms ad hoc.** Use `src/chirp/http/forms.py` helpers
-  when binding request form data.
-- **Messages are actionable.** Field errors should name the field/rule without
-  leaking internals.
-- **Optional form parsing stays optional.** Multipart behavior follows the
-  `forms` extra in `pyproject.toml:43-45`.
+## Guardrails
 
-## Contract Checklist
+- Falsy valid values are not treated as missing.
+- Rules reuse HTTP form binding rather than parsing requests independently.
 
-When this domain changes, check:
+## Edges
 
-- `src/chirp/validation/result.py`, `rules.py`, `__init__.py`.
-- `src/chirp/http/forms.py` and `src/chirp/templating/returns.py`
-  `ValidationError` behavior.
-- Form contract rules in `src/chirp/contracts/`.
-- Forms docs, examples, README feature rows, changelog.
-- `tests/test_validation.py`, `tests/test_forms.py`,
-  `tests/contracts/test_forms.py`, form-route contract tests.
+- binds → **http** (form data)
+- returns → **templating** (ValidationError)
 
-## Advocate
+## Owns
 
-- **Field-level regression cases.** Cover empty, missing, malformed, repeated,
-  and falsy valid values.
-- **Better binding messages.** Errors should tell users whether parsing,
-  coercion, or validation failed.
-- **Docs parity.** Examples should show htmx and plain-browser form outcomes.
-- **Form contract coverage.** Public form helpers should be reflected in
-  startup checks where static evidence exists.
-
-## Do Not
-
-- Add a full schema framework.
-- Treat falsy values as missing unless the rule says so.
-- Duplicate form parsing logic outside HTTP helpers.
-- Hide malformed input behind generic "invalid" messages.
-
-## Own
-
-**Code:** `src/chirp/validation/`, validation-facing form helpers.
-**Tests:** validation, forms, form contracts, malformed/falsy value cases.
-**Docs:** forms validation docs and examples.
-**Agent artifacts:** this file.
-**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.
+- **code:** `src/chirp/validation/`
+- **tests:** `tests/test_validation.py`, `tests/test_forms.py`, `tests/contracts/test_forms.py`
+- **docs:** `docs/forms-production.md`

@@ -196,6 +196,7 @@ ignore = [
 "src/chirp/security/access_grants.py" = ["S608"] # Grant SQL uses validated identifiers + bound params
 "src/chirp/server/production.py" = ["S104"] # Server binds to 0.0.0.0 intentionally
 "src/chirp/contracts/**/*.py" = ["S110", "S112", "S608"] # Contract checkers intentionally suppress errors
+".stewards/*.py" = ["T201"] # Repository governance scripts report validation results
 
 # =============================================================================
 # ty — Type Checker (Rust-based, Astral)
