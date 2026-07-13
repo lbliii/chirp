@@ -110,7 +110,7 @@ When client-side behavior is needed, chirp supports Alpine.js for local state an
 ## What Chirp Is Not
 
 - **Not a REST API framework.** If your primary output is JSON for a separate frontend, use FastAPI. Chirp's strength is rendering HTML.
-- **Not a Django replacement.** Chirp doesn't include an ORM, admin panel, or auth backend. It's smaller and sharper — a framework for the rendering layer, not the entire stack.
+- **Not a Django replacement.** Chirp doesn't bundle an ORM, admin generator, or background job system. It is an application framework for server-rendered UI, not a kitchen-sink application platform.
 - **Not a static site generator.** Chirp serves dynamic HTML. For static sites in the Bengal ecosystem, see [Bengal](https://github.com/lbliii/bengal).
 - **Not opinionated about your database.** Use SQLAlchemy, SQLModel, raw SQL, or no database at all. Chirp renders HTML — where the data comes from is your choice.
 

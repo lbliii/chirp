@@ -5,25 +5,27 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://pypi.org/project/bengal-chirp/)
 
-**A full-stack Python hypermedia framework with a built-in contract compiler.**
+**One template. Every interaction. Checked before deploy.**
 
-Routes return intent — `Page`, `Fragment`, `EventStream`, `Suspense`, and friends — and Chirp
-handles content negotiation, layout composition, and htmx awareness. Install as
+Chirp is the hypermedia-native Python framework for server-rendered product UIs.
+Typed route returns produce full pages, htmx fragments, streaming HTML, and live
+SSE updates from the same named template blocks. `chirp check` catches broken
+routes, blocks, and targets before users do.
+
+No SPA. No duplicated partials. No JavaScript build pipeline. Install as
 **`bengal-chirp`**, import as **`chirp`**. Requires Python 3.14+.
 
-Chirp ships routing, templates, forms, validation, sessions, auth, streaming HTML, SSE,
-static files, security middleware, testing tools, and hypermedia contract checks in one
-framework. At startup it compiles routes, typed return declarations, template blocks,
-and registries into one immutable internal application model used by `chirp check`,
-runtime transition traces, and testing tools. JSON routes and explicit `Response`
-objects are supported when you need them.
+Chirp includes routing, templates, forms, validation, sessions, auth helpers,
+streaming HTML, SSE, static files, security middleware, and testing tools. At
+startup, its built-in contract compiler turns routes, typed return declarations,
+template blocks, and registries into one immutable application model used by
+`chirp check`, runtime transition traces, and tests. JSON routes and explicit
+`Response` objects remain available when you need them.
 Database access uses [Shapes](https://lbliii.github.io/chirp/docs/build-apps/forms-data/shapes/)
 and an optional in-tree PostgreSQL driver. Background jobs, admin UIs, and email delivery
 integrate at the seams — see [Non-goals](https://lbliii.github.io/chirp/docs/about/non-goals/).
 
-Status: **alpha** (0.9.x). See [Public API](docs/public-api.md) for stable vs provisional exports.
-Public positioning and performance language is governed by the machine-checked
-[claims ledger](docs/design/public-claims.json).
+Status: **alpha** (0.10.x). See [Public API](docs/public-api.md) for stable vs provisional exports.
 
 📚 **Documentation:** [lbliii.github.io/chirp](https://lbliii.github.io/chirp/)
 
@@ -83,10 +85,10 @@ No `make_response()`. No separate partials directory. The type *is* the intent.
 Read [Philosophy](docs/philosophy.md) and [Return values](https://lbliii.github.io/chirp/docs/about/core-concepts/return-values/)
 for the full model.
 
-The same declarations form Chirp's contract compiler input. `chirp check`
-diagnoses broken route/template/target relationships before a browser reaches
-them, while DevTools and transition tests correlate runtime requests back to
-the compiled model. The primary output is still a live ASGI application;
+The same declarations form Chirp's contract compiler input. Run `chirp check`
+to diagnose broken route, template, block, and target relationships before a
+browser reaches them. DevTools and transition tests correlate runtime requests
+back to the compiled model. The primary output is still a live ASGI application;
 `chirp freeze` is an optional static projection for compatible routes.
 
 See [Hypermedia Application Compiler](docs/hypermedia-application-compiler.md)
@@ -444,6 +446,9 @@ uv run poe benchmark
 
 See the [committed baseline and full artifact](benchmarks/README.md#committed-network-baseline)
 for current results, caveats, environment metadata, and runners.
+
+Public positioning and performance language is governed by the machine-checked
+[claims ledger](docs/design/public-claims.json).
 
 </details>
 

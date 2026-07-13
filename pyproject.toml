@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bengal-chirp"
 version = "0.10.0"
-description = "Python web framework for HTMX, HTML fragments, streaming HTML, and Server-Sent Events"
+description = "Hypermedia-native Python framework with typed returns and contract checks for server-rendered UIs"
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"

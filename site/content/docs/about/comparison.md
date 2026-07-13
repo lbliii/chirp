@@ -12,9 +12,9 @@ category: explanation
 
 ## What Chirp is
 
-Chirp is a Python web framework for apps where the server sends HTML — full
-pages, htmx fragments, streaming renders, and live updates — instead of JSON to
-a JavaScript front end.
+Chirp is a hypermedia-native application framework for server-rendered Python
+UIs. It sends full pages, htmx fragments, streaming renders, and live updates
+instead of using JSON as a mandatory boundary to a JavaScript front end.
 
 Reach for Chirp when server-rendered UI is your main product surface and you
 want the framework to catch broken UI wiring before users do. Reach for
@@ -58,9 +58,8 @@ rule Chirp out fast, and the difference column to see what it adds.
 
 :::{note}
 Chirp is narrower than Django on purpose. Keep Django's admin, ORM, and auth
-ecosystem where they fit, and let Chirp own the hypermedia UI surface. Chirp
-positions itself *alongside* existing platforms, not as a replacement for all
-of them.
+ecosystem where they fit, and let Chirp own the server-rendered product UI.
+Chirp is an application framework, but not a kitchen-sink application platform.
 :::
 
 ### Against hypermedia UI stacks
