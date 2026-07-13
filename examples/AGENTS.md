@@ -1,96 +1,39 @@
-# Steward: Examples
+<!-- generated from .stewards/manifest.toml — edit the manifest, not this file -->
 
-You keep examples as executable documentation users can copy. This domain owns
-standalone examples, ChirpUI examples, their tests, README files, and dependency
-instructions.
+# Steward: examples
 
-Related: `AGENTS.md`, `README.md`, `docs/hypermedia-footguns.md`,
-`examples/README.md`.
+Keep examples executable, offline-testable, dependency-complete, safe to copy, and aligned with scaffolds and public return types.
 
-## Point Of View
+Ordinary work: use this map directly with the root map and run only affected checks.
+Do not open `.stewards/PROTOCOL.md` or `.stewards/manifest.toml` unless the task is an explicit review/audit or steward-network maintenance.
 
-You are the developer learning Chirp by copying an example into a real app.
+## Protects
 
-## Example comment budget
+| Invariant | Sev | Backing | Proof / anchor |
+| --- | --- | --- | --- |
+| Examples remain executable documentation under the default offline pytest collection. | P1 | machine-backed | `uv run pytest examples -q` (`examples-suite`) |
 
-Flagship examples (especially `chirpui/lucky_cat`) teach by running code, not by
-inline essays. Keep comments within this budget:
+## Guardrails
 
-- **Module docstring** — ≤15 lines: what the example is, how to run it, and where
-  domain logic lives (the DOMAIN vs CHIRP seam). Link `DESIGN.md` for doctrine.
-- **Function docstring** — one line on behavior plus one non-obvious *why* when
-  needed. No restating the return-type table or IA rules.
-- **Inline comments** — pointer only: `DESIGN.md §N`, a site doc URL, or a
-  one-line footgun. Do not duplicate footgun essays from `DESIGN.md` or the site.
-- **Verbose inline is allowed** only where the code looks like a bug without it
-  (`if False: yield`, `hx-select` overrides, `sys.modules` purge, `is deferred`
-  vs bare truthiness).
+- Standalone examples do not require chirp-ui shell delegation.
+- Flagship examples teach through running code and keep comments within the documented budget.
+- Good-first-issue work remains reserved for external contributors.
 
-When trimming, move duplicated doctrine into the example's `DESIGN.md` (single
-source of truth) and leave a short pointer in code.
+## Edges
 
-## Protect
+- mirrors → **cli** (scaffold defaults)
+- demonstrates → **docs** (copyable behavior)
 
-- **Examples are collected by pytest.** `pyproject.toml:219` includes
-  `examples` in `testpaths`.
-- **Example lint rules are relaxed for demos.** `pyproject.toml:165` documents
-  allowed example-only patterns; do not expand them casually.
-- **Standalone means standalone.** `examples/standalone/README.md:71` says a
-  standalone example requiring ChirpUI shell or delegation is a bug.
-- **Dependency instructions must match imports.** Review comments repeatedly
-  flagged examples missing optional extras.
-- **Examples teach return types.** They should prefer `Page`, `Fragment`,
-  `MutationResult`, `ValidationError`, `Suspense`, `Stream`, and `EventStream`
-  over manual response branching.
-- **No hidden network.** Default example tests should not fetch remote services.
-- **Security examples must be safe to copy.** Auth/authorization snippets should
-  use server-side facts, not user-controlled claims.
+## Owns
 
-## Contract Checklist
-
-When this domain changes, check:
-
-- `examples/standalone/`, `examples/chirpui/`, per-example `README.md`, tests,
-  templates, static assets.
-- `pyproject.toml` optional extras and dev deps used by examples.
-- `src/chirp/cli/templates/` when examples mirror scaffolds.
-- README feature tables, docs guides, site examples, changelog.
-- Run the narrow example test, then `uv run pytest examples/ -q` for broad
-  example changes.
-- Contract tests when example changes reveal a framework safety rule.
+- **code:** `examples/`
+- **tests:** `examples/`
+- **docs:** `examples/**/README.md`
 
 ## Advocate
 
-- **Executable copy-paste paths.** Every README command should work in a fresh
-  environment.
-- **Hypermedia footgun coverage.** Examples should demonstrate safe OOB, SSE,
-  form, shell, and Suspense patterns.
-- **Scaffold feedback loop.** When examples improve a default pattern, update
-  scaffold templates too.
-- **Offline tests.** External service examples need fakes or clear integration
-  gating.
-
-## Serve Peers
-
-- Tell `cli` when an example should become a scaffold default.
-- Tell `docs` and `site` when an example becomes the canonical pattern.
-- Tell optional-extra stewards when README install commands need extras.
-- Tell `contracts` when an example exposes a startup-checkable footgun.
+- Offline copy-paste paths that teach return types and feed safer patterns back into scaffolds.
 
 ## Do Not
 
-- Pick up GitHub issues labeled `good first issue` or titled `[GF] ...` — those
-  are reserved for external contributors, not maintainer/agent work (see root
-  `AGENTS.md` § GitHub Issues).
-- Teach manual htmx branching when a return type solves the problem.
-- Add optional-extra imports without README/install updates.
-- Let examples drift from public API docs or scaffolds.
-- Commit secrets, real tokens, or private endpoints.
-
-## Own
-
-**Code:** `examples/`.
-**Tests:** example tests and safety contract tests.
-**Docs:** example READMEs and example-linked docs.
-**Agent artifacts:** this file and example/scaffold AGENTS outputs.
-**CODEOWNERS:** manual-confirmation-needed; no CODEOWNERS file exists.
+- Take good-first issues, hide optional dependencies, or commit secrets and private endpoints.
