@@ -7,6 +7,8 @@ from typing import Any
 
 from .hypermedia_program import (
     BlockNode,
+    EnhancementEdge,
+    EnhancementNode,
     HypermediaProgram,
     Provenance,
     RouteNode,
@@ -96,9 +98,16 @@ def _compile_templates(
     kida_env: Any,
     page_templates: set[str],
     page_leaf_templates: set[str],
-) -> tuple[tuple[TemplateNode, ...], tuple[BlockNode, ...]]:
+) -> tuple[
+    tuple[TemplateNode, ...],
+    tuple[BlockNode, ...],
+    tuple[EnhancementNode, ...],
+    tuple[EnhancementEdge, ...],
+]:
     templates: list[TemplateNode] = []
     blocks: list[BlockNode] = []
+    enhancements: list[EnhancementNode] = []
+    enhancement_edges: list[EnhancementEdge] = []
     for name in names:
         template_id = stable_identity("template", name)
         block_names: tuple[str, ...] = ()
@@ -106,10 +115,42 @@ def _compile_templates(
         load_error: str | None = None
         try:
             template = kida_env.get_template(name)
-            block_names = tuple(sorted(template.block_metadata()))
             metadata = template.template_metadata()
+            block_names = tuple(sorted(metadata.blocks))
             extended = getattr(metadata, "extends", None)
             extends = extended if isinstance(extended, str) else None
+
+            block_ids = {stable_identity("block", name, block) for block in block_names}
+            for block_name in block_names:
+                block_metadata = metadata.blocks[block_name]
+                enhancement = block_metadata.get_modifier("enhancement")
+                if enhancement is None:
+                    continue
+                fallback = block_metadata.get_modifier("fallback")
+                block_id = stable_identity("block", name, block_name)
+                origin = SourceOrigin("template", f"{name}:{block_name}", enhancement.lineno)
+                enhancements.append(
+                    EnhancementNode(
+                        id=stable_identity("enhancement", name, block_name),
+                        template_id=template_id,
+                        block_id=block_id,
+                        capability=enhancement.value,
+                        fallback=fallback.value if fallback is not None else None,
+                        fallback_declared=fallback is not None,
+                        origin=origin,
+                    )
+                )
+                if fallback is not None and isinstance(fallback.value, str):
+                    fallback_block_id = stable_identity("block", name, fallback.value)
+                    enhancement_edges.append(
+                        EnhancementEdge(
+                            id=stable_identity("enhancement_edge", block_id, fallback_block_id),
+                            enhanced_block_id=block_id,
+                            fallback_block_id=fallback_block_id,
+                            resolved=fallback_block_id in block_ids,
+                            origin=origin,
+                        )
+                    )
         except Exception as exc:
             load_error = f"{type(exc).__name__}: {exc}"
         origin = SourceOrigin("template", name)
@@ -130,7 +171,12 @@ def _compile_templates(
             BlockNode(stable_identity("block", name, block), template_id, block, origin)
             for block in block_names
         )
-    return tuple(templates), tuple(sorted(blocks, key=lambda node: node.id))
+    return (
+        tuple(templates),
+        tuple(sorted(blocks, key=lambda node: node.id)),
+        tuple(sorted(enhancements, key=lambda node: node.id)),
+        tuple(sorted(enhancement_edges, key=lambda edge: edge.id)),
+    )
 
 
 def _compile_routes(router: Any) -> tuple[RouteNode, ...]:
@@ -306,7 +352,7 @@ def compile_hypermedia_program(
     routes = _compile_routes(router)
     declarations = _normalize_declarations(template_declarations)
     names = _reachable_template_names(router, page_templates, declarations)
-    templates, blocks = _compile_templates(
+    templates, blocks, enhancements, enhancement_edges = _compile_templates(
         names,
         kida_env,
         page_templates,
@@ -319,6 +365,8 @@ def compile_hypermedia_program(
         templates=templates,
         blocks=blocks,
         targets=targets,
+        enhancements=enhancements,
+        enhancement_edges=enhancement_edges,
         transitions=transitions,
         template_declarations=declarations,
     )

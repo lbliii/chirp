@@ -1,6 +1,6 @@
 # RFC 016: Enhancement Tiers As Compiled Fallback Contracts
 
-**Status:** Proposed — research decision only; no template syntax or runtime behavior ships with this RFC
+**Status:** Accepted in part — Kida 0.12 and the private compiler model ship first; diagnostics, runtime behavior, and browser proof remain proposed
 **Issue:** [#347](https://github.com/lbliii/chirp/issues/347)
 **Parent:** [#335](https://github.com/lbliii/chirp/issues/335)
 **Related:** [#152](https://github.com/lbliii/chirp/issues/152), RFC 008, RFC 015
@@ -23,20 +23,22 @@ enhanced surface, which block is the unenhanced surface, or whether the two
 surfaces preserve the same DOM target and user task. SSE and other post-load
 updates therefore remain outside the current no-JavaScript proof.
 
-Issue #347 proposed attaching this relationship to a named template block:
+Issue #347 originally proposed attaching this relationship to a named template
+block with an `enhanced=` modifier:
 
 ```kida
 {% block chart enhanced="sse" fallback="table" %}
 ```
 
-That spelling is not valid Kida 0.11 syntax. The locked parser accepts a block
-name and an optional `if` expression; the frozen Kida `Block` AST has no
-enhancement metadata. Chirp must not make the example appear to work through a
-source-regex side channel.
+Kida 0.12 now supports generic typed literal modifiers on blocks and fragments.
+Chirp adopts the canonical `enhancement=` spelling, consumes only Kida's public
+metadata, and requires `kida-templates>=0.12.0`; it does not use a source-regex
+side channel.
 
-This RFC chooses the intended contract model and the upstream boundary. It does
-not accept a public template grammar, add a check category, change a severity,
-or claim that enhancement tiers work in 0.9.
+This RFC chooses the contract model and records the cleared upstream boundary.
+The first Chirp increment accepts the modifier vocabulary and compiles private
+facts only. It does not add a check category, change a severity, or alter render
+behavior.
 
 ## 2. Current evidence
 
@@ -47,7 +49,7 @@ or claim that enhancement tiers work in 0.9.
 | Runnable floor | Plain requests prove CRUD, `303`, and `422` behavior | `examples/standalone/nojs_floor/` |
 | Browser pattern | The suite knows how to create a Playwright context with JavaScript disabled, but the no-JS example has no such browser test | `examples/standalone/webmcp_form/test_browser_smoke.py` |
 | Compiled graph | Routes, templates, blocks, targets, and transition edges are immutable internal records | `src/chirp/app/hypermedia_program.py`, RFC 008 |
-| Block grammar | Kida 0.11 exposes block name, body, fragment flag, and optional condition, not arbitrary metadata | declared minimum `kida-templates>=0.11.0`, lock resolution 0.11.0, and the tagged [parser](https://github.com/lbliii/kida/blob/v0.11.0/src/kida/parser/blocks/template_structure.py) / [AST](https://github.com/lbliii/kida/blob/v0.11.0/src/kida/nodes/structure.py) |
+| Block grammar | Kida 0.12 exposes ordered literal block/fragment modifiers as immutable, source-located metadata | declared minimum `kida-templates>=0.12.0` and the [Kida 0.12.0 release](https://github.com/lbliii/kida/releases/tag/v0.12.0) |
 
 The no-JS example means #347 must extend existing evidence rather than create a
 second competing floor. The internal program means the relationship should
@@ -86,9 +88,9 @@ The intended authoring shape is a Kida-native modifier on a fragment block:
 {% endfragment %}
 ```
 
-This is **proposed grammar**, not valid syntax in the currently supported Kida
-release. The exact tokens become public template behavior only after the Kida
-release gate and a separate Chirp implementation check-in.
+This is the accepted Chirp metadata vocabulary on Kida 0.12. The private
+compiler records it now; diagnostics and any runtime behavior still require
+separate implementation check-ins.
 
 ### Why a block modifier
 
@@ -122,9 +124,9 @@ class EnhancementNode:
     id: str
     template_id: str
     block_id: str
-    capability: Literal["htmx", "sse"]
-    fallback_block_id: str
-    target_id: str
+    capability: str | int | float | bool | None
+    fallback: str | int | float | bool | None
+    fallback_declared: bool
     origin: SourceOrigin
 
 
@@ -137,18 +139,22 @@ class EnhancementEdge:
     origin: SourceOrigin
 ```
 
-The names are illustrative internal design, not public API. An implementation
-may model the relationship as another `TransitionEdge` kind if that keeps graph
-queries simpler. Either representation must remain frozen, deterministic, and
-published under the existing freeze lock.
+These are private implementation records, not public API. They remain frozen,
+deterministic, and published under the existing freeze lock. Preserving literal
+scalar values and whether `fallback=` was present lets the later contract
+increment diagnose unknown capabilities, missing fallbacks, and non-string
+fallbacks without rescanning template source.
 
-Compilation needs Kida-provided facts for:
+The first compiler increment consumes Kida-provided facts for:
 
 - literal capability and fallback block names;
-- whether the enhanced surface is fragment-only;
 - the logical template and source line;
-- literal root IDs for both blocks when statically available; and
-- block reachability during full render.
+- whether a named fallback block resolves in the same logical template.
+
+The contract increment still needs facts for whether the enhanced surface is
+fragment-only, literal root IDs when statically available, and full-render
+reachability. The compiler does not claim those proofs before the metadata
+exists.
 
 Dynamic target selection cannot be guessed. It needs a validated declaration
 or remains outside the first implementation.
@@ -171,9 +177,9 @@ maintainer approval:
 | Required htmx/SSE producer or target edge is unresolved | Existing rule severity | The owning rule remains authoritative; this category adds relationship context. |
 | Root ID is dynamic and cannot be proven | `WARNING` or explicit declaration required | Static analysis must not claim proof it does not have. |
 
-No severity changes in this RFC. In particular, `nojs_floor` remains `INFO` by
-default, and its existing explicit override remains the application-level way
-to enforce the mutation floor.
+No severity changes in this compiler increment. In particular, `nojs_floor`
+remains `INFO` by default, and its existing explicit override remains the
+application-level way to enforce the mutation floor.
 
 Diagnostics should name the template, enhanced block, fallback block,
 capability, target ID, and source line. Missing fallbacks must fail loud; the
@@ -230,11 +236,10 @@ A future coverage counter may report declared, statically validated, and
 browser-exercised enhancement relationships. Coverage output cannot infer that
 a Playwright test exists merely because a fallback block compiles.
 
-## 8. Kida release gate
+## 8. Kida release gate — cleared
 
-Chirp implementation is blocked until a released Kida version provides a
-typed, introspectable contract for literal block modifiers. The upstream work
-must:
+Kida 0.12.0 provides the required typed, introspectable contract for literal
+block modifiers. The upstream release:
 
 1. parse modifiers on `block` and `fragment` without weakening current block
    name or optional-condition validation;
@@ -243,10 +248,8 @@ must:
 4. expose metadata through stable analysis or template introspection; and
 5. retain render behavior when metadata is absent.
 
-Chirp must then bump its minimum Kida version, add missing-extra/version
-guidance where relevant, and prove ordinary block rendering, fragments,
-Suspense, OOB discovery, and compiler identities before consuming the metadata.
-No private Kida parser import or source-regex compatibility shim is acceptable.
+Chirp now requires `kida-templates>=0.12.0`, consumes the public metadata, and
+proves ordinary rendering plus immutable compiler identities. No private Kida parser import or source-regex compatibility shim is acceptable.
 
 ## 9. ChirpUI policy
 
@@ -262,12 +265,10 @@ condition rather than breaking core imports.
 
 ## 10. Delivery sequence
 
-1. **RFC review:** accept or revise this relationship model and proposed
-   severity table. No runtime change.
-2. **Kida release:** land typed block modifiers and publish a compatible
-   release.
-3. **Compiler increment:** add immutable enhancement edges and preserve existing
-   graph/severity behavior for undeclared templates.
+1. **RFC review — complete:** relationship model accepted; no runtime change.
+2. **Kida release — complete:** typed block modifiers shipped in Kida 0.12.0.
+3. **Compiler increment — complete:** immutable enhancement nodes and edges are
+   compiled while existing graph, severity, and render behavior remain stable.
 4. **Contract increment:** add declared-only diagnostics with end-to-end
    `tests/contracts/` proof.
 5. **Browser proof:** extend a maintained example with JS-disabled, healthy,
@@ -283,7 +284,7 @@ Kida minimum-version changes.
 
 | #347 criterion | RFC disposition |
 | --- | --- |
-| Syntax: block attributes vs directive | Prefer literal Kida block/fragment modifiers; reject wrapper directives and sidecars. Public grammar awaits Kida release and review. |
+| Syntax: block attributes vs directive | Use literal Kida block/fragment modifiers with canonical `enhancement=` and `fallback=` names; reject wrapper directives and sidecars. |
 | Relationship to #152 | Extend the shipped route-level floor with a block relationship; reuse its example instead of replacing it. |
 | Degraded-mode CI | Require Playwright with JavaScript disabled plus unavailable-transport proof. |
 | ChirpUI defaults | No implicit defaults in the first increment; opt-in macros may follow. |
@@ -297,13 +298,12 @@ Kida minimum-version changes.
   enhancement declaration.
 - Creating a parallel partials directory or alternate serialization path.
 - Promoting `nojs_floor` globally from `INFO`.
-- Changing render-plan, OOB, Suspense, or block-not-found behavior in this RFC.
-- Treating an RFC example as valid copyable syntax before the Kida gate lands.
+- Changing render-plan, OOB, Suspense, or block-not-found behavior in this increment.
+- Treating compiled metadata as proof that the later diagnostic or browser gates passed.
 
 ## 13. Status and collateral
 
-This document is a proposed design and source audit. It changes no public API,
-template grammar, CLI, `AppConfig`, return type, contract category, severity,
-runtime dependency, example, or generated site output.
-
-No changelog: proposed RFC only; user-visible behavior has not changed.
+The accepted first increment changes the Kida dependency floor and compiles
+private enhancement facts. It changes no exported Python API, CLI, `AppConfig`,
+return type, contract category, severity, rendering, example, or generated site
+output. A changelog fragment records the dependency and authoring impact.

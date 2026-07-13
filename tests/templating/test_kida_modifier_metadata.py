@@ -14,7 +14,7 @@ def test_adapter_surfaces_typed_block_and_fragment_modifiers_without_render_drif
         loader=DictLoader(
             {
                 "page.html": (
-                    '{% block chart enhanced="sse" fallback="table" %}'
+                    '{% block chart enhancement="sse" fallback="table" %}'
                     "<div>{{ value }}</div>{% end %}"
                     '{% fragment updates transport="sse" %}'
                     "<span>{{ message }}</span>{% end %}"
@@ -30,10 +30,10 @@ def test_adapter_surfaces_typed_block_and_fragment_modifiers_without_render_drif
     chart = metadata.blocks["chart"]
     updates = metadata.blocks["updates"]
     assert [(item.name, item.value) for item in chart.modifiers] == [
-        ("enhanced", "sse"),
+        ("enhancement", "sse"),
         ("fallback", "table"),
     ]
-    assert chart.get_modifier("enhanced") is not None
+    assert chart.get_modifier("enhancement") is not None
     assert updates.get_modifier("transport") is not None
     assert adapter.render_template("page.html", {"value": "ready"}) == "<div>ready</div>"
     assert adapter.render_block("page.html", "updates", {"message": "live"}) == (

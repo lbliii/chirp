@@ -16,6 +16,7 @@ from chirp.errors import ConfigurationError
 type Provenance = Literal["declared", "inferred"]
 type OriginKind = Literal["handler", "registry", "template"]
 type TransitionKind = Literal["route_block", "route_template", "target_block", "template_block"]
+type ModifierScalar = str | int | float | bool | None
 
 
 def stable_identity(kind: str, *parts: str) -> str:
@@ -95,6 +96,32 @@ class TargetNode:
 
 
 @dataclass(frozen=True, slots=True)
+class EnhancementNode:
+    """One explicitly enhanced block and its literal declaration values."""
+
+    id: str
+    template_id: str
+    block_id: str
+    capability: ModifierScalar
+    fallback: ModifierScalar
+    fallback_declared: bool
+    origin: SourceOrigin
+    provenance: Provenance = "declared"
+
+
+@dataclass(frozen=True, slots=True)
+class EnhancementEdge:
+    """One declared enhanced-to-fallback block relationship."""
+
+    id: str
+    enhanced_block_id: str
+    fallback_block_id: str
+    resolved: bool
+    origin: SourceOrigin
+    provenance: Provenance = "declared"
+
+
+@dataclass(frozen=True, slots=True)
 class TransitionEdge:
     """A stable relationship between compiled nodes."""
 
@@ -115,6 +142,8 @@ class HypermediaProgram:
     templates: tuple[TemplateNode, ...] = ()
     blocks: tuple[BlockNode, ...] = ()
     targets: tuple[TargetNode, ...] = ()
+    enhancements: tuple[EnhancementNode, ...] = ()
+    enhancement_edges: tuple[EnhancementEdge, ...] = ()
     transitions: tuple[TransitionEdge, ...] = ()
     template_declarations: tuple[TemplateDeclaration, ...] = ()
 
@@ -124,11 +153,14 @@ class HypermediaProgram:
             ("template", self.templates),
             ("block", self.blocks),
             ("target", self.targets),
+            ("enhancement", self.enhancements),
+            ("enhancement edge", self.enhancement_edges),
             ("transition", self.transitions),
         )
         for label, values in collections:
             _reject_duplicate_ids(label, values)
         _validate_transitions(self)
+        _validate_enhancements(self)
 
     def template(self, name: str) -> TemplateNode | None:
         """Return the template with logical *name*, if compiled."""
@@ -198,4 +230,31 @@ def _validate_transitions(program: HypermediaProgram) -> None:
             raise ConfigurationError(
                 f"Hypermedia program transition {edge.id!r} resolves to unknown destination "
                 f"{edge.destination_id!r}."
+            )
+
+
+def _validate_enhancements(program: HypermediaProgram) -> None:
+    template_ids = {node.id for node in program.templates}
+    block_ids = {node.id for node in program.blocks}
+    enhanced_block_ids = {node.block_id for node in program.enhancements}
+    for node in program.enhancements:
+        if node.template_id not in template_ids:
+            raise ConfigurationError(
+                f"Hypermedia program enhancement {node.id!r} has unknown template "
+                f"{node.template_id!r}."
+            )
+        if node.block_id not in block_ids:
+            raise ConfigurationError(
+                f"Hypermedia program enhancement {node.id!r} has unknown block {node.block_id!r}."
+            )
+    for edge in program.enhancement_edges:
+        if edge.enhanced_block_id not in enhanced_block_ids:
+            raise ConfigurationError(
+                f"Hypermedia program enhancement edge {edge.id!r} has unknown enhanced block "
+                f"{edge.enhanced_block_id!r}."
+            )
+        if edge.resolved and edge.fallback_block_id not in block_ids:
+            raise ConfigurationError(
+                f"Hypermedia program enhancement edge {edge.id!r} resolves to unknown fallback "
+                f"{edge.fallback_block_id!r}."
             )
