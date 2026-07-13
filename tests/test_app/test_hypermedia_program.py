@@ -6,6 +6,7 @@ import pytest
 
 from chirp import App
 from chirp.app.hypermedia_program import (
+    EnhancementEdge,
     HypermediaProgram,
     RouteNode,
     SourceOrigin,
@@ -120,6 +121,87 @@ def test_program_and_nodes_are_immutable_after_publication(tmp_path) -> None:
         _attempt_mutation(program, "routes", ())
     with pytest.raises(FrozenInstanceError):
         _attempt_mutation(program.routes[0], "path", "/late")
+
+
+@pytest.mark.issue(347)
+def test_program_compiles_declared_enhancement_and_fallback_edge(tmp_path) -> None:
+    (tmp_path / "chart.html").write_text(
+        "{% block chart_table %}<table></table>{% endblock %}\n"
+        '{% fragment chart_live enhancement="sse" fallback="chart_table" %}'
+        "<svg></svg>{% endfragment %}",
+        encoding="utf-8",
+    )
+    app = App(AppConfig(template_dir=tmp_path))
+    app.route("/chart", template="chart.html")(_index)
+
+    app.freeze()
+
+    program = app._runtime_state.hypermedia_program
+    assert program is not None
+    assert len(program.enhancements) == 1
+    enhancement = program.enhancements[0]
+    assert enhancement.template_id == stable_identity("template", "chart.html")
+    assert enhancement.block_id == stable_identity("block", "chart.html", "chart_live")
+    assert enhancement.capability == "sse"
+    assert enhancement.fallback == "chart_table"
+    assert enhancement.fallback_declared is True
+    assert enhancement.origin == SourceOrigin("template", "chart.html:chart_live", 2)
+
+    assert program.enhancement_edges == (
+        EnhancementEdge(
+            id=stable_identity(
+                "enhancement_edge",
+                stable_identity("block", "chart.html", "chart_live"),
+                stable_identity("block", "chart.html", "chart_table"),
+            ),
+            enhanced_block_id=stable_identity("block", "chart.html", "chart_live"),
+            fallback_block_id=stable_identity("block", "chart.html", "chart_table"),
+            resolved=True,
+            origin=SourceOrigin("template", "chart.html:chart_live", 2),
+        ),
+    )
+
+    with pytest.raises(FrozenInstanceError):
+        _attempt_mutation(enhancement, "capability", "htmx")
+
+
+@pytest.mark.issue(347)
+def test_program_preserves_unresolved_and_incomplete_enhancement_facts(tmp_path) -> None:
+    (tmp_path / "chart.html").write_text(
+        '{% fragment missing enhancement="future" fallback="not_there" %}'
+        "missing{% endfragment %}"
+        '{% fragment incomplete enhancement="sse" %}incomplete{% endfragment %}',
+        encoding="utf-8",
+    )
+    app = App(AppConfig(template_dir=tmp_path))
+    app.route("/chart", template="chart.html")(_index)
+
+    app.freeze()
+
+    program = app._runtime_state.hypermedia_program
+    assert program is not None
+    enhancements = {node.block_id: node for node in program.enhancements}
+    missing_id = stable_identity("block", "chart.html", "missing")
+    incomplete_id = stable_identity("block", "chart.html", "incomplete")
+    assert enhancements[missing_id].capability == "future"
+    assert enhancements[missing_id].fallback_declared is True
+    assert enhancements[incomplete_id].fallback_declared is False
+    assert enhancements[incomplete_id].fallback is None
+    assert len(program.enhancement_edges) == 1
+    assert program.enhancement_edges[0].enhanced_block_id == missing_id
+    assert program.enhancement_edges[0].resolved is False
+
+
+@pytest.mark.issue(347)
+def test_ordinary_templates_compile_without_enhancement_facts(tmp_path) -> None:
+    app = _build_equivalent_app(tmp_path, reverse=False)
+
+    app.freeze()
+
+    program = app._runtime_state.hypermedia_program
+    assert program is not None
+    assert program.enhancements == ()
+    assert program.enhancement_edges == ()
 
 
 @pytest.mark.issue(509)

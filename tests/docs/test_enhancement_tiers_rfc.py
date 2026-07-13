@@ -9,13 +9,13 @@ _RFC = _ROOT / "docs" / "rfcs" / "016-enhancement-tier-contracts.md"
 
 
 @pytest.mark.issue(347)
-def test_enhancement_tier_rfc_is_explicitly_non_shipping() -> None:
+def test_enhancement_tier_rfc_records_the_compiler_increment_boundary() -> None:
     text = _RFC.read_text(encoding="utf-8")
 
-    assert "**Status:** Proposed" in text
-    assert "not valid Kida 0.11 syntax" in text
-    assert "No severity changes in this RFC" in text
-    assert "No changelog: proposed RFC only" in text
+    assert "**Status:** Accepted in part" in text
+    assert "requires `kida-templates>=0.12.0`" in text
+    assert "No severity changes in this compiler increment" in text
+    assert "A changelog fragment records the dependency and authoring impact" in text
 
 
 @pytest.mark.issue(347)
@@ -36,6 +36,6 @@ def test_enhancement_tier_rfc_cites_current_proof_surfaces() -> None:
 def test_enhancement_tier_rfc_preserves_constitutional_gates() -> None:
     text = _RFC.read_text(encoding="utf-8")
 
-    assert "separate Chirp implementation check-in" in text
+    assert "separate implementation check-ins" in text
     assert "No private Kida parser import or source-regex compatibility shim" in text
     assert "runtime must never substitute an empty block" in text

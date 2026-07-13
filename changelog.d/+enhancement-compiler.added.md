@@ -1,0 +1,1 @@
+**Enhancement-tier compiler facts** — templates may declare `enhancement=` and `fallback=` literal block modifiers for Chirp's immutable internal graph. This preparation does not change rendering or emit new `app.check()` findings. The minimum `kida-templates` version is now 0.12.0.
