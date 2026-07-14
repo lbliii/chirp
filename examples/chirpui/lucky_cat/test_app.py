@@ -14,6 +14,8 @@ SSE twin (honest parallel-work figures, no sleeps). app.check() stays clean
 throughout (TestContracts).
 """
 
+import warnings
+
 import pytest
 from store_test_helpers import client_balance, sole_client_store, warm_authed_store
 
@@ -55,7 +57,16 @@ class TestContracts:
 
     @pytest.mark.issue(229)
     def test_app_check_passes(self, example_app) -> None:
-        example_app.check()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            example_app.check()
+
+        lucky_cat_scope_warnings = [
+            str(item.message)
+            for item in caught
+            if "[K-WARN-002]" in str(item.message) and "(chirpui/" not in str(item.message)
+        ]
+        assert not lucky_cat_scope_warnings, "\n".join(lucky_cat_scope_warnings)
 
     @pytest.mark.issue(723)
     def test_enhancement_contracts_remain_declared_only(self, example_app) -> None:

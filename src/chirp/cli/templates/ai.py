@@ -11,8 +11,9 @@ from chirp.ai import AgentRun, InMemoryConversationStore, LLM
 
 TEMPLATES_DIR = Path(__file__).parent / \"templates\"
 
-app = App(AppConfig(template_dir=TEMPLATES_DIR, worker_mode=\"async\"))
-secure_stack(app)
+app = App(AppConfig.from_env(template_dir=TEMPLATES_DIR, worker_mode=\"async\"))
+for middleware in secure_stack(app.config):
+    app.add_middleware(middleware)
 
 _store = InMemoryConversationStore()
 _llm = LLM(os.environ.get(\"CHIRP_LLM\", \"openai:gpt-4o-mini\"))

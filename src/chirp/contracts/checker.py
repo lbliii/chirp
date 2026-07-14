@@ -124,6 +124,7 @@ from .template_scan import (
     extract_targets_from_source,
     extract_template_references,
     extract_wizard_form_ids,
+    load_template_inventory,
     load_template_sources,
     resolve_template_reference,
 )
@@ -454,6 +455,21 @@ def _session_signal_names(app: App) -> frozenset[str]:
     return registry.session_names
 
 
+def _issue_with_template_aliases(
+    issue: ContractIssue,
+    aliases_by_canonical: dict[str, tuple[str, ...]],
+) -> ContractIssue:
+    """Attach logical aliases to built-in diagnostics for one physical source."""
+    if issue.template is None:
+        return issue
+    aliases = aliases_by_canonical.get(issue.template, ())
+    if len(aliases) < 2:
+        return issue
+    alias_details = f"Logical aliases for the same physical source: {', '.join(aliases)}."
+    details = f"{issue.details}\n{alias_details}" if issue.details else alias_details
+    return dataclasses.replace(issue, details=details)
+
+
 def _mixed_audience_derived_names(app: App) -> frozenset[str]:
     """Return derived signals whose deps span global and session audiences."""
     registry = getattr(app._mutable_state, "signal_registry", None)
@@ -539,11 +555,33 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
     template_sources = snapshot.template_sources
     if kida_env is not None and kida_env.loader is not None and not template_sources:
         template_sources = load_template_sources(kida_env)
+    template_aliases = getattr(kida_env, "template_aliases", None) if kida_env is not None else None
+    alias_to_canonical: dict[str, str] = {}
+    aliases_by_canonical: dict[str, tuple[str, ...]] = {}
+    if kida_env is not None and kida_env.loader is not None:
+        inventory = load_template_inventory(kida_env)
+        if inventory.sources == template_sources:
+            referenced_for_identity = (
+                set(referenced_templates_from_routes)
+                | set(snapshot.page_templates)
+                | set(snapshot.page_leaf_templates)
+            )
+            if snapshot._hypermedia_program is not None:
+                referenced_for_identity.update(snapshot._hypermedia_program.declared_template_names)
+            for template_name, source in inventory.sources.items():
+                referenced_for_identity.update(
+                    resolve_template_reference(reference, template_name, template_aliases)
+                    for reference in extract_template_references(source)
+                )
+            canonical_scan = inventory.canonicalize(referenced_for_identity)
+            template_sources = canonical_scan.sources
+            alias_to_canonical = canonical_scan.alias_to_canonical
+            aliases_by_canonical = canonical_scan.aliases_by_canonical
+    template_issue_start = len(result.issues)
     result.issues.extend(check_query_contracts(router, template_sources, middleware_list))
     if kida_env is not None and kida_env.loader is not None:
         result.templates_scanned = len(template_sources)
         result.issues.extend(check_chirpui_runtime_registration(template_sources, snapshot.extras))
-        template_aliases = getattr(kida_env, "template_aliases", None)
         referenced_paths: set[str] = set()
         static_routes, parametric_routes = build_route_index(route_paths)
         literal_attrs_by_template = collect_literal_attributes(kida_env, template_sources)
@@ -612,10 +650,9 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
             all_ids.update(extract_fragment_island_ids(source))
             all_ids.update(extract_wizard_form_ids(source))
             ids_with_disinherit.update(extract_ids_with_disinherit(source))
-            referenced_templates_from_sources.update(
-                resolve_template_reference(ref, template_name, template_aliases)
-                for ref in extract_template_references(source)
-            )
+            for reference in extract_template_references(source):
+                resolved = resolve_template_reference(reference, template_name, template_aliases)
+                referenced_templates_from_sources.add(alias_to_canonical.get(resolved, resolved))
             for href_url in extract_href_references(source) | literal_href_references(
                 literal_attrs
             ):
@@ -911,16 +948,19 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
             )
 
         all_template_names = set(template_sources)
-        referenced_templates = (
-            referenced_templates_from_routes
-            | referenced_templates_from_sources
-            | snapshot.page_templates
-            | (
-                snapshot._hypermedia_program.declared_template_names
-                if snapshot._hypermedia_program is not None
-                else frozenset()
+        referenced_templates = {
+            alias_to_canonical.get(name, name)
+            for name in (
+                referenced_templates_from_routes
+                | referenced_templates_from_sources
+                | snapshot.page_templates
+                | (
+                    snapshot._hypermedia_program.declared_template_names
+                    if snapshot._hypermedia_program is not None
+                    else frozenset()
+                )
             )
-        )
+        }
 
         dead = sorted(all_template_names - referenced_templates)
         for template_name in dead:
@@ -1209,6 +1249,12 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
 
     live_blocks = getattr(app._mutable_state, "live_blocks", {})
     result.issues.extend(check_live_blocks(live_blocks, router, snapshot.route_templates, kida_env))
+
+    if aliases_by_canonical:
+        result.issues[template_issue_start:] = [
+            _issue_with_template_aliases(issue, aliases_by_canonical)
+            for issue in result.issues[template_issue_start:]
+        ]
 
     # Run registered plugin checks
     registered_checks = getattr(app, "_mutable_state", None)

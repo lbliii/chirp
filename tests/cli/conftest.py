@@ -25,6 +25,7 @@ from typing import Any
 import pytest
 
 SCAFFOLD_MODES = ["minimal", "sse", "shell", "v2", "v2_plain"]
+DEPLOYABLE_SCAFFOLD_MODES = [*SCAFFOLD_MODES, "stream", "ai"]
 
 
 def _mode_args(mode: str) -> list[str]:
@@ -34,6 +35,10 @@ def _mode_args(mode: str) -> list[str]:
         return ["--sse"]
     if mode == "shell":
         return ["--shell"]
+    if mode == "stream":
+        return ["--stream"]
+    if mode == "ai":
+        return ["--ai"]
     return []  # v2 / v2_plain
 
 

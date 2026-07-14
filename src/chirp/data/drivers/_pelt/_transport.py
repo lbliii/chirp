@@ -150,10 +150,15 @@ async def _upgrade_to_tls(
     stream: ByteStream,
     ctx: ssl.SSLContext,
     *,
-    hostname: str | None,
+    hostname: str | None = None,
 ) -> ByteStream:
     """Wrap a connected stream in TLS (extracted for testability)."""
-    tls = await TLSStream.wrap(stream, hostname=hostname, ssl_context=ctx)
+    tls = await TLSStream.wrap(
+        stream,
+        server_side=False,
+        hostname=hostname,
+        ssl_context=ctx,
+    )
     return tls
 
 

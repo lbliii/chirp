@@ -97,6 +97,13 @@ app would fare in production without changing your config, use `chirp check
 | `macro_css` | WARNING | Activate chirp-ui (`use_chirp_ui(app)`) or ship your own CSS for the core-macro classes (`chirp-dropdown`, `chirp-modal`, `field--error`, …) when neither is present. |
 | `chirpui_css_verify` | WARNING | Fix typoed or stale `chirpui-*` class tokens in literal `class=` attributes so they resolve to classes in the installed chirp-ui CSS. Only runs when chirp-ui is active. |
 
+When nested filesystem loader roots expose one file under multiple logical
+names, built-in checks scan that physical file once. Chirp prefers a logical
+name that routes, declarations, or other templates actually reference, and
+lists every equivalent alias in the diagnostic `details`. Distinct files with
+identical content remain distinct. Custom contract checks still receive the
+original `snapshot.template_sources` mapping with every logical loader name.
+
 ### Dynamic template registries
 
 Static source analysis cannot prove a template chosen from a plugin or view

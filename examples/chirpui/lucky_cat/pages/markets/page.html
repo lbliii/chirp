@@ -134,8 +134,8 @@
     card/star ids, zero collision. -#}
 {% def featured_spotlight_body(market, t, spark, dir="") %}
 {% if (market ?? none) is not none %}
-{% set _up = (t ?? none) is not none and t.change_pct_24h >= 0 %}
-{% set _ff = ('luckycat-flash--up' if dir == 'up' else ('luckycat-flash--down' if dir == 'down' else '')) %}
+{% let _up = (t ?? none) is not none and t.change_pct_24h >= 0 %}
+{% let _ff = ('luckycat-flash--up' if dir == 'up' else ('luckycat-flash--down' if dir == 'down' else '')) %}
 <a class="luckycat-market-card luckycat-lobby__featured-card {{ 'luckycat-market-card--up' if _up else 'luckycat-market-card--down' }}"
    href="/markets/{{ market.symbol }}" {{ shell_outlet_attrs() }}>
   <span class="luckycat-market-card__top">
@@ -261,7 +261,7 @@
           So it is a bespoke spotlight card (featured_spotlight_body) under the
           stable #lobby-featured sink — a card-styled <a> with a live redrawing
           sparkline + price/change flash, no card/star ids, zero collision. -#}
-      {% set _featured = featured_market ?? none %}
+      {% let _featured = featured_market ?? none %}
       {% if (_featured ?? none) is not none %}
       <section id="lobby-featured" class="luckycat-lobby__featured" aria-label="Featured market">
         <h2 class="luckycat-lobby__heading">
@@ -288,7 +288,7 @@
           <a class="luckycat-lobby__see-all"
              href="{{ favorites_href ?? '/markets/favorites' }}" {{ shell_outlet_attrs() }}>See all</a>
         </h2>
-        {% set _watch = watchlist_preview | default(()) %}
+        {% let _watch = watchlist_preview | default(()) %}
         {% if (_watch | length) > 0 %}
         <div class="luckycat-markets-grid luckycat-lobby__watchlist-grid">
           {% for market in _watch %}

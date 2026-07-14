@@ -17,6 +17,7 @@ from chirp.cli.templates.scaffold import (
     AGENTS_MD,
     MIGRATIONS_README,
     PYPROJECT_TOML,
+    RAILWAY_JSON,
     THEME_CSS_STUB,
 )
 from chirp.cli.templates.shell import (
@@ -75,6 +76,7 @@ __all__ = [
     "MINIMAL_APP_PY",
     "MINIMAL_INDEX_HTML",
     "PYPROJECT_TOML",
+    "RAILWAY_JSON",
     "SHELL_APP_PY",
     "SHELL_CONTEXT_PY",
     "SHELL_ITEMS_LAYOUT_HTML",

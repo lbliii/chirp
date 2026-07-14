@@ -26,7 +26,7 @@ _debug = os.environ.get("CHIRP_DEBUG", "1" if _env != "production" else "0") not
     "",
 )
 
-config = AppConfig(
+config = AppConfig.from_env(
     secret_key=_secret,
     template_dir="pages",
     env=_env,
@@ -34,7 +34,7 @@ config = AppConfig(
 )
 app = App(config=config)
 
-if not config.debug and config.secret_key == _DEFAULT_SECRET:
+if config.env != "development" and config.secret_key == _DEFAULT_SECRET:
     msg = (
         "Refusing to start in production with default secret key. "
         "Set CHIRP_SECRET_KEY to a strong random value."
@@ -112,7 +112,7 @@ _debug = os.environ.get("CHIRP_DEBUG", "1" if _env != "production" else "0") not
 # run the normal Alpine build under a per-request nonce CSP instead:
 # csp_nonce_enabled=True auto-wires CSPNonceMiddleware (with 'unsafe-eval' for
 # Alpine), keeping the csp_nonce contract clean while Alpine stays functional.
-config = AppConfig(
+config = AppConfig.from_env(
     secret_key=_secret,
     template_dir="pages",
     env=_env,
@@ -122,7 +122,7 @@ config = AppConfig(
 )
 app = App(config=config)
 
-if not config.debug and config.secret_key == _DEFAULT_SECRET:
+if config.env != "development" and config.secret_key == _DEFAULT_SECRET:
     msg = (
         "Refusing to start in production with default secret key. "
         "Set CHIRP_SECRET_KEY to a strong random value."

@@ -20,6 +20,59 @@ permissions:
   pull-requests: write
 
 jobs:
+  pelt-controlled-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHON_GIL: "0"
+      CHIRP_BENCH_PG_DSN: postgresql://chirp:chirp@localhost:5432/chirp_bench
+      CHIRP_BENCH_PG_IMAGE: postgres:18.1-bookworm
+    services:
+      postgres:
+        image: postgres:18.1-bookworm
+        env:
+          POSTGRES_USER: chirp
+          POSTGRES_PASSWORD: chirp
+          POSTGRES_DB: chirp_bench
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv with fixed free-threaded Python
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14.2t"
+          enable-cache: true
+
+      - name: Install declared dependencies
+        run: uv sync --no-sources --group dev --extra data-pg
+
+      - name: Run controlled Pelt evidence
+        run: >-
+          uv run --no-sync python -m benchmarks.pelt_controlled
+          --repetitions 5
+          --concurrency 1,2,4,8
+          --queries 1000
+          --warmup 10
+          --stream-rows 10000
+          --stream-batch-size 100
+          --bulk-rows 500
+          --output benchmark-artifacts/pelt-controlled.json
+
+      - name: Upload controlled Pelt evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pelt-controlled-${{ github.sha }}
+          path: benchmark-artifacts/pelt-controlled.json
+          if-no-files-found: error
+
   core-regression:
     runs-on: ubuntu-latest
     timeout-minutes: 15

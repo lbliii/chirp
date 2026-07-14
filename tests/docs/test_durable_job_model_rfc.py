@@ -1,4 +1,4 @@
-"""Source-backed status checks for durable-job RFC #615."""
+"""Source-backed status checks for durable-job RFC #615 and decision #719."""
 
 from pathlib import Path
 
@@ -8,14 +8,15 @@ _ROOT = Path(__file__).resolve().parents[2]
 _RFC = _ROOT / "docs" / "rfcs" / "022-durable-job-model.md"
 
 
-@pytest.mark.issue(615, 677)
-def test_durable_job_rfc_records_private_phase_one_shipping_boundary() -> None:
+@pytest.mark.issue(615, 677, 719)
+def test_durable_job_rfc_records_private_store_and_decision_boundary() -> None:
     text = _RFC.read_text(encoding="utf-8")
 
-    assert "**Status:** Accepted — Phase 1 private store implemented" in text
-    assert "**Shipping impact:** Private data surface only" in text
-    assert "It does not add a public API" in text
-    assert "change any `app.check()` output" in text
+    assert "**Status:** Accepted — Phase 1 implemented; Phase 2/3 boundaries approved" in text
+    assert "**Shipping impact:** Private data surface plus an approved decision record" in text
+    assert "Neither issue adds a public API" in text
+    assert "This RFC itself does not add or change any" in text
+    assert "`app.check()` output" in text
     assert "No site example, scaffold, CLI" in text
 
 
@@ -51,16 +52,41 @@ def test_durable_job_rfc_preserves_delivery_and_schema_boundaries() -> None:
         assert phrase in text
 
 
-@pytest.mark.issue(615, 677)
-def test_durable_job_rfc_records_phase_one_decisions_and_defers_later_surfaces() -> None:
+@pytest.mark.issue(615, 677, 719)
+def test_durable_job_rfc_records_approved_and_deferred_surfaces() -> None:
     text = _RFC.read_text(encoding="utf-8")
 
-    assert "## Open questions requiring later maintainer check-in" in text
+    assert "## Approved Phase 2 and Phase 3 boundaries" in text
+    assert "## Deferred decisions requiring later maintainer check-in" in text
     assert "### Phase 1 implementation decisions" in text
     assert "_chirp_job_schema" in text
     assert "locked queue row" in text
     assert "64 KiB encoded limit" in text
     assert "not approved public API" in text
-    assert "What future `app.check()` categories" in text
-    assert "durable-job semantics depend on a particular Milo revision" in text
+    assert "provisional `jobs` contract category" in text
+    assert "exactly one executor per app instance" in text
+    assert "Payload compatibility is exact and fail-loud" in text
+    assert "SQLite parity is rejected for epic #615" in text
     assert "status` / `step` / `total" in text
+
+
+@pytest.mark.issue(719)
+def test_durable_job_rfc_assigns_decision_proof_and_collateral() -> None:
+    text = _RFC.read_text(encoding="utf-8")
+
+    assert "### Decision matrix and proof ownership" in text
+    for concern in (
+        "| Crash recovery |",
+        "| Idempotency |",
+        "| Retries |",
+        "| Malformed definitions |",
+        "| Lifecycle and free-threading |",
+        "| Optional dependencies |",
+        "| SQLite gaps |",
+        "| Migration ownership |",
+    ):
+        assert concern in text
+    assert "#720 for validated enqueue wiring" in text
+    assert "Phase 3 native child" in text
+    assert "Acceptance #719 is" in text
+    assert "n/a (decision-only RFC and parent-scope reconciliation)" in text
