@@ -100,16 +100,16 @@ def _python_metadata() -> dict[str, str | bool]:
 
 
 def _processor_name() -> str:
-    """Return useful CPU provenance on hosts where ``platform.processor`` is empty."""
-    processor = platform.processor().strip()
-    if processor:
-        return processor
+    """Return concrete CPU provenance across Linux and other hosts."""
     cpuinfo = Path("/proc/cpuinfo")
     if cpuinfo.is_file():
         for line in cpuinfo.read_text(encoding="utf-8", errors="replace").splitlines():
             key, separator, value = line.partition(":")
             if separator and key.strip() in {"model name", "Hardware"}:
                 return value.strip()
+    processor = platform.processor().strip()
+    if processor:
+        return processor
     return "unknown"
 
 
