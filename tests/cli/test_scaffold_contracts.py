@@ -10,7 +10,12 @@ from pathlib import Path
 
 import pytest
 
-from tests.cli.conftest import SCAFFOLD_MODES, run_and_parse, scaffold
+from tests.cli.conftest import (
+    DEPLOYABLE_SCAFFOLD_MODES,
+    SCAFFOLD_MODES,
+    run_and_parse,
+    scaffold,
+)
 
 _FREEZE_CHECK_CODE = r"""
 import json, sys
@@ -131,6 +136,73 @@ def test_scaffold_passes_security_stack_in_production(
     assert "SessionMiddleware" in middleware
     assert "CSRFMiddleware" in middleware
     assert "SecurityHeadersMiddleware" in middleware
+
+
+_RAILWAY_RUNTIME_CODE = r"""
+import asyncio, json, sys
+sys.path.insert(0, ".")
+import app as _app
+from chirp.testing import TestClient
+
+
+async def inspect_runtime():
+    async with TestClient(_app.app) as client:
+        health_get = await client.get("/health")
+        health_head = await client.request("HEAD", "/health")
+        ready_get = await client.get("/ready")
+        ready_head = await client.request("HEAD", "/ready")
+    config = _app.app.config
+    print(json.dumps({
+        "host": config.host,
+        "port": config.port,
+        "env": config.env,
+        "debug": config.debug,
+        "allowed_hosts": config.allowed_hosts,
+        "health_get": health_get.status,
+        "health_head": health_head.status,
+        "ready_get": ready_get.status,
+        "ready_head": ready_head.status,
+    }))
+
+
+asyncio.run(inspect_runtime())
+"""
+
+
+@pytest.mark.issue(736)
+@pytest.mark.parametrize("mode", DEPLOYABLE_SCAFFOLD_MODES)
+def test_scaffold_uses_railway_runtime_contract(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    project = scaffold(tmp_path, monkeypatch, mode=mode)
+    result = run_and_parse(
+        project,
+        _RAILWAY_RUNTIME_CODE,
+        extra_env={
+            "CHIRP_ENV": "production",
+            "PORT": "4732",
+            "RAILWAY_ENVIRONMENT_ID": "env_test",
+            "RAILWAY_PUBLIC_DOMAIN": "launch-board.example.up.railway.app",
+        },
+    )
+    assert result.returncode == 0, (
+        f"Scaffold '{mode}' Railway subprocess failed:\n"
+        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+    assert result.payload == {
+        "host": "0.0.0.0",
+        "port": 4732,
+        "env": "production",
+        "debug": False,
+        "allowed_hosts": [
+            "launch-board.example.up.railway.app",
+            "healthcheck.railway.app",
+        ],
+        "health_get": 200,
+        "health_head": 200,
+        "ready_get": 200,
+        "ready_head": 200,
+    }
 
 
 # Scaffold the chirp-ui v2 variant, freeze it, and report (a) the generated

@@ -1,10 +1,52 @@
 """Tests for chirp.cli._new — ``chirp new`` subcommand."""
 
+import json
 from pathlib import Path
 
 import pytest
 
 from chirp.cli import main
+
+
+@pytest.mark.issue(736)
+@pytest.mark.parametrize(
+    "mode_args",
+    [
+        [],
+        ["--minimal"],
+        ["--sse"],
+        ["--shell"],
+        ["--stream"],
+        ["--ai"],
+    ],
+    ids=["v2", "minimal", "sse", "shell", "stream", "ai"],
+)
+def test_generated_apps_ship_railway_runtime_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mode_args: list[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    main(["new", "myapp", *mode_args])
+
+    project = tmp_path / "myapp"
+    source = (project / "app.py").read_text()
+    config = json.loads((project / "railway.json").read_text())
+
+    assert "AppConfig.from_env(" in source
+    assert 'if __name__ == "__main__":' in source
+    assert "app.run()" in source
+    assert config == {
+        "$schema": "https://railway.com/railway.schema.json",
+        "build": {"builder": "RAILPACK"},
+        "deploy": {
+            "startCommand": "python app.py",
+            "healthcheckPath": "/ready",
+            "healthcheckTimeout": 100,
+            "restartPolicyType": "ON_FAILURE",
+            "restartPolicyMaxRetries": 10,
+        },
+    }
 
 
 def test_templates_shim_import() -> None:
@@ -37,6 +79,7 @@ class TestChirpNewDefaultV2:
         assert (project / "static" / "theme.css").is_file()
         assert (project / "AGENTS.md").is_file()
         assert (project / "pyproject.toml").is_file()
+        assert (project / "railway.json").is_file()
         assert (project / "migrations" / ".gitkeep").is_file()
         assert (project / "tests" / "conftest.py").is_file()
         assert (project / "tests" / "test_app.py").is_file()
@@ -55,6 +98,7 @@ class TestChirpNewDefaultV2:
         assert "secure=not config.debug" not in source
         assert "env=_env" in source
         assert "CHIRP_ENV" in source
+        assert "AppConfig.from_env(" in source
         assert "SessionConfig" in source
         assert "CSRFMiddleware(CSRFConfig())" in source
         assert "SecurityHeadersMiddleware()" in source
@@ -174,6 +218,7 @@ class TestChirpNewMinimal:
         assert "secure=not config.debug" not in source
         assert "env=_env" in source
         assert "CHIRP_ENV" in source
+        assert "AppConfig.from_env(" in source
         assert "SessionMiddleware" in source
         assert "CSRFMiddleware(CSRFConfig())" in source
         assert "SecurityHeadersMiddleware()" in source
@@ -272,6 +317,7 @@ class TestChirpNewShell:
         assert "secure=not config.debug" not in source
         assert "env=_env" in source
         assert "CHIRP_ENV" in source
+        assert "AppConfig.from_env(" in source
         assert "SessionMiddleware" in source
         assert "CSRFMiddleware(CSRFConfig())" in source
         assert "SecurityHeadersMiddleware()" in source

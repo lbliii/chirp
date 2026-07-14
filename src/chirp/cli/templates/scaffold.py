@@ -52,6 +52,22 @@ auth = ["argon2-cffi>=23.1.0"]
 forms = ["python-multipart>=0.0.18"]
 """
 
+RAILWAY_JSON = """\
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "RAILPACK"
+  },
+  "deploy": {
+    "startCommand": "python app.py",
+    "healthcheckPath": "/ready",
+    "healthcheckTimeout": 100,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
+"""
+
 MIGRATIONS_README = """# Migrations
 
 Place SQL migration scripts here when using ``chirp.data`` or another migration tool.
