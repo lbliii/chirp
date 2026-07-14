@@ -136,9 +136,19 @@ def _ssl_context_for(config: ConnectionConfig) -> ssl.SSLContext | None:
     return ctx
 
 
-async def _upgrade_to_tls(stream: ByteStream, ctx: ssl.SSLContext) -> ByteStream:
+async def _upgrade_to_tls(
+    stream: ByteStream,
+    ctx: ssl.SSLContext,
+    *,
+    hostname: str | None = None,
+) -> ByteStream:
     """Wrap a connected stream in TLS (extracted for testability)."""
-    tls = await TLSStream.wrap(stream, ssl_context=ctx)
+    tls = await TLSStream.wrap(
+        stream,
+        server_side=False,
+        hostname=hostname,
+        ssl_context=ctx,
+    )
     return tls
 
 
@@ -191,7 +201,8 @@ async def negotiate_tls(stream: PGStream, config: ConnectionConfig) -> PGStream:
         if not await _request_ssl():
             msg = f"server refused SSL connection (sslmode={mode})"
             raise TLSError(msg)
-        tls_stream = await _upgrade_to_tls(stream.stream, ctx)
+        hostname = config.host if mode == "verify-full" else None
+        tls_stream = await _upgrade_to_tls(stream.stream, ctx, hostname=hostname)
         return PGStream(stream=tls_stream, recv=stream.recv)
 
     if mode == "allow":
