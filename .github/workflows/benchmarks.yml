@@ -51,7 +51,7 @@ jobs:
           enable-cache: true
 
       - name: Install locked dependencies
-        run: uv sync --frozen --no-sources --group dev --extra data-pg
+        run: uv sync --frozen --group dev --extra data-pg
 
       - name: Run controlled Pelt evidence
         run: >-
