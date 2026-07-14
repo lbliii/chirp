@@ -53,6 +53,13 @@ The SSE tab shows native Chirp `EventStream` traces. It does not replace
 `window.EventSource`. Framework streams such as browser reload are hidden by
 default so application streams stay readable.
 
+The Reload tab shows the debug template-reload planner's redacted decision for
+each changed HTML template: logical template name, changed/added/removed named
+blocks, `patch`/`diagnose`/`reload` outcome, reason, target when known, and
+monotonic revision. The records survive the ensuing full-page reload in
+tab-scoped session storage. This phase is observational: the existing browser
+reload still happens, and a `patch` decision does not mutate the DOM.
+
 ## Debug Contract
 
 In debug mode, Chirp reserves its internal URL space, including:
@@ -89,7 +96,7 @@ window.ChirpHtmxDebug.transitionCoverage(["normal", "boosted", "targeted"])
 
 `help()` describes the available API. `exportRecordsJson()` returns htmx
 requests, errors, SSE connections and events, View Transition events, render
-plans, compiled-transition evidence, and Swap Doctor records in a
+plans, template-reload decisions, compiled-transition evidence, and Swap Doctor records in a
 machine-readable form. `transitionCoverage()` compares the modes you explicitly
 expect with the bounded observations captured by the server. It reports gaps;
 it does not claim that a static route graph proves browser behavior.
@@ -138,6 +145,9 @@ fields:
 - `transitionCoverage`: the observed mode, observation-ID, and compiled-ID
   summary at export time.
 - `vtEvents`: View Transition lifecycle records.
+- `templateReloadPlans`: bounded, redacted template planner records. These
+  contain logical template/block/target identities and diagnostic type/line,
+  but no source filename, rendered HTML, request context, or credentials.
 
 `X-Chirp-Return-Trace` is a compact debug header that records the typed return
 branch Chirp negotiated, such as `Template`, `Fragment`, `PageComposition`,

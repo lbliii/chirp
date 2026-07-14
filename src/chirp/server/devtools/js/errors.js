@@ -208,7 +208,7 @@ CH.help = function() {
     enabledBy: "AppConfig(debug=True) or chirp dev app:app",
     drawer: "Press Ctrl+Shift+D to toggle the Chirp DevTools drawer.",
     inspector: "Press Ctrl+Shift+K to inspect effective hx-* attributes.",
-    exportRecordsJson: "Call window.ChirpHtmxDebug.exportRecordsJson() for agent-readable htmx, transition, SSE, View Transition, render-plan, and Swap Doctor records.",
+    exportRecordsJson: "Call window.ChirpHtmxDebug.exportRecordsJson() for agent-readable htmx, transition, SSE, template-reload, View Transition, render-plan, and Swap Doctor records.",
     transitionCoverage: "Call window.ChirpHtmxDebug.transitionCoverage(['normal', 'boosted', 'targeted']) to report observed and intentionally untested request modes.",
     getState: "Call window.ChirpHtmxDebug.getState() for the live in-browser state object.",
     getHtmxCompatibility: "Call window.ChirpHtmxDebug.getHtmxCompatibility() for configured/live htmx tier, version, assets, and duplicate diagnostics.",
@@ -226,6 +226,7 @@ CH.exportRecordsJson = function() {
     transitionCoverage: buildTransitionCoverage([]),
     vtEvents: state.vtEvents,
     htmxCompatibility: state.htmxCompatibility,
+    templateReloadPlans: state.templateReloadPlans,
   }, null, 2);
 };
 CH.getSSEConnections = function() { return state.sseConnections; };

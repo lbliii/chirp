@@ -21,6 +21,7 @@ var STORAGE_KEYS = {
   verbose: "chirp-debug-verbose",
   pause: "chirp-debug-pause",
   redactCurl: "chirp-debug-redact-curl",
+  reloadPlans: "chirp-debug-reload-plans",
 };
 var HIGHLIGHT_PATH = "/__chirp/debug/highlight";
 var DEBUG_TRACES_PATH = "/__chirp/debug/traces.json";
@@ -46,7 +47,14 @@ var state = {
   nativeTraceKeys: {},
   vtEvents: [],
   htmxCompatibility: null,
+  templateReloadPlans: [],
 };
+
+function saveTemplateReloadPlans() {
+  try {
+    sessionStorage.setItem(STORAGE_KEYS.reloadPlans, JSON.stringify(state.templateReloadPlans));
+  } catch (e) {}
+}
 
 function loadState() {
   try {
@@ -64,6 +72,21 @@ function loadState() {
     if (p !== null) state.paused = p === "true";
     var rc = localStorage.getItem(STORAGE_KEYS.redactCurl);
     if (rc !== null) state.redactCurl = rc === "true";
+    var plans = sessionStorage.getItem(STORAGE_KEYS.reloadPlans);
+    if (plans) {
+      var parsedPlans = JSON.parse(plans);
+      if (Array.isArray(parsedPlans)) {
+        state.templateReloadPlans = parsedPlans.filter(function(plan) {
+          return plan && typeof plan === "object" && plan.schemaVersion === 1 &&
+            typeof plan.revision === "number" &&
+            ["patch", "diagnose", "reload"].indexOf(plan.outcome) >= 0 &&
+            typeof plan.reason === "string" &&
+            Array.isArray(plan.changedBlocks) &&
+            Array.isArray(plan.addedBlocks) &&
+            Array.isArray(plan.removedBlocks);
+        }).slice(0, 100);
+      }
+    }
   } catch (e) {}
 }
 

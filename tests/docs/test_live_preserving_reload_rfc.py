@@ -6,21 +6,23 @@ import pytest
 
 _ROOT = Path(__file__).resolve().parents[2]
 _RFC = _ROOT / "docs" / "rfcs" / "019-live-preserving-template-reload.md"
+_DEVTOOLS = _ROOT / "docs" / "devtools.md"
 
 
 @pytest.mark.issue(341)
-def test_live_reload_rfc_is_explicitly_non_shipping() -> None:
+def test_live_reload_rfc_keeps_browser_mutation_non_shipping() -> None:
     text = _RFC.read_text(encoding="utf-8")
     normalized = " ".join(text.split())
 
     assert "**Status:** Accepted" in text
-    assert "offline planner foundation implemented" in text
-    assert "existing `reload`/`css` EventStream" in text
+    assert "planner decisions are visible in DevTools" in normalized
+    assert "before the existing `reload` event" in normalized
     assert "[maintainer decision for issue #341][issue-341-decision]" in text
     assert "approves only the bounded planner and browser-canary phases" in normalized
     assert "does not change `AppConfig`" in text
     assert "a new public `AppConfig` field in this RFC" in text
-    assert "No changelog: internal planner foundation only" in text
+    assert "the browser still performs its existing full reload" in normalized
+    assert "DevTools documentation and a changelog fragment" in normalized
 
 
 @pytest.mark.issue(341)
@@ -52,3 +54,25 @@ def test_live_reload_rfc_preserves_fail_loud_and_stream_gates() -> None:
     assert "does not patch an active Suspense target" in text
     assert "separate implementation" in text
     assert "Five Lucky Cat edits preserve one continuously updating signal connection" in text
+
+
+@pytest.mark.issue(681)
+def test_reload_devtools_docs_record_the_observational_boundary() -> None:
+    rfc = _RFC.read_text(encoding="utf-8")
+    normalized_rfc = " ".join(rfc.split())
+    devtools = _DEVTOOLS.read_text(encoding="utf-8")
+    normalized_devtools = " ".join(devtools.split())
+
+    for phrase in (
+        "tab-scoped session storage",
+        "fail-closed empty browser surface",
+        "Absolute source filenames, rendered HTML, and request context are not serialized",
+    ):
+        assert phrase in normalized_rfc
+    for phrase in (
+        "The Reload tab",
+        "the existing browser reload still happens",
+        "`templateReloadPlans`",
+        "no source filename, rendered HTML, request context, or credentials",
+    ):
+        assert phrase in normalized_devtools
