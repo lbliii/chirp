@@ -237,6 +237,62 @@ committed Dockerfile — not a stale local tree from `railway up`. Set `GIT_REF=
 as a service variable so the Dockerfile installs Chirp from the same ref. See
 `docs/deployment/railway.md` § Deploy source.
 
+### Optional local OCI run with Apple Container
+
+On Apple Silicon with macOS 26, Apple Container 1.x can build and run this same
+Dockerfile without Docker Desktop. The verified baseline was Apple Container
+1.1.0 on macOS 26.5.1, producing a `linux/arm64/v8` image; no Dockerfile change
+or Apple-specific Chirp behavior was required.
+
+From the repository root, after installing and starting Apple Container:
+
+```bash
+container system start
+GIT_REF="$(git rev-parse HEAD)"
+
+container build \
+  --platform linux/arm64 \
+  --cpus 4 \
+  --memory 4G \
+  --build-arg "GIT_REF=${GIT_REF}" \
+  --tag lucky-cat:apple-container \
+  examples/chirpui/lucky_cat
+
+export CHIRP_SECRET_KEY="$(openssl rand -hex 32)"
+
+container run \
+  --detach \
+  --name lucky-cat-apple-container \
+  --platform linux/arm64 \
+  --cpus 4 \
+  --memory 2G \
+  --publish 127.0.0.1:8000:8000 \
+  --env PORT=8000 \
+  --env CHIRP_HOST=0.0.0.0 \
+  --env CHIRP_ENV=production \
+  --env CHIRP_DEBUG=0 \
+  --env CHIRP_LOG_FORMAT=json \
+  --env CHIRP_SECRET_KEY \
+  --env LUCKY_CAT_FEED=sim \
+  lucky-cat:apple-container
+```
+
+`CHIRP_HOST=0.0.0.0` is required for the guest process to receive the
+host-to-VM port forward; the host side remains restricted to
+`127.0.0.1:8000`. Verify `/health`, `/ready`, `/`, and the `/ft/stream` SSE
+route, then stop cleanly with:
+
+```bash
+container stop --signal SIGTERM --time 15 lucky-cat-apple-container
+```
+
+The CPU and memory values are validation settings, not production sizing.
+Apple Container has no first-party Compose workflow, and this remains an
+optional local OCI path—not a macOS production recommendation. Follow the
+[published recipe](../../../site/content/docs/quality/deployment/production.md#optional-apple-container-workflow-on-macos)
+for the probe commands and caveats, or inspect the
+[machine-verified receipt](../../../docs/audits/apple-container-1.0-validation.md).
+
 ## Production vs demo
 
 Lucky Cat is a **single-process demo**, not a production multi-tenant deployment.

@@ -134,6 +134,102 @@ CMD ["chirp", "run", "myapp:app", "--production", "--workers", "4"]
 Use `chirp check --warnings-as-errors` (without `--deploy`) when you want strict warnings but do not want to escalate the production-only severities — for example, on a staging gate.
 :::
 
+## Optional Apple Container workflow on macOS
+
+[Apple Container](https://github.com/apple/container) can build and run an
+existing Chirp Dockerfile on Apple Silicon without Docker Desktop. This is an
+optional local OCI workflow, not an Apple-specific Chirp integration or a
+production deployment target.
+
+The verified baseline was a MacBook Pro `Mac15,6` with an Apple M3 Pro,
+macOS 26.5.1, Apple Container 1.1.0, and a `linux/arm64/v8` Lucky Cat image.
+Install the signed package from the
+[Apple Container releases](https://github.com/apple/container/releases), then
+start its services and confirm the version:
+
+```bash
+container --version
+container system start
+container system version --format json
+```
+
+From the Chirp repository root, build the unchanged Lucky Cat Dockerfile. The
+compatibility receipt pinned an exact commit; this form pins the commit in your
+current checkout while preserving the tested build flags:
+
+```bash
+GIT_REF="$(git rev-parse HEAD)"
+
+container build \
+  --platform linux/arm64 \
+  --cpus 4 \
+  --memory 4G \
+  --build-arg "GIT_REF=${GIT_REF}" \
+  --tag lucky-cat:apple-container \
+  examples/chirpui/lucky_cat
+```
+
+Run it with localhost-only publication and explicit production settings:
+
+```bash
+export CHIRP_SECRET_KEY="$(openssl rand -hex 32)"
+
+container run \
+  --detach \
+  --name lucky-cat-apple-container \
+  --platform linux/arm64 \
+  --cpus 4 \
+  --memory 2G \
+  --publish 127.0.0.1:8000:8000 \
+  --env PORT=8000 \
+  --env CHIRP_HOST=0.0.0.0 \
+  --env CHIRP_ENV=production \
+  --env CHIRP_DEBUG=0 \
+  --env CHIRP_LOG_FORMAT=json \
+  --env CHIRP_SECRET_KEY \
+  --env LUCKY_CAT_FEED=sim \
+  lucky-cat:apple-container
+```
+
+`CHIRP_HOST=0.0.0.0` is required. Chirp's safe local default binds only inside
+the guest; Apple Container's host-to-VM port forward cannot reach that guest
+loopback address. The host publication remains restricted to
+`127.0.0.1:8000`.
+
+Check liveness, readiness, normal HTML, and a ten-second SSE sample:
+
+```bash
+curl --fail --show-error http://127.0.0.1:8000/health
+curl --fail --show-error http://127.0.0.1:8000/ready
+curl --fail --show-error http://127.0.0.1:8000/ \
+  --output /tmp/lucky-cat-home.html
+rg '<html|id="markets-lobby"' /tmp/lucky-cat-home.html
+
+curl --fail --show-error --no-buffer --max-time 10 \
+  --header 'Accept: text/event-stream' \
+  http://127.0.0.1:8000/ft/stream \
+  --output /tmp/lucky-cat-sse.body
+rg '^(event|data):' /tmp/lucky-cat-sse.body
+
+curl --fail --show-error http://127.0.0.1:8000/ready
+```
+
+The SSE command is expected to end with curl's ten-second timeout after writing
+events; the final readiness check proves the app remained available. Stop the
+container with the verified graceful-shutdown deadline:
+
+```bash
+container stop --signal SIGTERM --time 15 lucky-cat-apple-container
+```
+
+The 4 CPU/4 GiB builder and 4 CPU/2 GiB runtime limits are reproducible
+validation settings, not production sizing recommendations. Apple Container has no
+first-party Compose workflow, and Chirp does not support a Compose shim for it.
+The same Dockerfile remains the source for Docker/BuildKit and Railway. See the
+full [compatibility receipt](https://github.com/lbliii/chirp/blob/main/docs/audits/apple-container-1.0-validation.md)
+for the image digests, GIL-disabled interpreter assertion, shutdown log, and hosted-CI
+caveat.
+
 ## What the server gives you
 
 Pounce handles these for every Chirp app, no configuration required:
