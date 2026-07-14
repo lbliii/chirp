@@ -13,7 +13,7 @@
 {# Cross-page ticker — `ticker` signal renders ticker_signal fragment. DESIGN.md §4 #}
 {% def ticker_strip_body(ticker=none) %}
 {% if (ticker ?? none) is not none %}
-{% set up = ticker.change_pct_24h >= 0 %}
+{% let up = ticker.change_pct_24h >= 0 %}
 <span class="luckycat-ticker__item">
   <a class="luckycat-ticker__sym" href="/markets/{{ ticker.symbol }}">{{ ticker.symbol }}</a>
   <span class="luckycat-ticker__price">{{ ticker.price }}</span>

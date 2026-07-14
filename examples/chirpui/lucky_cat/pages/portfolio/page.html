@@ -65,9 +65,9 @@
     the live rate × worker width so visitors on default 3.14 see the contrast
     without faking numbers. When GIL is off, the bar fills to the top. -#}
 {% if (ticks_per_sec ?? none) is not none and workers > 1 %}
-  {% set ceiling = ticks_per_sec * workers if gil_enabled else ticks_per_sec %}
-  {% set scale = ceiling if ceiling > 0 else 1 %}
-  {% set actual_pct = (ticks_per_sec / scale * 100) | round %}
+  {% let ceiling = ticks_per_sec * workers if gil_enabled else ticks_per_sec %}
+  {% let scale = ceiling if ceiling > 0 else 1 %}
+  {% let actual_pct = (ticks_per_sec / scale * 100) | round %}
   <div class="luckycat-ft__meter" aria-label="Tick throughput vs parallel ceiling">
     <div class="luckycat-ft__meter-head">
       <span class="luckycat-ft__meter-label">Throughput</span>
