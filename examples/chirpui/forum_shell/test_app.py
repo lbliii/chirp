@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from chirp.contracts import check_hypermedia_surface
 from chirp.testing import (
     TestClient,
@@ -72,3 +74,12 @@ class TestForumShell:
         assert result.coverage.post_routes == 1
         assert result.coverage.post_routes_with_form_contract == 1
         assert result.coverage.mounted_page_routes_with_contract >= 1
+
+    @pytest.mark.issue(723)
+    def test_enhancement_contracts_remain_declared_only(self, example_app) -> None:
+        """No ChirpUI default silently opts the canary into enhancement tiers."""
+        example_app.freeze()
+        program = example_app._runtime_state.hypermedia_program
+        assert program is not None
+        assert program.enhancements == ()
+        assert program.enhancement_edges == ()

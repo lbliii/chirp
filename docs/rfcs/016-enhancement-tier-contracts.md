@@ -1,6 +1,6 @@
 # RFC 016: Enhancement Tiers As Compiled Fallback Contracts
 
-**Status:** Accepted in part — Kida 0.12 and the private compiler model ship first; diagnostics, runtime behavior, and browser proof remain proposed
+**Status:** Accepted in part — Kida 0.12, the private compiler model, and the evidence ledger ship first; diagnostics, runtime behavior, and browser proof remain proposed
 **Issue:** [#347](https://github.com/lbliii/chirp/issues/347)
 **Parent:** [#335](https://github.com/lbliii/chirp/issues/335)
 **Related:** [#152](https://github.com/lbliii/chirp/issues/152), RFC 008, RFC 015
@@ -185,6 +185,37 @@ Diagnostics should name the template, enhanced block, fallback block,
 capability, target ID, and source line. Missing fallbacks must fail loud; the
 runtime must never substitute an empty block or an empty OOB wrapper.
 
+### 5.1 Evidence ledger
+
+Issue #723 exercised the frozen compiler facts with intentional declarations,
+plain and htmx `TestClient` paths, and undeclared Lucky Cat and Forum Shell
+canaries. This is a decision input for the contract increment, not an
+`app.check()` behavior or severity change.
+
+| Candidate condition | Observable frozen fact | Evidence disposition | Candidate posture for separate approval |
+| --- | --- | --- | --- |
+| Accepted `htmx`/`sse` capability with a resolved string fallback | Node preserves the capability and fallback; edge resolves to a block in the same logical template | **Accept as clean** | No finding |
+| `fallback=` omitted | `fallback_declared` is false and no edge exists | **Accept** | `ERROR`: the explicit enhancement declaration has no degradation relationship |
+| `fallback=` is a non-string literal | Literal value is preserved and no edge exists | **Accept** | `ERROR`: a block identity must be a string |
+| String fallback names no block | Edge is preserved with `resolved=False` | **Accept** | `ERROR`: the promised degradation surface does not exist |
+| Capability is an unknown string | Literal value is preserved independently of the edge | **Accept** | `ERROR` for the first closed allowlist (`htmx`, `sse`) |
+| Capability is a non-string literal | Typed literal is preserved | **Accept** | `ERROR`: a capability identity must be a string |
+| Fallback is fragment-only or unreachable in the full render | The current program does not preserve block-vs-fragment kind or full-render reachability | **No-go now** | No diagnostic until the shared compiler can prove the fact |
+| Enhanced and fallback literal root IDs differ, or either root is dynamic | The current program does not preserve root-ID evidence | **No-go now** | No diagnostic until source-backed root facts exist |
+| Required htmx/SSE producer or target edge is unresolved | Existing rules own those edges and severities; the enhancement node alone does not bind a producer | **Revise** | Add relationship context only after a shared edge can be proved; do not duplicate or promote the owning rule |
+| Application has no enhancement declarations | Both canaries compile empty enhancement node/edge tuples | **Accept as clean** | No finding and no implicit ChirpUI defaults |
+
+The false-positive budget is zero false `ERROR`s on the two undeclared
+canaries. The known false-negative inventory is explicit: fragment-only/full-
+render reachability, root-ID parity, and capability-producer linkage receive no
+new finding until the shared compiler can supply those facts.
+
+The five accepted invalid-declaration cases are structurally deterministic and
+source-located. Their proposed `ERROR` posture still requires the repository's
+explicit severity check-in before implementation. Browser behavior remains a
+separate gate: compiler metadata does not prove that a fallback is useful with
+JavaScript disabled.
+
 ## 6. Capability-specific proof
 
 ### 6.1 htmx
@@ -269,11 +300,14 @@ condition rather than breaking core imports.
 2. **Kida release — complete:** typed block modifiers shipped in Kida 0.12.0.
 3. **Compiler increment — complete:** immutable enhancement nodes and edges are
    compiled while existing graph, severity, and render behavior remain stable.
-4. **Contract increment:** add declared-only diagnostics with end-to-end
-   `tests/contracts/` proof.
-5. **Browser proof:** extend a maintained example with JS-disabled, healthy,
+4. **Evidence ledger — complete:** classify deterministic malformed
+   declarations, preserve declared-only canary silence, and reject checks whose
+   facts are not yet in the shared compiler.
+5. **Contract increment:** after explicit severity approval, add only accepted
+   declared-only diagnostics with end-to-end `tests/contracts/` proof.
+6. **Browser proof:** extend a maintained example with JS-disabled, healthy,
    unavailable-transport, and broken-fixture paths.
-6. **Documentation:** publish accepted syntax, diagnostics, ChirpUI guidance,
+7. **Documentation:** publish accepted syntax, diagnostics, ChirpUI guidance,
    and changelog only when behavior ships.
 
 Each implementation increment needs the repository's explicit check-in for
@@ -303,7 +337,9 @@ Kida minimum-version changes.
 
 ## 13. Status and collateral
 
-The accepted first increment changes the Kida dependency floor and compiles
-private enhancement facts. It changes no exported Python API, CLI, `AppConfig`,
-return type, contract category, severity, rendering, example, or generated site
-output. A changelog fragment records the dependency and authoring impact.
+The accepted compiler increment changes the Kida dependency floor and compiles
+private enhancement facts. The evidence increment adds fixtures, canary
+assertions, and the decision ledger without changing exported Python API, CLI,
+`AppConfig`, return types, contract categories, severities, rendering, or
+generated site output. A changelog fragment records the dependency and authoring impact;
+the evidence-only increment needs no changelog.
