@@ -125,6 +125,7 @@ def test_parent_template_change_forces_composition_reload(tmp_path: Path) -> Non
     assert plan.reason == "composition_changed"
 
 
+@pytest.mark.issue(681)
 def test_broken_template_diagnoses_without_payload_or_snapshot_publication(tmp_path: Path) -> None:
     path = tmp_path / "page.html"
     _write_two_blocks(path)
@@ -177,6 +178,7 @@ def test_patch_eligibility_fails_closed(
     assert plan.requires_response_validation is False
 
 
+@pytest.mark.issue(681)
 def test_duplicate_route_targets_are_ambiguous(tmp_path: Path) -> None:
     path = tmp_path / "page.html"
     _write_two_blocks(path)
@@ -199,6 +201,7 @@ def test_duplicate_route_targets_are_ambiguous(tmp_path: Path) -> None:
     assert plan.reason == "target_ambiguous"
 
 
+@pytest.mark.issue(681)
 def test_unknown_edits_receive_unique_monotonic_revisions_under_threads(tmp_path: Path) -> None:
     path = tmp_path / "page.html"
     _write_two_blocks(path)

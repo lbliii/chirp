@@ -77,6 +77,17 @@ def test_htmx_debug_js_s_tier_features() -> None:
     assert "exportRecordsJson" in HTMX_DEBUG_BOOT_JS
 
 
+@pytest.mark.issue(681)
+def test_devtools_boot_script_records_reload_plans_across_full_reload() -> None:
+    assert 'window.addEventListener("chirp:reload-plan"' in HTMX_DEBUG_BOOT_JS
+    assert "normalizeTemplateReloadPlan" in HTMX_DEBUG_BOOT_JS
+    assert "templateReloadPlans" in HTMX_DEBUG_BOOT_JS
+    assert "saveTemplateReloadPlans" in HTMX_DEBUG_BOOT_JS
+    assert "sessionStorage" in HTMX_DEBUG_BOOT_JS
+    assert "renderTemplateReloadPlans" in HTMX_DEBUG_BOOT_JS
+    assert "No template reload decisions recorded yet" in HTMX_DEBUG_BOOT_JS
+
+
 def test_htmx_debug_js_v3_sse_monitor() -> None:
     """V3: SSE monitor consumes native Chirp EventStream traces."""
     assert "window.EventSource =" not in HTMX_DEBUG_BOOT_JS

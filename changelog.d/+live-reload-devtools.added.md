@@ -1,0 +1,1 @@
+DevTools now preserves redacted template-reload planner decisions across the existing development full-page reload, without enabling DOM patching or exposing source paths, rendered HTML, or request context.

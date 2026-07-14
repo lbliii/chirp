@@ -8,18 +8,71 @@ the process while .html/.css edits trigger an in-browser refresh.
 from __future__ import annotations
 
 import asyncio
+import json
+import threading
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
-from chirp.app.state import PendingRoute
+from chirp.app.state import PendingRoute, RuntimeAppState
 from chirp.realtime.events import EventStream, SSEEvent
 
 if TYPE_CHECKING:
     from chirp.config import AppConfig
+    from chirp.templating.dev_template_reload import (
+        TemplateReloadPlan,
+        TemplateReloadPlanner,
+        TemplateReloadSurface,
+    )
+    from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 
 # Stable path unlikely to collide with user routes
 DEV_RELOAD_SSE_PATH = "/__chirp__/dev-reload"
+
+
+class _TemplateReloadPlannerLike(Protocol):
+    def plan_edit(
+        self,
+        filename: str | Path,
+        surface: TemplateReloadSurface,
+    ) -> TemplateReloadPlan: ...
+
+
+class _TemplateReloadPlanPublisher:
+    """Publish one stable plan per file revision across reload connections."""
+
+    __slots__ = ("_cache", "_lock", "_planner")
+
+    def __init__(self, planner: TemplateReloadPlanner) -> None:
+        self._planner = planner
+        self._lock = threading.Lock()
+        self._cache: dict[
+            str,
+            tuple[tuple[int, int] | None, TemplateReloadSurface, TemplateReloadPlan],
+        ] = {}
+
+    def plan_edit(
+        self,
+        filename: str | Path,
+        surface: TemplateReloadSurface,
+    ) -> TemplateReloadPlan:
+        path = Path(filename)
+        key = str(path.resolve())
+        try:
+            stat = path.stat()
+            fingerprint: tuple[int, int] | None = (stat.st_mtime_ns, stat.st_size)
+        except OSError:
+            fingerprint = None
+        with self._lock:
+            cached = self._cache.get(key)
+            if cached is not None and cached[:2] == (fingerprint, surface):
+                return cached[2]
+            plan = self._planner.plan_edit(path, surface)
+            if key not in self._cache and len(self._cache) >= 256:
+                self._cache.pop(next(iter(self._cache)))
+            self._cache[key] = (fingerprint, surface, plan)
+            return plan
+
 
 DEV_BROWSER_RELOAD_SNIPPET = f"""\
 <script>
@@ -31,6 +84,14 @@ DEV_BROWSER_RELOAD_SNIPPET = f"""\
   }}
   var es = new EventSource("{DEV_RELOAD_SSE_PATH}");
   window.__chirpDevReloadSource = es;
+  es.addEventListener("planner", function(evt) {{
+    try {{
+      var detail = JSON.parse(evt.data || "null");
+      if (detail && typeof detail === "object") {{
+        window.dispatchEvent(new CustomEvent("chirp:reload-plan", {{ detail: detail }}));
+      }}
+    }} catch (e) {{}}
+  }});
   es.addEventListener("reload", function() {{ location.reload(); }});
   es.addEventListener("css", function() {{
     var t = Date.now();
@@ -116,6 +177,7 @@ def _iter_tracked_files(roots: list[Path], suffixes: tuple[str, ...]) -> list[Pa
 
 async def _reload_event_stream(
     config: AppConfig,
+    planner: _TemplateReloadPlannerLike | None = None,
 ) -> AsyncIterator[SSEEvent]:
     """Yield SSE reload events when watched files change."""
     roots = _watch_roots(config)
@@ -134,6 +196,7 @@ async def _reload_event_stream(
         if tick % rescan_every == 1 or not tracked_files:
             tracked_files = _iter_tracked_files(roots, suffixes)
         changed_suffixes: set[str] = set()
+        changed_paths: list[Path] = []
         for path in tracked_files:
             key = str(path.resolve())
             try:
@@ -146,18 +209,99 @@ async def _reload_event_stream(
             elif m > old:
                 mtimes[key] = m
                 changed_suffixes.add(path.suffix.lower())
+                changed_paths.append(path)
         if changed_suffixes:
+            for event in _template_reload_plan_events(changed_paths, planner):
+                yield event
             if changed_suffixes <= {".css"}:
                 yield SSEEvent(data="css", event="css")
             else:
                 yield SSEEvent(data="reload", event="reload")
 
 
-def make_dev_reload_pending_route(config: AppConfig) -> PendingRoute:
+def _template_reload_plan_events(
+    changed_paths: list[Path],
+    planner: _TemplateReloadPlannerLike | None,
+) -> tuple[SSEEvent, ...]:
+    """Return redacted planner records for changed HTML before full reload."""
+    if planner is None:
+        return ()
+    from chirp.templating.dev_template_reload import TemplateReloadSurface
+
+    surface = TemplateReloadSurface()
+    events = []
+    for path in sorted(set(changed_paths)):
+        if path.suffix.lower() != ".html":
+            continue
+        events.append(_template_reload_plan_event(planner.plan_edit(path, surface)))
+    return tuple(events)
+
+
+def _template_reload_plan_event(plan: TemplateReloadPlan) -> SSEEvent:
+    """Serialize only the public-safe fields approved for DevTools."""
+    payload = {
+        "schema_version": 1,
+        "revision": plan.revision,
+        "outcome": plan.outcome,
+        "reason": plan.reason,
+        "template_name": plan.template_name,
+        "changed_blocks": list(plan.changed_blocks),
+        "added_blocks": list(plan.added_blocks),
+        "removed_blocks": list(plan.removed_blocks),
+        "target_id": plan.target_id,
+        "error_type": plan.error_type,
+        "error_line": plan.error_line,
+        "requires_response_validation": plan.requires_response_validation,
+    }
+    return SSEEvent(
+        data=json.dumps(payload, sort_keys=True, separators=(",", ":")),
+        event="planner",
+    )
+
+
+def _build_template_reload_planner(
+    runtime_state: RuntimeAppState | None,
+    fragment_targets: FragmentTargetRegistry | None,
+) -> _TemplateReloadPlannerLike | None:
+    """Build the shared planner lazily after app freeze publishes its graph."""
+    if runtime_state is None:
+        return None
+    env = runtime_state.kida_env
+    if env is None:
+        return None
+    from chirp.templating.dev_template_reload import (
+        TemplateReloadPlanner,
+        build_template_reload_inventory,
+    )
+
+    inventory = build_template_reload_inventory(
+        env,
+        runtime_state.hypermedia_program,
+        fragment_targets,
+    )
+    return _TemplateReloadPlanPublisher(TemplateReloadPlanner(env, inventory))
+
+
+def make_dev_reload_pending_route(
+    config: AppConfig,
+    runtime_state: RuntimeAppState | None = None,
+    fragment_targets: FragmentTargetRegistry | None = None,
+) -> PendingRoute:
     """Return a pending route for the dev-reload SSE stream."""
+    planner: _TemplateReloadPlannerLike | None = None
+    planner_ready = False
+    planner_lock = threading.Lock()
+
+    def _planner() -> _TemplateReloadPlannerLike | None:
+        nonlocal planner, planner_ready
+        with planner_lock:
+            if not planner_ready:
+                planner = _build_template_reload_planner(runtime_state, fragment_targets)
+                planner_ready = True
+            return planner
 
     def _handler() -> EventStream:
-        return EventStream(_reload_event_stream(config))
+        return EventStream(_reload_event_stream(config, _planner()))
 
     return PendingRoute(
         DEV_RELOAD_SSE_PATH,

@@ -7,6 +7,54 @@ function pushSseEvent(connId, type, url, data) {
   refreshSsePanel();
 }
 
+// --- Template reload planner records ---
+function reloadPlanText(value, limit) {
+  if (value == null) return null;
+  return String(value).slice(0, limit);
+}
+
+function reloadPlanList(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 50).map(function(item) { return String(item).slice(0, 160); });
+}
+
+function normalizeTemplateReloadPlan(value) {
+  if (!value || typeof value !== "object" || value.schema_version !== 1) return null;
+  var revision = Number(value.revision);
+  if (!isFinite(revision) || revision < 1 || Math.floor(revision) !== revision) return null;
+  if (["patch", "diagnose", "reload"].indexOf(value.outcome) < 0) return null;
+  var reason = reloadPlanText(value.reason, 160);
+  if (!reason) return null;
+  return {
+    schemaVersion: 1,
+    revision: revision,
+    outcome: value.outcome,
+    reason: reason,
+    templateName: reloadPlanText(value.template_name, 240),
+    changedBlocks: reloadPlanList(value.changed_blocks),
+    addedBlocks: reloadPlanList(value.added_blocks),
+    removedBlocks: reloadPlanList(value.removed_blocks),
+    targetId: reloadPlanText(value.target_id, 160),
+    errorType: reloadPlanText(value.error_type, 160),
+    errorLine: typeof value.error_line === "number" ? value.error_line : null,
+    requiresResponseValidation: value.requires_response_validation === true,
+    receivedAt: Date.now(),
+  };
+}
+
+function ingestTemplateReloadPlan(value) {
+  var plan = normalizeTemplateReloadPlan(value);
+  if (!plan) return;
+  state.templateReloadPlans.unshift(plan);
+  if (state.templateReloadPlans.length > 100) state.templateReloadPlans.pop();
+  saveTemplateReloadPlans();
+  refreshReloadPanel();
+}
+
+window.addEventListener("chirp:reload-plan", function(evt) {
+  ingestTemplateReloadPlan(evt.detail);
+});
+
 // --- SSE Monitor (native Chirp EventStream traces) ---
 function findSseConnection(id) {
   for (var i = 0; i < state.sseConnections.length; i++) {

@@ -509,7 +509,13 @@ class AppCompiler:
             )
 
             if is_dev_browser_reload_enabled(self._config):
-                self._mutable.pending_routes.append(make_dev_reload_pending_route(self._config))
+                self._mutable.pending_routes.append(
+                    make_dev_reload_pending_route(
+                        self._config,
+                        self._runtime,
+                        self._mutable.fragment_target_registry,
+                    )
+                )
 
         from chirp.server.fragment_dispatch import (
             FRAGMENT_ROUTE_PREFIX,

@@ -93,6 +93,11 @@ function injectStyles() {
     ".chirp-dbg-sse-evt .evt-type{font-weight:bold;min-width:60px;display:inline-block}",
     ".chirp-dbg-vt-row{padding:8px 12px;border-radius:4px;margin-bottom:4px;display:flex;align-items:center;gap:10px;background:#1e1f2e;border-left:3px solid var(--chirp-vt)}",
     ".chirp-dbg-vt-row .vt-label{color:var(--chirp-vt);font-weight:bold}",
+    ".chirp-dbg-reload-row{padding:10px 12px;border-radius:4px;margin-bottom:6px;background:#1e1f2e;border-left:3px solid var(--chirp-warning)}",
+    ".chirp-dbg-reload-row.patch{border-left-color:var(--chirp-success)}",
+    ".chirp-dbg-reload-row.diagnose{border-left-color:var(--chirp-error)}",
+    ".chirp-dbg-reload-row .decision{font-weight:bold}",
+    ".chirp-dbg-reload-row .meta{color:#7c8396;font-size:12px}",
     ".chirp-dbg-doctor{display:flex;flex-direction:column;gap:8px}",
     ".chirp-dbg-doctor-status{display:inline-block;width:max-content;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:bold}",
     ".chirp-dbg-doctor-status.ok{background:#9ece6a20;color:var(--chirp-success);border:1px solid #9ece6a40}",
@@ -228,7 +233,7 @@ function renderSwapDoctorHTML(record) {
 }
 
 // --- Panel DOM ---
-var panelRoot, drawer, togglePill, activityPanel, errorsPanel, inspectorPanel, ssePanel;
+var panelRoot, drawer, togglePill, activityPanel, errorsPanel, inspectorPanel, reloadPanel, ssePanel;
 var tabsEl, tabNames;
 
 function refreshActivityPanel() {
@@ -238,6 +243,10 @@ function refreshActivityPanel() {
 function refreshSsePanel() {
   if (ssePanel && state.tab === "sse") renderSseLog();
   updatePill();
+}
+
+function refreshReloadPanel() {
+  if (reloadPanel && state.tab === "reload") renderTemplateReloadPlans();
 }
 
 function renderPanel() {
@@ -299,7 +308,7 @@ function renderPanel() {
 
   tabsEl = document.createElement("div");
   tabsEl.className = "chirp-dbg-tabs";
-  tabNames = ["activity", "sse", "inspector", "errors"];
+  tabNames = ["activity", "reload", "sse", "inspector", "errors"];
   tabNames.forEach(function(name) {
     var t = document.createElement("div");
     t.className = "chirp-dbg-tab" + (state.tab === name ? " active" : "");
@@ -346,6 +355,10 @@ function renderPanel() {
   ssePanel.className = "chirp-dbg-panel";
   ssePanel.style.display = state.tab === "sse" ? "block" : "none";
 
+  reloadPanel = document.createElement("div");
+  reloadPanel.className = "chirp-dbg-panel";
+  reloadPanel.style.display = state.tab === "reload" ? "block" : "none";
+
   inspectorPanel = document.createElement("div");
   inspectorPanel.className = "chirp-dbg-panel";
   inspectorPanel.style.display = state.tab === "inspector" ? "block" : "none";
@@ -362,6 +375,7 @@ function renderPanel() {
   errorsPanel.style.display = state.tab === "errors" ? "block" : "none";
 
   drawer.appendChild(activityPanel);
+  drawer.appendChild(reloadPanel);
   drawer.appendChild(ssePanel);
   drawer.appendChild(inspectorPanel);
   drawer.appendChild(errorsPanel);
@@ -415,6 +429,7 @@ function renderPanel() {
           transitionTraces: state.transitionTraces,
           transitionCoverage: buildTransitionCoverage([]),
           vtEvents: state.vtEvents,
+          templateReloadPlans: state.templateReloadPlans,
         }, null, 2);
         copyText(payload);
         try {
@@ -444,13 +459,51 @@ function renderPanel() {
 
 function renderPanelContent() {
   activityPanel.style.display = state.tab === "activity" ? "block" : "none";
+  reloadPanel.style.display = state.tab === "reload" ? "block" : "none";
   ssePanel.style.display = state.tab === "sse" ? "block" : "none";
   inspectorPanel.style.display = state.tab === "inspector" ? "block" : "none";
   errorsPanel.style.display = state.tab === "errors" ? "block" : "none";
 
   if (state.tab === "activity") renderActivityLog();
+  if (state.tab === "reload") renderTemplateReloadPlans();
   if (state.tab === "sse") renderSseLog();
   if (state.tab === "errors") renderErrorHistory();
+}
+
+function renderTemplateReloadPlans() {
+  reloadPanel.innerHTML = "";
+  if (state.templateReloadPlans.length === 0) {
+    reloadPanel.innerHTML = "<p style='color:#7c8396'>No template reload decisions recorded yet.</p>";
+    return;
+  }
+
+  var controls = document.createElement("div");
+  controls.className = "chirp-dbg-filter";
+  controls.appendChild(createBtn("Clear", function() {
+    state.templateReloadPlans = [];
+    saveTemplateReloadPlans();
+    renderTemplateReloadPlans();
+  }));
+  reloadPanel.appendChild(controls);
+
+  state.templateReloadPlans.forEach(function(plan) {
+    var row = document.createElement("div");
+    row.className = "chirp-dbg-reload-row " + plan.outcome;
+    var color = plan.outcome === "patch" ? COLORS.success : plan.outcome === "diagnose" ? COLORS.error : COLORS.warning;
+    var blocks = [];
+    if (plan.changedBlocks.length) blocks.push("changed: " + plan.changedBlocks.join(", "));
+    if (plan.addedBlocks.length) blocks.push("added: " + plan.addedBlocks.join(", "));
+    if (plan.removedBlocks.length) blocks.push("removed: " + plan.removedBlocks.join(", "));
+    var detail = blocks.length ? "<div class='meta'>" + esc(blocks.join(" · ")) + "</div>" : "";
+    if (plan.targetId) detail += "<div class='meta'>target: #" + esc(plan.targetId) + "</div>";
+    if (plan.errorType) detail += "<div class='meta'>" + esc(plan.errorType) + (plan.errorLine != null ? " line " + plan.errorLine : "") + "</div>";
+    row.innerHTML =
+      "<div><span class='decision' style='color:" + color + "'>" + esc(plan.outcome.toUpperCase()) + "</span> " +
+      "<span class='meta'>revision " + plan.revision + "</span></div>" +
+      "<div>" + esc(plan.templateName || "(unknown template)") + "</div>" +
+      "<div class='meta'>" + esc(plan.reason) + "</div>" + detail;
+    reloadPanel.appendChild(row);
+  });
 }
 
 var filterText = "";

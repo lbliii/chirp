@@ -1,15 +1,16 @@
 # RFC 019: Live-preserving template reload
 
-**Status:** Accepted — offline planner foundation implemented; browser patching
-and continuity canary pending
+**Status:** Accepted — planner decisions are visible in DevTools; browser
+patching and continuity canary pending
 
 **Issue:** [#341](https://github.com/lbliii/chirp/issues/341)
 
 **Last audited:** 2026-07-09
 
-**Shipping impact:** None. The internal planner is not wired into the reload
-channel. This RFC does not change `AppConfig`, CLI behavior, template syntax,
-render semantics, DevTools, or browser reload behavior.
+**Shipping impact:** Debug-only visibility. The internal planner publishes
+redacted decisions through the existing reload channel, then the browser still
+performs its existing full reload. This RFC does not change `AppConfig`, CLI
+behavior, template syntax, render semantics, or production behavior.
 
 ## Summary
 
@@ -173,12 +174,15 @@ foundation:
 - a per-planner lock and monotonic revisions so concurrent edits cannot publish
   duplicate revision IDs.
 
-The planner is intentionally not connected to `dev_browser_reload.py`. The
-existing `reload`/`css` EventStream and full-document reload behavior are
-unchanged. Real nested Kida blocks currently change ancestor hashes too, so
-the planner conservatively selects `reload` when more than one block hash
-changes. Authoritative ancestor pruning, browser DOM evidence, response
-validation, DevTools records, and the five-edit Lucky Cat continuity canary
+`dev_browser_reload.py` now uses one lock-guarded planner to emit a versioned,
+redacted `planner` event before the existing `reload` event. DevTools validates
+and retains the record in tab-scoped session storage so it remains visible
+after the full-document reload. The browser does not act on `patch`; the
+planner receives a fail-closed empty browser surface and therefore cannot
+authorize mutation in this phase. Real nested Kida blocks currently change
+ancestor hashes too, so the planner conservatively selects `reload` when more
+than one block hash changes. Authoritative ancestor pruning, browser DOM
+evidence, response validation, and the five-edit Lucky Cat continuity canary
 remain required before browser patching can ship.
 
 ## Change detection
@@ -330,6 +334,13 @@ The browser panel should also show whether the application signal connection
 remained open across the edit. No rendered context, session key, CSRF token, or
 HTML payload belongs in the trace record.
 
+The implemented observational phase adds a Reload tab and includes
+`templateReloadPlans` in the agent-readable export. Records contain only the
+logical template name, named-block changes, outcome, reason, target identity,
+diagnostic type/line, response-validation flag, and revision. Absolute source
+filenames, rendered HTML, and request context are not serialized. Invalid or
+unknown record shapes are ignored, and the empty tab is safe.
+
 ## Browser proof
 
 The Lucky Cat Playwright canary must perform five valid edits to an eligible
@@ -387,7 +398,7 @@ observable and cannot silently reuse a prior success identifier.
 
 - compile the debug-only logical template inventory — helper implemented;
 - classify real edits as patch, diagnose, or reload — implemented and tested;
-- expose decisions in DevTools while still performing full reload — pending;
+- expose decisions in DevTools while still performing full reload — implemented;
   and
 - measure false patch eligibility against Forum Shell and Lucky Cat — nested
   ancestor-hash fallback recorded; broader measurement pending.
@@ -470,8 +481,8 @@ cannot be safely mutated piecemeal. Pounce process reload remains authoritative.
 
 ## Collateral
 
-No changelog: internal planner foundation only, with no shipped browser
-behavior. Site, example, scaffold, public API, migration, and release
-collateral wait for browser integration.
+DevTools documentation and a changelog fragment record the new debug-only
+planner visibility. Site, example, scaffold, public API, migration, and broader
+release collateral wait for browser mutation.
 
 [issue-341-decision]: https://github.com/lbliii/chirp/issues/341#issuecomment-4929173683
