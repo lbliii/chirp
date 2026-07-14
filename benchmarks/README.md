@@ -153,6 +153,10 @@ greater than one. Compare artifacts only when PostgreSQL, Python, hardware, and
 configuration match. Loopback synthetic results are not production throughput
 claims, and no baseline should be published until repeated runs are stable.
 
+<!-- pelt-controlled-result:start -->
+No controlled Pelt result has been committed yet.
+<!-- pelt-controlled-result:end -->
+
 ## Core Regression Workloads
 
 `python -m benchmarks.core` emits a reproducible JSON artifact with:

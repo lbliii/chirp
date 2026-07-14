@@ -96,6 +96,20 @@ def _python_metadata() -> dict[str, str | bool]:
     }
 
 
+def _processor_name() -> str:
+    """Return useful CPU provenance on hosts where ``platform.processor`` is empty."""
+    processor = platform.processor().strip()
+    if processor:
+        return processor
+    cpuinfo = Path("/proc/cpuinfo")
+    if cpuinfo.is_file():
+        for line in cpuinfo.read_text(encoding="utf-8", errors="replace").splitlines():
+            key, separator, value = line.partition(":")
+            if separator and key.strip() in {"model name", "Hardware"}:
+                return value.strip()
+    return "unknown"
+
+
 def parse_concurrency(value: str) -> tuple[int, ...]:
     """Parse a strictly increasing comma-separated concurrency series."""
     try:
@@ -349,7 +363,7 @@ async def run_pelt_benchmarks(
         "python": _python_metadata(),
         "platform": platform.platform(),
         "machine": platform.machine(),
-        "processor": platform.processor(),
+        "processor": _processor_name(),
         "logical_cpus": os.cpu_count(),
         "postgresql": {"server_version": server_version},
         "packages": {
