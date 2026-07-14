@@ -58,6 +58,90 @@ pounce serve --app myapp:app --config pounce.toml
 This is useful when operations teams want a server-native config file. It does
 not change Chirp's `AppConfig`, route contracts, or template checks.
 
+## Optional Apple Container workflow
+
+Apple Silicon developers on macOS 26 can use
+[Apple Container](https://github.com/apple/container) as an optional local OCI
+runtime for the existing Lucky Cat Dockerfile. This is not a production target,
+an Apple-specific Chirp integration, or a replacement for the documented
+Docker/BuildKit and Railway paths.
+
+The completed compatibility receipt used a MacBook Pro `Mac15,6` with an Apple
+M3 Pro, macOS 26.5.1, Apple Container 1.1.0, and a `linux/arm64/v8` image. After
+installing Apple's signed package, start the runtime and verify it:
+
+```bash
+container --version
+container system start
+container system version --format json
+```
+
+The successful workflow built the committed Dockerfile with four builder CPUs
+and 4 GiB of memory, then ran it with four CPUs and 2 GiB:
+
+```bash
+GIT_REF="$(git rev-parse HEAD)"
+
+container build \
+  --platform linux/arm64 \
+  --cpus 4 \
+  --memory 4G \
+  --build-arg "GIT_REF=${GIT_REF}" \
+  --tag lucky-cat:apple-container \
+  examples/chirpui/lucky_cat
+
+export CHIRP_SECRET_KEY="$(openssl rand -hex 32)"
+
+container run \
+  --detach \
+  --name lucky-cat-apple-container \
+  --platform linux/arm64 \
+  --cpus 4 \
+  --memory 2G \
+  --publish 127.0.0.1:8000:8000 \
+  --env PORT=8000 \
+  --env CHIRP_HOST=0.0.0.0 \
+  --env CHIRP_ENV=production \
+  --env CHIRP_DEBUG=0 \
+  --env CHIRP_LOG_FORMAT=json \
+  --env CHIRP_SECRET_KEY \
+  --env LUCKY_CAT_FEED=sim \
+  lucky-cat:apple-container
+```
+
+Keep `CHIRP_HOST=0.0.0.0`: the runtime's port forward cannot reach a process
+bound to the guest loopback. Publication is still host-local because the
+mapping binds `127.0.0.1:8000`.
+
+Verify the same surfaces exercised by the receipt, then send SIGTERM with the
+tested shutdown deadline:
+
+```bash
+curl --fail --show-error http://127.0.0.1:8000/health
+curl --fail --show-error http://127.0.0.1:8000/ready
+curl --fail --show-error http://127.0.0.1:8000/ \
+  --output /tmp/lucky-cat-home.html
+rg '<html|id="markets-lobby"' /tmp/lucky-cat-home.html
+
+curl --fail --show-error --no-buffer --max-time 10 \
+  --header 'Accept: text/event-stream' \
+  http://127.0.0.1:8000/ft/stream \
+  --output /tmp/lucky-cat-sse.body
+rg '^(event|data):' /tmp/lucky-cat-sse.body
+curl --fail --show-error http://127.0.0.1:8000/ready
+
+container stop --signal SIGTERM --time 15 lucky-cat-apple-container
+```
+
+The SSE curl is expected to stop at its ten-second client deadline after
+writing events. The resource values are repeatable validation settings, not
+production sizing advice. Apple Container does not provide a first-party
+Compose workflow; do not add a third-party shim to Chirp's supported surface.
+See the [full receipt](../audits/apple-container-1.0-validation.md) and the
+[published deployment recipe](https://lbliii.github.io/chirp/docs/quality/deployment/production/#optional-apple-container-workflow-on-macos)
+for the exact digests, GIL-disabled interpreter proof, shutdown evidence, and hosted-CI
+caveat.
+
 ## Preflight Checks
 
 Run both checks in CI or before deployment because they validate different
