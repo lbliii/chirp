@@ -28,6 +28,7 @@ import time
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
+from functools import lru_cache
 from typing import Any, overload
 
 import anyio
@@ -51,6 +52,130 @@ _current_conn: ContextVar[Any] = ContextVar("chirp_db_conn")
 
 # App-level database accessor (set by App during lifespan startup).
 _db_var: ContextVar[Database] = ContextVar("chirp_db")
+
+
+@lru_cache(maxsize=1024)
+def _postgresql_sql(sql: str, param_count: int) -> str:
+    """Translate the facade's portable qmark parameters to PostgreSQL ``$N``.
+
+    Question marks inside quoted strings, identifiers, dollar-quoted bodies,
+    and comments are inert. Native ``$N`` SQL remains accepted when it contains
+    no qmark parameters; mixing both styles is rejected as ambiguous.
+    """
+    parts: list[str] = []
+    qmark_count = 0
+    has_native_params = False
+    index = 0
+    length = len(sql)
+
+    def copy_quoted(quote: str) -> None:
+        nonlocal index
+        parts.append(quote)
+        index += 1
+        while index < length:
+            char = sql[index]
+            parts.append(char)
+            index += 1
+            if char == "\\" and index < length:
+                parts.append(sql[index])
+                index += 1
+                continue
+            if char != quote:
+                continue
+            if index < length and sql[index] == quote:
+                parts.append(sql[index])
+                index += 1
+                continue
+            return
+
+    while index < length:
+        char = sql[index]
+        if char in {"'", '"'}:
+            copy_quoted(char)
+            continue
+
+        if sql.startswith("--", index):
+            end = sql.find("\n", index + 2)
+            if end == -1:
+                parts.append(sql[index:])
+                break
+            parts.append(sql[index : end + 1])
+            index = end + 1
+            continue
+
+        if sql.startswith("/*", index):
+            start = index
+            index += 2
+            depth = 1
+            while index < length and depth:
+                if sql.startswith("/*", index):
+                    depth += 1
+                    index += 2
+                elif sql.startswith("*/", index):
+                    depth -= 1
+                    index += 2
+                else:
+                    index += 1
+            parts.append(sql[start:index])
+            continue
+
+        if char == "$":
+            delimiter_end = index + 1
+            if delimiter_end < length and sql[delimiter_end] == "$":
+                delimiter_end += 1
+            elif delimiter_end < length and (
+                sql[delimiter_end].isalpha() or sql[delimiter_end] == "_"
+            ):
+                delimiter_end += 1
+                while delimiter_end < length and (
+                    sql[delimiter_end].isalnum() or sql[delimiter_end] == "_"
+                ):
+                    delimiter_end += 1
+                if delimiter_end < length and sql[delimiter_end] == "$":
+                    delimiter_end += 1
+                else:
+                    delimiter_end = index
+            else:
+                delimiter_end = index
+
+            if delimiter_end > index:
+                delimiter = sql[index:delimiter_end]
+                close = sql.find(delimiter, delimiter_end)
+                if close == -1:
+                    parts.append(sql[index:])
+                    break
+                close += len(delimiter)
+                parts.append(sql[index:close])
+                index = close
+                continue
+
+            if index + 1 < length and sql[index + 1].isdigit():
+                has_native_params = True
+            parts.append(char)
+            index += 1
+            continue
+
+        if char == "?":
+            qmark_count += 1
+            parts.append(f"${qmark_count}")
+            index += 1
+            continue
+
+        parts.append(char)
+        index += 1
+
+    if qmark_count == 0:
+        return sql
+    if has_native_params:
+        msg = "PostgreSQL query mixes portable '?' and native '$N' parameters"
+        raise ValueError(msg)
+    if qmark_count != param_count:
+        msg = (
+            "PostgreSQL query parameter mismatch: "
+            f"found {qmark_count} portable '?' placeholder(s) for {param_count} value(s)"
+        )
+        raise ValueError(msg)
+    return "".join(parts)
 
 
 def get_db() -> Database:
@@ -721,7 +846,7 @@ async def _execute_fetch_all(
         return [dict(zip(columns, row, strict=True)) for row in rows]
 
     # PostgreSQL (pelt returns Records)
-    rows = await conn.fetch(sql, *params)
+    rows = await conn.fetch(_postgresql_sql(sql, len(params)), *params)
     return [dict(row) for row in rows]
 
 
@@ -737,7 +862,7 @@ async def _execute_fetch_one(
         return dict(zip(columns, row, strict=True))
 
     # PostgreSQL
-    row = await conn.fetchrow(sql, *params)
+    row = await conn.fetchrow(_postgresql_sql(sql, len(params)), *params)
     if row is None:
         return None
     return dict(row)
@@ -763,7 +888,9 @@ async def _execute_stream(
 
     # PostgreSQL — use a transaction cursor for true server-side streaming
     async with conn.transaction():
-        async for row in conn.cursor(sql, *params, prefetch=batch_size):
+        async for row in conn.cursor(
+            _postgresql_sql(sql, len(params)), *params, prefetch=batch_size
+        ):
             yield dict(row)
 
 
@@ -778,7 +905,13 @@ async def _execute_many(
         return cursor.rowcount
 
     # PostgreSQL — pelt's executemany returns None, count manually
-    await conn.executemany(sql, params_seq)
+    if not params_seq:
+        return 0
+    param_count = len(params_seq[0])
+    if any(len(params) != param_count for params in params_seq):
+        msg = "PostgreSQL execute_many parameter rows must all have the same length"
+        raise ValueError(msg)
+    await conn.executemany(_postgresql_sql(sql, param_count), params_seq)
     return len(params_seq)
 
 
@@ -788,7 +921,7 @@ async def _execute_statement(driver: str, conn: Any, sql: str, params: tuple[Any
         return cursor.rowcount
 
     # PostgreSQL
-    result = await conn.execute(sql, *params)
+    result = await conn.execute(_postgresql_sql(sql, len(params)), *params)
     # PostgreSQL returns "INSERT 0 1" style command tags
     parts = result.split()
     if len(parts) >= 3:
