@@ -1,10 +1,12 @@
 """Tests for chirp.data — typed async database access."""
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 import pytest
 
 from chirp.data import Database, DataError, Notification, get_db, migrate
+from chirp.data import database as db_mod
 from chirp.data._mapping import map_row, map_rows
 from chirp.data.errors import MigrationError, QueryError
 
@@ -77,6 +79,109 @@ class TestDriverDetection:
     def test_unsupported_url_raises(self) -> None:
         with pytest.raises(DataError, match="Unsupported database URL scheme"):
             Database("mysql://localhost/db")
+
+
+class TestPostgreSQLParameters:
+    @pytest.mark.issue(755)
+    def test_translates_qmarks_and_skips_inert_sql(self) -> None:
+        sql = """SELECT '?', "?", $$?$$, $body$?$body$, value
+        FROM things
+        /* ? /* nested ? */ ? */
+        WHERE first = ? -- ?
+          AND second = ?"""
+
+        translated = db_mod._postgresql_sql(sql, 2)
+
+        assert "WHERE first = $1 -- ?" in translated
+        assert "AND second = $2" in translated
+        assert "SELECT '?', \"?\", $$?$$, $body$?$body$" in translated
+
+    @pytest.mark.issue(755)
+    def test_preserves_native_postgresql_parameters(self) -> None:
+        sql = "SELECT * FROM things WHERE first = $1 AND second = $2"
+        assert db_mod._postgresql_sql(sql, 2) == sql
+
+    @pytest.mark.issue(755)
+    def test_rejects_mismatched_qmark_count(self) -> None:
+        with pytest.raises(ValueError, match=r"found 1.*for 2"):
+            db_mod._postgresql_sql("SELECT * FROM things WHERE id = ?", 2)
+
+    @pytest.mark.issue(755)
+    def test_rejects_mixed_parameter_styles(self) -> None:
+        with pytest.raises(ValueError, match="mixes portable"):
+            db_mod._postgresql_sql("SELECT * FROM things WHERE a = ? AND b = $2", 2)
+
+    @pytest.mark.issue(755)
+    def test_rejects_unbound_qmark(self) -> None:
+        with pytest.raises(ValueError, match=r"found 1.*for 0"):
+            db_mod._postgresql_sql("SELECT * FROM things WHERE id = ?", 0)
+
+    @pytest.mark.issue(755)
+    async def test_all_postgresql_dispatch_paths_translate_qmarks(self) -> None:
+        class _Transaction:
+            async def __aenter__(self) -> None:
+                return None
+
+            async def __aexit__(self, *args: object) -> None:
+                return None
+
+        class _Connection:
+            def __init__(self) -> None:
+                self.sql: list[str] = []
+
+            async def fetch(self, sql: str, *params: object) -> list[dict[str, object]]:
+                self.sql.append(sql)
+                return [{"value": params[0]}]
+
+            async def fetchrow(self, sql: str, *params: object) -> dict[str, object]:
+                self.sql.append(sql)
+                return {"value": params[0]}
+
+            async def execute(self, sql: str, *params: object) -> str:
+                self.sql.append(sql)
+                return "UPDATE 0 1"
+
+            async def executemany(self, sql: str, params_seq: object) -> None:
+                self.sql.append(sql)
+
+            def transaction(self) -> _Transaction:
+                return _Transaction()
+
+            def cursor(
+                self, sql: str, *params: object, prefetch: int
+            ) -> AsyncIterator[dict[str, object]]:
+                self.sql.append(sql)
+
+                async def rows() -> AsyncIterator[dict[str, object]]:
+                    yield {"value": params[0]}
+
+                return rows()
+
+        connection = _Connection()
+        query = "SELECT value FROM things WHERE value = ?"
+        await db_mod._execute_fetch_all("postgresql", connection, query, (1,))
+        await db_mod._execute_fetch_one("postgresql", connection, query, (2,))
+        await db_mod._execute_statement(
+            "postgresql", connection, "UPDATE things SET value = ?", (3,)
+        )
+        await db_mod._execute_many(
+            "postgresql", connection, "INSERT INTO things (value) VALUES (?)", [(4,), (5,)]
+        )
+        rows = [
+            row
+            async for row in db_mod._execute_stream(
+                "postgresql", connection, query, (6,), batch_size=10
+            )
+        ]
+
+        assert rows == [{"value": 6}]
+        assert connection.sql == [
+            "SELECT value FROM things WHERE value = $1",
+            "SELECT value FROM things WHERE value = $1",
+            "UPDATE things SET value = $1",
+            "INSERT INTO things (value) VALUES ($1)",
+            "SELECT value FROM things WHERE value = $1",
+        ]
 
 
 # =============================================================================
