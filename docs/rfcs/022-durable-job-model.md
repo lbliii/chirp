@@ -1,18 +1,22 @@
 # RFC 022: Durable job model
 
-**Status:** Accepted — Phase 1 private store implemented
+**Status:** Accepted — Phase 1 implemented; Phase 2/3 boundaries approved
 
 **Issue:** [#615](https://github.com/lbliii/chirp/issues/615)
 
+**Decision:** [#719](https://github.com/lbliii/chirp/issues/719)
+
 **Parent saga:** [#614](https://github.com/lbliii/chirp/issues/614)
 
-**Last audited:** 2026-07-10
+**Last audited:** 2026-07-14
 
-**Shipping impact:** Private data surface only. Issue #677 adds a private
-Postgres store, three internal tables through a package-shipped migration, and
-live database proof. It does not add a public API, runtime executor, AppConfig
-field, CLI command, contract category, severity change, scheduler,
-cancellation protocol, or non-Postgres backend.
+**Shipping impact:** Private data surface plus an approved decision record.
+Issue #677 adds a private Postgres store, three internal tables through a
+package-shipped migration, and live database proof. Issue #719 freezes the
+provisional definition, contract, lifecycle, progress, and backend boundaries
+for later implementation. Neither issue adds a public API, runtime executor,
+AppConfig field, CLI command, contract finding, scheduler, cancellation
+protocol, or non-Postgres backend.
 
 ## Summary
 
@@ -38,9 +42,10 @@ application deployment and uses the database for durability and coordination;
 it does not require Redis or a separate worker service.
 
 Phase 1 records its private Python names, module placement, SQL schema, and
-bounded store defaults below. Public registration, contract categories,
-lifecycle wiring, executor behavior, and compatibility status remain later
-implementation-review decisions.
+bounded store defaults below. The #719 decision records the minimum provisional
+definition, contract, lifecycle, and compatibility semantics that Phase 2 and
+Phase 3 may implement. Exact Python names and public promotion remain separate
+implementation and graduation reviews.
 
 ## Current implementation audit
 
@@ -119,10 +124,12 @@ drains shutdown hooks before disconnecting the database. Separate worker
 startup and shutdown hooks are registered during setup and invoked by Pounce
 worker lifecycle messages.
 
-Those hooks are possible executor seams, not an approved integration. Starting
-one poller per process, per Pounce worker, or per queue has different capacity
-and shutdown behavior. The implementation must choose one model explicitly and
-prove it under Python 3.14t instead of inferring ownership from hook names.
+Those hooks are possible executor seams, but #719 assigns executor ownership to
+the application lifespan. One app instance may start exactly one executor after
+database readiness and app freeze. Pounce worker hooks must not start a second
+poller for that app instance. Each deployment process may host its own app
+instance and executor; PostgreSQL, not process-local bookkeeping, still owns
+global queue capacity. Phase 3 must prove that ownership under Python 3.14t.
 
 ### Contract/compiler boundary
 
@@ -131,10 +138,11 @@ contains registries and compiler facts required by current checks, but no job
 definitions. `app.check()` therefore cannot currently verify a job handler,
 payload type, queue, retry policy, or migration.
 
-A future job-definition registry belongs to setup/freeze. Runtime enqueue must
-reference a frozen definition by stable identity; it must not register handlers
-after freeze. Adding snapshot fields, compiler records, or a new error category
-requires its own contract design review.
+The provisional job-definition registry belongs to setup/freeze. Runtime
+enqueue must reference a frozen definition by stable identity; it must not
+register handlers after freeze. Phase 2 may add the approved frozen snapshot
+and provisional `jobs` category described below, but exact Python names and any
+stable promotion still require implementation review.
 
 ### Progress is not HTML streaming
 
@@ -167,6 +175,124 @@ Postgres-first store and the following boundaries:
 The first slice explicitly excludes a scheduler, cancellation, arbitrary object
 serialization, SQLite or another backend, a top-level stable export, a new
 AppConfig field, and a workflow JSON API.
+
+## Approved Phase 2 and Phase 3 boundaries
+
+Issue #719 approves semantic shapes rather than stable Python spellings. Phase
+2 and Phase 3 remain provisional until the product proof and graduation review
+in Phase 4. In particular, no top-level export or `AppConfig` field is approved.
+
+### Definition, registration, and enqueue
+
+A provisional definition is a frozen, slotted setup-time value containing:
+
+- a stable definition identity;
+- one authoritative typed payload contract and explicit schema version;
+- queue, priority, retry/backoff, and queue-concurrency policy;
+- one asynchronous handler reference held only in the frozen registry; and
+- the bounds needed to compile and validate those values before runtime.
+
+Registration occurs only during setup. App freeze publishes one immutable
+registry snapshot for contract checks, enqueue validation, and executor reads.
+Duplicate identities fail setup, post-freeze mutation fails loud, and concurrent
+reads require no mutable shared registry state.
+
+Enqueue accepts a registered definition identity and a value validated against
+that definition's payload contract. It snapshots canonical JSON, the explicit
+payload schema version, and execution policy into the existing Postgres store.
+It does not accept arbitrary objects, unregistered dynamic handlers, or a second
+hand-maintained schema document.
+
+Payload compatibility is exact and fail-loud for this epic. Unknown definition
+identities, unsupported stored schema versions, and malformed decoded payloads
+are deterministic non-retryable failures. Upcasters and implicit imports of old
+Python classes are not approved. A future RFC may add an explicit evolution
+mechanism without changing existing durable rows by accident.
+
+### Failure, retention, and progress
+
+Handler failures use the retry policy snapshotted on the job. Definition lookup,
+schema-version, payload-decoding, and framework validation failures do not
+retry. Persisted failure metadata is limited to a stable safe code and bounded,
+redacted summary; raw tracebacks, exception arguments, payloads, credentials,
+and request state remain excluded.
+
+Succeeded and failed rows, including non-null idempotency keys, remain retained
+for this epic. It does not add purge, replay, archival, retention scheduling, or
+automatic idempotency-key recycling. Those operations need a later policy and
+operator-surface review.
+
+The provisional progress document retains the Phase 1 shape:
+
+```text
+status: required bounded string
+step: non-negative integer, default 0
+total: non-negative integer, default 0
+```
+
+`total == 0` means the total is unknown. When `total > 0`, `step` must not exceed
+`total`. This remains advisory, replaceable, revisioned, and lease-fenced. It is
+not coupled to a Milo package version and does not drive lifecycle transitions.
+
+### Executor ownership and free-threading
+
+The application lifespan owns exactly one executor per app instance. It starts
+only after database connection, migration readiness, setup, and app freeze.
+Pounce lifecycle hooks must not multiply pollers for the same instance. Local
+concurrency is bounded independently from the database-coordinated global queue
+limit.
+
+Shutdown stops new claims, drains active handlers for a bounded interval, and
+then stops renewal so unfinished work becomes reclaimable by lease expiry. The
+executor does not disconnect the shared database. Registry state stays frozen;
+mutable claim, heartbeat, and shutdown bookkeeping uses explicit async
+coordination rather than relying on the GIL. Handler tasks begin with isolated
+`ContextVar` state and never inherit an HTTP request, session, or response.
+
+### Contract and migration policy
+
+Phase 2 may add a provisional `jobs` contract category with these defaults:
+
+- **error:** duplicate or malformed definitions, missing statically referenced
+  handlers, invalid payload contracts or policy bounds, and a configured
+  Postgres job store without the checked-in migration declaration;
+- **warning:** a dynamic definition reference that static analysis cannot prove;
+  and
+- **runtime startup error:** missing or incompatible live database tables or
+  schema version.
+
+`app.check()` inspects frozen declarations and compiler facts. It does not scan
+production queue rows, connect solely to inspect a live schema, guess dynamic
+identities, or claim that a handler is idempotent.
+
+Durable-job schema ownership remains with deterministic, package-shipped,
+reviewable migrations applied through Chirp's existing migration workflow. The
+store, registry, contracts, and executor never issue DDL or repair a deployment.
+
+### Backend boundary
+
+SQLite parity is rejected for epic #615, not merely deferred within its phases.
+SQLite lacks the proven `SKIP LOCKED`, lease, and multi-instance concurrency
+semantics that define this Postgres-backed contract. A later RFC may consider a
+dev-only or single-box SQLite adapter, but it must document weaker semantics and
+must not claim parity with this backend.
+
+### Decision matrix and proof ownership
+
+| Concern | Approved boundary | Required implementation proof | Owner and collateral |
+| --- | --- | --- | --- |
+| Crash recovery | At-least-once reclaim consumes an attempt and receives a new owner/token. | Kill an executor after claim and after an external side effect; prove reclaim, stale-owner fencing, completion, and the documented duplicate-effect risk. | Phase 3 native child; executor operations guidance and safe metrics. |
+| Idempotency | The existing queue-scoped key and retained-row semantics remain authoritative; no automatic recycling. | Concurrent equal keys retain one identity; null keys remain distinct; terminal rows keep their key. | #720 for validated enqueue wiring; existing live-Postgres store tests remain the persistence proof. |
+| Retries | Deterministic definition/payload failures do not retry; handler failures use snapshotted policy. | Exhaustion, database-clock backoff, malformed stored versions, redacted failure metadata, and crash-consumed attempts. | #720 for definition/payload classification; Phase 3 child for handler execution. |
+| Malformed definitions | Setup/freeze rejects duplicates, invalid identities, payload contracts, and policy bounds. | Fail-loud setup and `app.check()` cases, mounted composition, post-freeze mutation rejection, and actionable subjects. | #720; provisional API inventory, contract documentation, focused example, and changelog for implemented behavior. |
+| Lifecycle and free-threading | One app-lifespan executor per app instance; frozen registry and explicit async coordination. | Python 3.14t stress for concurrent reads, claims, heartbeat isolation, ContextVar isolation, bounded drain, and deterministic shutdown. | Phase 3 native child; lifecycle and operations documentation. |
+| Optional dependencies | Job imports and HTML-only apps neither connect to PostgreSQL nor create job state. | Import isolation, app startup without job configuration, and missing-domain failure only when job behavior is requested. | #720 and Phase 3 child; explicit no-impact result for core HTML docs/examples. |
+| SQLite gaps | No SQLite parity in #615; a later adapter must admit weaker semantics. | No SQLite implementation or parity claim is required to graduate this epic. Any future adapter begins with a separate RFC and semantic-gap tests. | Parent #615 scope reconciliation; no current public collateral. |
+| Migration ownership | Package-shipped reviewed SQL through the existing migration workflow; no runtime DDL. | Deterministic migration, declaration diagnostics, missing/incompatible live-schema startup failure, and a scan proving runtime paths issue no DDL. | Existing Phase 1 migration plus #720 contract proof; migration and operations docs move only with implementation. |
+
+The decision record itself changes no runtime behavior. Acceptance #719 is
+therefore `n/a (decision-only RFC and parent-scope reconciliation)`; behavioral
+traceability belongs to the implementation children named in the matrix.
 
 ## Terminology
 
@@ -216,9 +342,9 @@ universal-operation RFC: Python type annotations and one shared constraint
 vocabulary are authoritative. The implementation must not ask authors to keep
 a dataclass, a JSON Schema document, and a database declaration synchronized.
 
-An illustrative definition may eventually name one frozen/slotted dataclass or
-an equivalent typed callable input. This RFC does not approve the decorator,
-method, or import path.
+A provisional definition names one frozen/slotted dataclass or equivalent typed
+callable input. The exact decorator, method, module, and import path remain for
+the Phase 2 implementation review; #719 approves no stable spelling.
 
 The compiled definition needs at least:
 
@@ -236,10 +362,10 @@ reject unsupported values before insertion. Decoding must validate the stored
 version and constraints before invoking the handler.
 
 Payload schema evolution cannot rely on importing an old Python class by
-accident. A later implementation review must choose either explicit upcasters,
-versioned handler identities, or a fail-loud compatibility policy. Unknown
-definitions and undecodable payloads are deterministic failures, not transient
-errors to retry forever.
+accident. This epic uses exact stored schema-version compatibility and fails
+loud on a mismatch. Unknown definitions and undecodable payloads are
+deterministic failures, not transient errors to retry forever. Upcasters remain
+future RFC work.
 
 ## Persistent lifecycle
 
@@ -281,10 +407,10 @@ Reclaiming expired work creates a new attempt and lease token. It need not pass
 through an externally observable fifth state. There is no `cancelled` state in
 the first slice.
 
-`failed` is the initial dead-letter surface. The first implementation should
-retain failed records for operator inspection rather than copying payloads to a
-second queue. Replay, purge, archival, and retention policy require later
-decisions.
+`failed` is the initial dead-letter surface. This epic retains failed records
+for operator inspection rather than copying payloads to a second queue. Replay,
+purge, archival, retention policy, and automatic idempotency-key recycling are
+not part of the epic.
 
 ### Atomic claim
 
@@ -330,10 +456,11 @@ A crashed executor does not write a retry transition. Its `running` lease
 expires and the next claimant increments the attempt. Crash recovery therefore
 consumes attempt budget like any other invocation.
 
-The first implementation should distinguish deterministic definition/payload
-errors from transient handler failures so poison jobs do not consume repeated
-leases. Exact exception classification and default backoff values are open
-public-contract decisions.
+Deterministic definition lookup, schema-version, payload-decoding, and framework
+validation failures enter `failed` without retry. Handler failures follow the
+retry policy snapshotted at enqueue until attempts are exhausted. Exact public
+exception types and provisional policy spellings remain Phase 2 implementation
+details.
 
 Failure persistence must be bounded and public-safe. Raw tracebacks, exception
 arguments, request bodies, credentials, or payload copies do not belong in the
@@ -380,11 +507,11 @@ step: non-negative integer
 total: non-negative integer
 ```
 
-This RFC does not decide whether all three fields are required, what zero
-means, or which relationships between `step` and `total` are valid. Whatever
-schema is approved must keep updates JSON-safe, bounded, revisioned, and fenced
-by the active lease token. Consumers may miss intermediate updates and should
-treat the latest snapshot as authoritative.
+`status` is required and bounded; `step` and `total` default to zero and remain
+non-negative. Zero `total` means unknown. When `total` is positive, `step` must
+not exceed it. Updates stay JSON-safe, bounded, revisioned, and fenced by the
+active lease token. Consumers may miss intermediate updates and should treat
+the latest snapshot as authoritative.
 
 Progress does not drive retries, completion, lease renewal, or cancellation.
 An executor may renew a lease without changing progress, and a handler may
@@ -419,10 +546,10 @@ shared mutable bookkeeping, deterministic shutdown tests, and ContextVar
 isolation. A handler must not inherit an HTTP `Request`, session, or response
 context from its enqueuing route.
 
-Whether polling belongs to app lifespan, Pounce worker lifecycle, or a
-dedicated executor component is unresolved. The answer must prevent duplicate
-poller multiplication from accidentally exceeding configured local
-concurrency.
+Polling belongs to the app lifespan, with exactly one executor per app instance.
+Pounce worker hooks must not start an additional poller for that instance.
+Separate app instances may each poll because PostgreSQL owns cross-instance
+claims and global queue capacity.
 
 ## Contract checks
 
@@ -442,9 +569,10 @@ Static checks cannot inspect every row in a production queue or prove that a
 handler is idempotent. Runtime store startup should fail clearly when required
 tables or migration versions are absent; it must not repair them.
 
-The category names, severity policy, compiler/snapshot fields, and migration
-proof mechanism require a separate contracts check-in. This RFC does not add or
-change any `app.check()` output.
+Phase 2 may implement the provisional `jobs` category and severity policy
+approved above. The compiler/snapshot field names and diagnostic wording remain
+implementation-review details. This RFC itself does not add or change any
+`app.check()` output.
 
 ## Security and data handling
 
@@ -499,14 +627,15 @@ the first job slice through that dependency.
 
 ### Phase 2: frozen definitions and contracts
 
-- approve setup registration and enqueue shape;
+- implement the approved provisional setup registration and enqueue semantics;
 - compile immutable definition snapshots at freeze;
-- add explicitly reviewed contract category/severity behavior; and
+- add the approved provisional `jobs` category/severity behavior; and
 - prove missing-handler and migration failures through `app.check()`.
 
 ### Phase 3: in-process executor
 
-- approve lifecycle ownership and bounded local concurrency;
+- implement one app-lifespan executor per app instance with bounded local
+  concurrency;
 - run typed handlers with heartbeat and graceful drain;
 - prove free-threaded and multi-instance recovery; and
 - provide operational metrics without payload leakage.
@@ -519,8 +648,9 @@ the first job slice through that dependency.
 - benchmark claim throughput and publish honest graduation guidance before
   recommending the store beyond measured bounds.
 
-SQLite parity, schedules, cross-instance live fan-out, MCP Task cancellation,
-and any public stable API remain separate work.
+SQLite parity is outside epic #615. Schedules, cross-instance live fan-out, MCP
+Task cancellation, retention/replay, and any public stable API remain separate
+work.
 
 ## Required proof before shipping
 
@@ -576,42 +706,40 @@ instances or hide an incomplete deployment.
 Rejected for the first slice. The approved product proof is app plus Postgres.
 Graduation guidance may recommend other infrastructure after measured limits.
 
-### SQLite semantic parity in the first slice
+### SQLite semantic parity in epic #615
 
 Rejected. `SKIP LOCKED`, lease/concurrency behavior, and multi-instance claims
-need a Postgres-first proof before a second backend can claim the same contract.
+define the Postgres-backed contract and do not have proven equivalent SQLite
+semantics. A later RFC may consider a weaker dev-only or single-box adapter, but
+it must not claim parity.
 
 ### One table as a workflow engine
 
 Rejected. There are no DAGs, child workflows, compensation, scheduler,
 cancellation state, arbitrary result documents, or workflow JSON API.
 
-## Open questions requiring later maintainer check-in
+## Deferred decisions requiring later maintainer check-in
 
-These decisions touch Stop And Ask surfaces and are not approved by this RFC:
+Issue #719 deliberately leaves these Stop And Ask surfaces unresolved:
 
-1. What public/provisional registration and enqueue form expresses definitions
-   without turning the private Phase 1 records into a compatibility promise?
-2. Does executor ownership attach to app lifespan, Pounce worker lifecycle, or
-   a separate component?
-3. What payload constraint compiler and version/upcast policy are authoritative?
-4. Which handler failures are non-retryable, and what bounded failure metadata
-   is safe to persist by default?
-5. How long do succeeded/failed jobs and idempotency keys remain retained, and
-   who owns purge or manual replay?
-6. What future `app.check()` categories, subjects, severity, and migration
-   evidence make missing definitions/tables actionable without scanning live
-   production rows?
-7. Is `status`/`step`/`total` the long-term public progress schema, and how is
-    compatibility with future Milo Progress versions reviewed without making
-    durable-job semantics depend on a particular Milo revision?
+1. Exact provisional Python names, decorator or method spellings, and module
+   placement for Phase 2.
+2. Exact public exception types, retry-policy spelling, and executor tuning
+   defaults for their implementation reviews.
+3. Retention duration, purge, replay, archival, and idempotency-key expiration.
+4. Upcasters or another payload-evolution mechanism beyond exact version
+   compatibility.
+5. Stable promotion, top-level exports, AppConfig integration, and compatibility
+   tier after Phase 4 product proof.
+6. Any SQLite adapter, which requires its own RFC and an explicit weaker-semantics
+   contract.
 
 ## Non-goals
 
 - public stable job types or top-level exports;
 - AppConfig job fields;
 - automatic schema mutation;
-- SQLite or generic backend protocols in the first slice;
+- SQLite or generic backend protocols in epic #615;
 - exactly-once execution;
 - Redis, Celery, Kafka, or a separate worker fleet requirement;
 - scheduling or cron;
@@ -632,5 +760,14 @@ and Python 3.14t gate both exercise the store. No site example, scaffold, CLI,
 contract category, benchmark claim, executor guidance, or generated site output
 moves because Phase 1 is private and does not execute handlers. SQLite
 documentation continues to make no durable-job parity claim.
+
+## Decision collateral
+
+Issue #719 updates only this RFC and the live #615 parent scope. It adds no
+runtime behavior, public API, contract finding, example, scaffold, benchmark,
+generated site output, or changelog fragment. Phase 2 issue #720 owns the
+provisional definitions and contract collateral. A separate native Phase 3
+child must own executor implementation and lifecycle proof before that work
+begins.
 
 [issue-615-decision]: https://github.com/lbliii/chirp/issues/615#issuecomment-4929195371
