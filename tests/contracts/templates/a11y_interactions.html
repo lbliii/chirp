@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Accessibility interaction evidence</title>
+    <style>
+      #motion-target { animation: evidence-pulse 2s linear; }
+      @keyframes evidence-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) {
+        #motion-target { animation-duration: 0.001s; }
+      }
+    </style>
+  </head>
+  <body>
+    <input id="focus-probe" aria-label="Focus probe">
+
+    <section aria-labelledby="focus-heading">
+      <h1 id="focus-heading">Focus continuity</h1>
+      <div id="good-focus-target">
+        <button id="good-focus-control" type="button" onclick="goodFocusSwap()">Good swap</button>
+      </div>
+      <div id="bad-focus-target">
+        <button id="bad-focus-control" type="button" onclick="badFocusSwap()">Broken swap</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="live-heading">
+      <h2 id="live-heading">Live regions</h2>
+      <div id="good-live-region" role="status" aria-live="polite"><span>Ready</span></div>
+      <div id="bad-live-region" role="status" aria-live="polite"><span>Ready</span></div>
+    </section>
+
+    <section aria-labelledby="dialog-heading">
+      <h2 id="dialog-heading">Dialog and popover</h2>
+      <button id="good-dialog-open" type="button" onclick="document.getElementById('good-dialog').showModal()">Open dialog</button>
+      <dialog id="good-dialog" aria-labelledby="good-dialog-title" closedby="any">
+        <h3 id="good-dialog-title">Good dialog</h3>
+        <form method="dialog"><button id="good-dialog-close" autofocus>Close</button></form>
+      </dialog>
+
+      <button id="bad-dialog-open" type="button" onclick="document.getElementById('bad-dialog').hidden = false">Open broken dialog</button>
+      <div id="bad-dialog" role="dialog" aria-label="Broken dialog" hidden>
+        <button type="button">Unmanaged control</button>
+      </div>
+
+      <button id="popover-open" type="button" popovertarget="auto-popover">Open popover</button>
+      <div id="auto-popover" popover>Automatic popover</div>
+    </section>
+
+    <section aria-labelledby="motion-heading">
+      <h2 id="motion-heading">Reduced motion</h2>
+      <div id="motion-target">Motion target</div>
+    </section>
+
+    <script>
+      function goodFocusSwap() {
+        document.getElementById('good-focus-target').outerHTML = '<div id="good-focus-target"><button id="good-focus-control" type="button" onclick="goodFocusSwap()">Good swap</button></div>';
+        document.getElementById('good-focus-control').focus();
+      }
+      function badFocusSwap() {
+        document.getElementById('bad-focus-target').outerHTML = '<div id="bad-focus-target"><p>Control removed</p></div>';
+      }
+      function goodLiveUpdate() {
+        document.querySelector('#good-live-region span').textContent = 'Updated';
+      }
+      function badLiveUpdate() {
+        document.getElementById('bad-live-region').outerHTML = '<div id="bad-live-region"><span>Updated without policy</span></div>';
+      }
+      function runMotionUpdate() {
+        document.getElementById('motion-target').textContent = 'Updated';
+      }
+    </script>
+  </body>
+</html>

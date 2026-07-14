@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "issue": 686,
+  "fixture": "tests/contracts/templates/a11y_interactions.html",
+  "browser_proof": "tests/contracts/test_accessibility_interactions_browser.py",
+  "families": {
+    "focus_continuity": {
+      "decision": "revise",
+      "control": "stable-id handoff retains focus",
+      "intentional_failure": "outer replacement detaches the active control and leaves body focused",
+      "known_false_negative": "the five current literal a11y checks do not observe post-swap activeElement",
+      "false_positive_boundary": "ordinary request-bearing elements cannot all require a focus declaration",
+      "next_gate": "compile and validate explicit declarations before considering missing-declaration warnings"
+    },
+    "live_region": {
+      "decision": "accept",
+      "control": "an inner update preserves both focus and the standard ARIA policy",
+      "intentional_failure": "an outer replacement silently removes role and aria-live",
+      "known_false_negative": "current checks do not connect unattended producers to preserved target attributes",
+      "false_positive_boundary": "high-frequency visual state and user-initiated swaps must not be announced universally",
+      "next_gate": "link only proven unattended producers to standard ARIA target policy"
+    },
+    "dialog_popover": {
+      "decision": "revise",
+      "control": "native modal focus entry, Escape close, focus return, and automatic popover dismissal",
+      "intentional_failure": "a custom role=dialog neither receives focus nor closes on Escape",
+      "known_false_negative": "literal naming checks cannot prove focus containment or return",
+      "false_positive_boundary": "automatic popovers are non-modal and must not be required to trap focus",
+      "next_gate": "separate native modal, custom modal, automatic popover, and manual popover policies"
+    },
+    "reduced_motion": {
+      "decision": "no-go",
+      "control": "reduced motion changes computed animation duration without changing final focus",
+      "intentional_failure": "none; motion preference is not itself an interaction-contract violation",
+      "known_false_negative": "static template scans cannot prove computed media-query behavior",
+      "false_positive_boundary": "the absence of animation is valid and focus policy must be motion-independent",
+      "next_gate": "retain browser equivalence proof; do not add a standalone app.check category"
+    }
+  },
+  "canaries": {
+    "lucky_cat": {
+      "root": "examples/chirpui/lucky_cat/pages",
+      "existing_a11y_findings": 0,
+      "candidate_counts": {
+        "focus_request_tags": 22,
+        "live_update_markers": 11,
+        "live_policy_markers": 11,
+        "dialogs": 1,
+        "popovers": 0,
+        "reduced_motion_markers": 1
+      },
+      "classification": "candidate-rich; blanket missing-policy rules would be noisy, declared-only graph checks remain viable"
+    },
+    "forum_shell": {
+      "root": "examples/chirpui/forum_shell/pages",
+      "existing_a11y_findings": 0,
+      "candidate_counts": {
+        "focus_request_tags": 1,
+        "live_update_markers": 0,
+        "live_policy_markers": 0,
+        "dialogs": 0,
+        "popovers": 0,
+        "reduced_motion_markers": 0
+      },
+      "classification": "focus canary only; insufficient diversity to justify live, dialog, popover, or motion defaults"
+    }
+  }
+}

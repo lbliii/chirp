@@ -1,6 +1,6 @@
 # RFC 017: Accessibility Contracts For Dynamic Interaction Paths
 
-**Status:** Proposed — research and severity proposal only; no new checks, CLI flags, or defaults ship with this RFC
+**Status:** Evidence phase complete — family decisions recorded; no new checks, CLI flags, or defaults ship
 **Issue:** [#346](https://github.com/lbliii/chirp/issues/346)
 **Parent:** [#335](https://github.com/lbliii/chirp/issues/335)
 **Related:** RFC 008, RFC 013, RFC 015, #347
@@ -340,6 +340,28 @@ Every implementation step needs the repository's explicit check-in before
 changing a severity/default, CLI shape, template contract, compiler record, or
 runtime focus helper.
 
+### 11.1 Issue #686 evidence receipt
+
+The evidence fixture and browser assertions now live at
+`tests/contracts/templates/a11y_interactions.html` and
+`tests/contracts/test_accessibility_interactions_browser.py`. The raw,
+machine-checked canary counts and false-result boundaries live in
+`tests/contracts/a11y_interaction_evidence.json`.
+
+| Family | Decision | Evidence boundary |
+| --- | --- | --- |
+| focus continuity | revise | Stable-ID handoff is browser-provable, but requiring declarations on every request-bearing element would be noisy. Start with invalid explicit declarations only. |
+| live regions | accept | Standard ARIA policy survives inner updates and can be lost by outer replacement. Limit the future graph rule to proven unattended producers. |
+| dialog and popover | revise | Native modal behavior and automatic popover dismissal are sound controls; custom modals and manual popovers need separate policies. |
+| reduced motion | no-go | Motion preference changes computed animation without changing the focus result. Keep browser equivalence proof; do not create a standalone contract category. |
+
+After stripping Kida comments, the Lucky Cat canary contains 22 request-bearing
+tags, 11 live-update markers, 11 live-policy markers, one native dialog, and one
+reduced-motion marker. Forum Shell contains one request-bearing tag and none of
+the other candidate families. Existing `a11y_*` findings remain zero on both.
+These receipts reject blanket missing-policy diagnostics and retain a path for
+narrow declared-only or proven-producer checks in separately reviewed children.
+
 ## 12. Success criteria mapping
 
 | #346 criterion | RFC disposition |
@@ -367,4 +389,5 @@ This document changes no public API, CLI, `AppConfig`, template behavior,
 contract category, severity, runtime helper, dependency, example, or generated
 site output.
 
-No changelog: proposed RFC only; user-visible behavior has not changed.
+No changelog: the evidence phase adds fixtures and a decision receipt only;
+user-visible behavior has not changed.

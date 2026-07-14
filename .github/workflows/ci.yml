@@ -144,6 +144,7 @@ jobs:
           examples/standalone/webmcp_form/test_browser_smoke.py
           tests/contracts/test_query_devtools_browser.py
           tests/contracts/test_query_cors_browser.py
+          tests/contracts/test_accessibility_interactions_browser.py
           -q --tb=short --timeout=120 -m "not slow"
 
   # Real-wire RFC 10008 interoperability proof (issue #532). The main job
