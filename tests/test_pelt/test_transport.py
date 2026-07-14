@@ -64,7 +64,12 @@ async def test_pgstream_receive_into_buffer():
 async def test_negotiate_tls_require_accepts_ssl(monkeypatch: pytest.MonkeyPatch):
     raw = _ScriptedStream([_transport._SSL_OK])
 
-    async def _passthrough_tls(stream: object, ctx: object) -> object:
+    async def _passthrough_tls(
+        stream: object,
+        ctx: object,
+        *,
+        hostname: str | None = None,
+    ) -> object:
         return stream
 
     monkeypatch.setattr(_transport, "_upgrade_to_tls", _passthrough_tls)
@@ -73,6 +78,58 @@ async def test_negotiate_tls_require_accepts_ssl(monkeypatch: pytest.MonkeyPatch
     out = await _transport.negotiate_tls(stream, config)
     assert out.stream is raw
     assert raw._sent[0] == _transport._SSL_REQUEST
+
+
+@pytest.mark.issue(753)
+@pytest.mark.anyio
+async def test_upgrade_to_tls_explicitly_uses_client_mode(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    raw = _ScriptedStream([])
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    captured: dict[str, object] = {}
+
+    async def _capture_wrap(stream: object, **kwargs: object) -> object:
+        captured.update(kwargs)
+        return stream
+
+    monkeypatch.setattr(_transport.TLSStream, "wrap", _capture_wrap)
+
+    out = await _transport._upgrade_to_tls(raw, context)
+
+    assert out is raw
+    assert captured == {
+        "server_side": False,
+        "hostname": None,
+        "ssl_context": context,
+    }
+
+
+@pytest.mark.issue(753)
+@pytest.mark.anyio
+async def test_negotiate_tls_verify_full_passes_postgres_hostname(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    raw = _ScriptedStream([_transport._SSL_OK])
+    captured: dict[str, object] = {}
+
+    async def _capture_tls(
+        stream: object,
+        ctx: object,
+        *,
+        hostname: str | None = None,
+    ) -> object:
+        captured["hostname"] = hostname
+        return stream
+
+    monkeypatch.setattr(_transport, "_upgrade_to_tls", _capture_tls)
+    stream = _transport.PGStream(stream=raw)
+    config = ConnectionConfig(host="postgres.railway.internal", user="u", ssl="verify-full")
+
+    out = await _transport.negotiate_tls(stream, config)
+
+    assert out.stream is raw
+    assert captured["hostname"] == "postgres.railway.internal"
 
 
 @pytest.mark.issue(326)
