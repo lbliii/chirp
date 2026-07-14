@@ -1,9 +1,10 @@
 """Tests for dead template detection in check_hypermedia_surface."""
 
 import pytest
-from kida import Environment, FileSystemLoader
+from kida import ChoiceLoader, Environment, FileSystemLoader
 
 from chirp import App, Page
+from chirp.app.state import ContractCheckSnapshot
 from chirp.config import AppConfig
 from chirp.contracts import (
     CheckResult,
@@ -12,6 +13,7 @@ from chirp.contracts import (
     Severity,
     check_hypermedia_surface,
     contract,
+    rules_chirpui_css_verify,
 )
 
 
@@ -208,3 +210,110 @@ async def home():
         result = check_hypermedia_surface(module.app)
         dead = _user_dead(result)
         assert len(dead) == 0
+
+    @pytest.mark.issue(707)
+    @pytest.mark.parametrize(
+        ("referenced_name", "canonical_name"),
+        [
+            ("partials/x.html", "partials/x.html"),
+            ("templates/partials/x.html", "templates/partials/x.html"),
+        ],
+    )
+    def test_nested_choice_loader_scans_aliases_once_and_preserves_custom_snapshot(
+        self,
+        tmp_path,
+        monkeypatch: pytest.MonkeyPatch,
+        referenced_name: str,
+        canonical_name: str,
+    ) -> None:
+        nested = tmp_path / "templates" / "partials"
+        nested.mkdir(parents=True)
+        (nested / "x.html").write_text(
+            '{% block content %}<div class="chirpui-alias-typo">x</div>{% endblock %}',
+            encoding="utf-8",
+        )
+        env = Environment(
+            loader=ChoiceLoader(
+                [FileSystemLoader(tmp_path), FileSystemLoader(tmp_path / "templates")]
+            )
+        )
+        app = App(AppConfig(skip_contract_checks=True, template_dir=str(tmp_path)), kida_env=env)
+        app.set_contract_check_data("chirpui_components", frozenset({"card.html"}))
+        monkeypatch.setattr(
+            rules_chirpui_css_verify,
+            "_known_chirpui_css_classes",
+            lambda: frozenset({"chirpui-known"}),
+        )
+        custom_names: set[str] = set()
+
+        def capture_snapshot(snapshot: ContractCheckSnapshot, result: CheckResult) -> None:
+            custom_names.update(snapshot.template_sources)
+
+        app.register_contract_check(capture_snapshot)
+
+        @app.route("/")
+        @contract(returns=FragmentContract(referenced_name, "content"))
+        async def home():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+        css_issues = [issue for issue in result.issues if issue.category == "chirpui_css_verify"]
+
+        assert _user_dead(result) == []
+        assert result.templates_scanned == 1
+        assert len(css_issues) == 1
+        assert css_issues[0].template == canonical_name
+        assert css_issues[0].details is not None
+        assert "partials/x.html" in css_issues[0].details
+        assert "templates/partials/x.html" in css_issues[0].details
+        assert custom_names == {"partials/x.html", "templates/partials/x.html"}
+
+    @pytest.mark.issue(707)
+    def test_declared_template_alias_normalizes_before_dead_comparison(self, tmp_path) -> None:
+        nested = tmp_path / "templates" / "partials"
+        nested.mkdir(parents=True)
+        (nested / "x.html").write_text(
+            "{% block content %}declared{% endblock %}", encoding="utf-8"
+        )
+        env = Environment(
+            loader=ChoiceLoader(
+                [FileSystemLoader(tmp_path), FileSystemLoader(tmp_path / "templates")]
+            )
+        )
+        app = App(AppConfig(skip_contract_checks=True, template_dir=str(tmp_path)), kida_env=env)
+        app.declare_template("templates/partials/x.html", blocks=("content",))
+
+        @app.route("/")
+        async def home():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+
+        assert _user_dead(result) == []
+        assert result.templates_scanned == 1
+
+    @pytest.mark.issue(707)
+    def test_template_reference_alias_normalizes_before_dead_comparison(self, tmp_path) -> None:
+        nested = tmp_path / "templates" / "partials"
+        nested.mkdir(parents=True)
+        (nested / "x.html").write_text("<div>included</div>", encoding="utf-8")
+        (tmp_path / "index.html").write_text(
+            '{% block content %}{% include "templates/partials/x.html" %}{% endblock %}',
+            encoding="utf-8",
+        )
+        env = Environment(
+            loader=ChoiceLoader(
+                [FileSystemLoader(tmp_path), FileSystemLoader(tmp_path / "templates")]
+            )
+        )
+        app = App(AppConfig(skip_contract_checks=True, template_dir=str(tmp_path)), kida_env=env)
+
+        @app.route("/")
+        @contract(returns=FragmentContract("index.html", "content"))
+        async def home():
+            return "ok"
+
+        result = check_hypermedia_surface(app)
+
+        assert _user_dead(result) == []
+        assert result.templates_scanned == 2

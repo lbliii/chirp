@@ -1,0 +1,1 @@
+Contract scans now canonicalize filesystem template aliases by physical source, preventing duplicate CSS diagnostics and false dead-template warnings while retaining every logical alias in diagnostic details.
