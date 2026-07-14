@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${PG_CONTAINER_ID:?set PG_CONTAINER_ID to the PostgreSQL service container id}"
+: "${PELT_TLS_DIR:?set PELT_TLS_DIR to a writable certificate output directory}"
+
+umask 077
+mkdir -p "${PELT_TLS_DIR}"
+
+openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
+  -keyout "${PELT_TLS_DIR}/ca.key" \
+  -out "${PELT_TLS_DIR}/ca.crt" \
+  -subj "/CN=Chirp Pelt Test CA"
+
+openssl req -newkey rsa:2048 -sha256 -nodes \
+  -keyout "${PELT_TLS_DIR}/server.key" \
+  -out "${PELT_TLS_DIR}/server.csr" \
+  -subj "/CN=localhost" \
+  -addext "subjectAltName=DNS:localhost"
+
+openssl x509 -req -sha256 -days 1 \
+  -in "${PELT_TLS_DIR}/server.csr" \
+  -CA "${PELT_TLS_DIR}/ca.crt" \
+  -CAkey "${PELT_TLS_DIR}/ca.key" \
+  -CAcreateserial \
+  -copy_extensions copy \
+  -out "${PELT_TLS_DIR}/server.crt"
+
+openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
+  -keyout "${PELT_TLS_DIR}/bad-ca.key" \
+  -out "${PELT_TLS_DIR}/bad-ca.crt" \
+  -subj "/CN=Untrusted Chirp Pelt Test CA"
+
+docker exec -i -u postgres "${PG_CONTAINER_ID}" \
+  psql --dbname chirp_test --set ON_ERROR_STOP=1 <<'SQL'
+SET password_encryption = 'scram-sha-256';
+ALTER ROLE chirp PASSWORD 'chirp';
+DO $body$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'pelt_password') THEN
+        CREATE ROLE pelt_password LOGIN PASSWORD 'pelt-password';
+    ELSE
+        ALTER ROLE pelt_password PASSWORD 'pelt-password';
+    END IF;
+END
+$body$;
+GRANT CONNECT ON DATABASE chirp_test TO pelt_password;
+SQL
+
+cat >"${PELT_TLS_DIR}/pg_hba.prefix" <<'HBA'
+hostssl all chirp         0.0.0.0/0 scram-sha-256
+hostssl all chirp         ::0/0      scram-sha-256
+hostnossl all chirp       0.0.0.0/0 scram-sha-256
+hostnossl all chirp       ::0/0      scram-sha-256
+hostssl all pelt_password 0.0.0.0/0 password
+hostssl all pelt_password ::0/0      password
+hostnossl all pelt_password 0.0.0.0/0 password
+hostnossl all pelt_password ::0/0      password
+HBA
+
+pgdata="$(docker exec "${PG_CONTAINER_ID}" printenv PGDATA)"
+docker cp "${PELT_TLS_DIR}/server.crt" "${PG_CONTAINER_ID}:/tmp/pelt-server.crt"
+docker cp "${PELT_TLS_DIR}/server.key" "${PG_CONTAINER_ID}:/tmp/pelt-server.key"
+docker cp "${PELT_TLS_DIR}/pg_hba.prefix" "${PG_CONTAINER_ID}:/tmp/pelt-pg-hba.prefix"
+
+docker exec "${PG_CONTAINER_ID}" sh -eu -c '
+  pgdata="$1"
+  cp /tmp/pelt-server.crt "${pgdata}/server.crt"
+  cp /tmp/pelt-server.key "${pgdata}/server.key"
+  chown postgres:postgres "${pgdata}/server.crt" "${pgdata}/server.key"
+  chmod 600 "${pgdata}/server.key"
+  cp "${pgdata}/pg_hba.conf" "${pgdata}/pg_hba.original"
+  cat /tmp/pelt-pg-hba.prefix "${pgdata}/pg_hba.original" >"${pgdata}/pg_hba.conf"
+  {
+    echo "ssl = on"
+    echo "ssl_cert_file = '\''server.crt'\''"
+    echo "ssl_key_file = '\''server.key'\''"
+  } >>"${pgdata}/postgresql.conf"
+' _ "${pgdata}"
+
+docker restart "${PG_CONTAINER_ID}" >/dev/null
+for _attempt in $(seq 1 30); do
+  if docker exec "${PG_CONTAINER_ID}" pg_isready --username chirp --dbname chirp_test; then
+    exit 0
+  fi
+  sleep 1
+done
+
+docker logs "${PG_CONTAINER_ID}"
+exit 1

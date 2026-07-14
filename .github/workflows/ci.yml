@@ -249,13 +249,24 @@ jobs:
       - name: Install dependencies (with PostgreSQL driver)
         run: uv sync --no-sources --group dev --extra data-pg
 
+      - name: Configure generated PostgreSQL TLS and auth fixture
+        env:
+          PG_CONTAINER_ID: ${{ job.services.postgres.id }}
+          PELT_TLS_DIR: ${{ runner.temp }}/pelt-tls
+        run: scripts/setup-pelt-postgres-tls
+
       - name: PostgreSQL round-trip tests
         env:
           CHIRP_TEST_PG_DSN: postgresql://chirp:chirp@localhost:5432/chirp_test
+          CHIRP_TEST_PG_TLS_DSN: postgresql://chirp:chirp@localhost:5432/chirp_test
+          CHIRP_TEST_PG_PASSWORD_DSN: postgresql://pelt_password:pelt-password@localhost:5432/chirp_test
+          CHIRP_TEST_PG_TLS_CA: ${{ runner.temp }}/pelt-tls/ca.crt
+          CHIRP_TEST_PG_BAD_TLS_CA: ${{ runner.temp }}/pelt-tls/bad-ca.crt
         run: >-
           uv run pytest
           tests/test_schema_introspect.py
           tests/test_pelt/test_connection_integration.py
+          tests/test_pelt/test_tls_auth_integration.py
           tests/test_jobs_postgres.py
           -q --tb=short --timeout=60
 

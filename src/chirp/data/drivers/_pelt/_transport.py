@@ -130,15 +130,29 @@ def _ssl_context_for(config: ConnectionConfig) -> ssl.SSLContext | None:
     if mode in ("verify-ca", "verify-full"):
         ctx.check_hostname = mode == "verify-full"
         ctx.verify_mode = ssl.CERT_REQUIRED
+        if config.sslrootcert is not None:
+            try:
+                ctx.load_verify_locations(cafile=config.sslrootcert)
+            except (OSError, ssl.SSLError) as exc:
+                msg = f"could not load TLS CA file {config.sslrootcert!r}: {exc}"
+                raise TLSError(
+                    msg,
+                    hint="Set sslrootcert to a readable PEM CA certificate.",
+                ) from exc
     else:
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
     return ctx
 
 
-async def _upgrade_to_tls(stream: ByteStream, ctx: ssl.SSLContext) -> ByteStream:
+async def _upgrade_to_tls(
+    stream: ByteStream,
+    ctx: ssl.SSLContext,
+    *,
+    hostname: str | None,
+) -> ByteStream:
     """Wrap a connected stream in TLS (extracted for testability)."""
-    tls = await TLSStream.wrap(stream, ssl_context=ctx)
+    tls = await TLSStream.wrap(stream, hostname=hostname, ssl_context=ctx)
     return tls
 
 
@@ -180,32 +194,40 @@ async def negotiate_tls(stream: PGStream, config: ConnectionConfig) -> PGStream:
         msg = "internal error: missing SSL context for TLS negotiation"
         raise TLSError(msg)
 
+    async def _upgrade() -> PGStream:
+        hostname = None if _is_unix_host(config.host) else config.host
+        try:
+            tls_stream = await _upgrade_to_tls(stream.stream, ctx, hostname=hostname)
+        except (ssl.SSLError, OSError, ValueError, anyio.BrokenResourceError, EndOfStream) as exc:
+            msg = f"TLS handshake failed for {config.host}:{config.port} (sslmode={mode}): {exc}"
+            raise TLSError(
+                msg,
+                hint="Verify sslmode, sslrootcert, the server certificate, and hostname.",
+            ) from exc
+        return PGStream(stream=tls_stream, recv=stream.recv)
+
     if mode == "require":
         if not await _request_ssl():
             msg = "server refused SSL connection (sslmode=require)"
             raise TLSError(msg)
-        tls_stream = await _upgrade_to_tls(stream.stream, ctx)
-        return PGStream(stream=tls_stream, recv=stream.recv)
+        return await _upgrade()
 
     if mode in ("verify-ca", "verify-full"):
         if not await _request_ssl():
             msg = f"server refused SSL connection (sslmode={mode})"
             raise TLSError(msg)
-        tls_stream = await _upgrade_to_tls(stream.stream, ctx)
-        return PGStream(stream=tls_stream, recv=stream.recv)
+        return await _upgrade()
 
     if mode == "allow":
         if await _request_ssl():
-            tls_stream = await _upgrade_to_tls(stream.stream, ctx)
-            return PGStream(stream=tls_stream, recv=stream.recv)
+            return await _upgrade()
         return stream
 
     if mode == "prefer":
         # libpq "prefer": try non-SSL first; Postgres expects SSLRequest before startup when
         # encryption is wanted, so attempt SSL and fall back to cleartext on refusal.
         if await _request_ssl():
-            tls_stream = await _upgrade_to_tls(stream.stream, ctx)
-            return PGStream(stream=tls_stream, recv=stream.recv)
+            return await _upgrade()
         return stream
 
     msg = f"unsupported sslmode: {mode!r}"
@@ -268,12 +290,24 @@ async def _drive_until_ready(
 async def connect_session(config: ConnectionConfig) -> PGSession:
     """Connect, negotiate TLS, run startup + auth, and return a ready session."""
     stream = await open_stream(config)
-    stream = await negotiate_tls(stream, config)
-    protocol = SimpleQueryProtocol()
-    database = config.database or config.user
-    startup = protocol.send_startup(user=config.user, database=database)
-    await stream.send(startup)
-    return await _drive_until_ready(stream, protocol, user=config.user, password=config.password)
+    connected = False
+    try:
+        stream = await negotiate_tls(stream, config)
+        protocol = SimpleQueryProtocol()
+        database = config.database or config.user
+        startup = protocol.send_startup(user=config.user, database=database)
+        await stream.send(startup)
+        session = await _drive_until_ready(
+            stream,
+            protocol,
+            user=config.user,
+            password=config.password,
+        )
+        connected = True
+        return session
+    finally:
+        if not connected:
+            await stream.stream.aclose()
 
 
 def build_cancel_request(*, pid: int, secret_key: int) -> bytes:

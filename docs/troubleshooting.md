@@ -52,6 +52,25 @@ SSL mode. Verify the server TLS configuration, CA/certificate paths, hostname,
 and requested SSL mode. Do not work around certificate failures by silently
 weakening production verification.
 
+Pelt accepts libpq-style `sslmode` and `sslrootcert` DSN parameters:
+
+```text
+postgresql://user:password@db.example/app?sslmode=verify-full&sslrootcert=/etc/app/ca.crt
+```
+
+- `verify-full` requires a trusted chain and a certificate matching the DSN
+  hostname.
+- `verify-ca` requires the trusted chain but does not compare the hostname.
+- `require` encrypts without certificate verification.
+- `prefer` asks for TLS and falls back only when PostgreSQL refuses SSL before
+  the handshake. It does not reconnect in cleartext after a failed handshake.
+- `disable` uses a cleartext transport.
+
+An unreadable or malformed `sslrootcert` reports the path and asks for a
+readable PEM CA. A bad chain or hostname reports `PELT_TLS_FAILED` with the
+original TLS exception chained. SCRAM-SHA-256 authentication is supported after
+TLS, but SCRAM channel binding (`SCRAM-SHA-256-PLUS`) is not.
+
 ## PELT_PG_ERROR
 
 The server returned a PostgreSQL `ErrorResponse` without a usable SQLSTATE.

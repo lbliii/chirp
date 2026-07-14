@@ -28,6 +28,7 @@ class ConnectionConfig:
     user: str = ""
     password: str = ""
     ssl: str = "prefer"
+    sslrootcert: str | None = None
     connect_timeout: float = 30.0
 
     SSL_MODES: ClassVar[frozenset[str]] = _SSL_MODES
@@ -69,6 +70,7 @@ class ConnectionConfig:
 
         query = parse_qs(parts.query)
         ssl = query.get("sslmode", ["prefer"])[0]
+        sslrootcert = query.get("sslrootcert", [None])[0]
         connect_timeout = float(query.get("connect_timeout", ["30"])[0])
 
         return cls(
@@ -78,6 +80,7 @@ class ConnectionConfig:
             user=unquote(parts.username) if parts.username else "",
             password=unquote(parts.password) if parts.password else "",
             ssl=ssl,
+            sslrootcert=sslrootcert,
             connect_timeout=connect_timeout,
         )
 

@@ -1,7 +1,8 @@
 # Pelt protocol conformance
 
 Status: live result-format and dynamic-type coverage completed by issue #695;
-broader extraction conformance remains in progress under issue #260.
+TLS and authentication coverage completed by issue #691; broader extraction
+conformance remains in progress under issue #260.
 
 This map separates Pelt behavior proven against a live PostgreSQL server from
 sans-I/O protocol/unit proof and work that remains missing. A unit wire vector is
@@ -11,7 +12,8 @@ valuable, but it is not a substitute for server negotiation and round trips.
 
 | Area | Live PostgreSQL proof | Sans-I/O or unit proof | Status |
 | --- | --- | --- | --- |
-| Authentication | Every `test-postgres` lane connects with a password | `tests/test_pelt/test_auth.py`, `tests/test_pelt/test_transport_handshake.py` | Live password handshake covered; dedicated TLS/channel-binding matrix remains open |
+| Authentication | `test_live_scram_and_password_authentication` proves explicit `scram-sha-256` and `password` HBA rules; `test_live_bad_credentials_are_actionable` proves SQLSTATE `28P01` | `tests/test_pelt/test_auth.py`, `tests/test_pelt/test_transport_handshake.py` | Covered on PostgreSQL 13–18; SCRAM channel binding is explicitly excluded |
+| TLS modes | `test_live_sslmode_matrix` proves `verify-full`, `verify-ca`, `require`, `prefer`, and `disable`; dedicated failures prove bad CA and hostname diagnostics | `tests/test_pelt/test_transport.py` locks SSLRequest refusal, hostname input, explicit CA loading, and cleanup | Covered on PostgreSQL 13–18 with generated one-day certificates |
 | Prepared statements | `test_parallel_checkouts_keep_statement_caches_single_owner` and `test_live_extended_query_negotiates_dynamic_types_and_text_fallback` prove cache reuse with per-execution formats | `tests/test_pelt/test_protocol_extended.py` locks mixed `Bind` result codes | Covered |
 | Leaf codecs | `test_live_leaf_codec_matrix` covers text results; the dynamic-type test covers mixed text/binary results | Per-family `tests/test_pelt/test_codecs*.py` modules | Covered for simple-query text and extended-query negotiated formats |
 | Arrays and ranges | `test_live_array_and_range_types_preserve_text_when_binary_is_not_requested` proves simple-query text; the dynamic-type test proves binary enum arrays and a server-assigned custom range | Binary and malformed vectors in `test_codecs_array.py`, `test_codecs_composite_range_enum.py`, `test_codec_plan.py`, and `test_type_discovery.py` | Covered |
@@ -22,8 +24,10 @@ valuable, but it is not a substitute for server negotiation and round trips.
 | LISTEN/NOTIFY | `test_listen_notify_delivery_unsubscribe_and_close` covers delivery, ordinary queries on a listening connection, multi-channel unsubscribe, and close | Notification framing and protocol events | Covered |
 
 The live tests run through `tests/test_pelt/test_connection_integration.py` with
-`CHIRP_TEST_PG_DSN`. CI's `test-postgres` matrix is the authoritative receipt;
-local runs without a DSN skip these cases rather than simulating success.
+`CHIRP_TEST_PG_DSN` and `tests/test_pelt/test_tls_auth_integration.py` with the
+dedicated TLS fixture variables. CI's `test-postgres` matrix is the
+authoritative receipt; local runs without those inputs skip these cases rather
+than simulating success.
 
 ## Honest boundaries
 
@@ -51,6 +55,16 @@ local runs without a DSN skip these cases rather than simulating success.
 - A listening connection still has exactly one socket reader. Ordinary query,
   LISTEN, and UNLISTEN round trips temporarily take exclusive read ownership;
   the notification reader resumes afterward while subscriptions remain.
+- `verify-ca` validates the server chain against system roots or the DSN's
+  `sslrootcert`; `verify-full` adds hostname verification. `require` and
+  `prefer` encrypt without certificate verification, while `disable` remains
+  cleartext. `prefer` falls back only when PostgreSQL refuses SSL before the
+  handshake; Pelt does not reconnect after a failed TLS handshake.
+- Pelt supports PostgreSQL cleartext password, MD5, and SCRAM-SHA-256 exchanges.
+  SCRAM channel binding (`SCRAM-SHA-256-PLUS`) is not implemented and remains
+  outside the supported boundary.
+- A failed TLS negotiation or authentication closes its stream, and partial
+  pool construction closes every connection that already succeeded.
 
 PostgreSQL's protocol reference defines the `Bind` result-format count and codes,
 and notes that statement-level `Describe` always reports format zero:
