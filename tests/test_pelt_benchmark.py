@@ -19,6 +19,12 @@ _CI_PATH = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.y
 _BENCHMARKS_CI_PATH = (
     Path(__file__).resolve().parents[1] / ".github" / "workflows" / "benchmarks.yml"
 )
+_CONTROLLED_RESULT_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "benchmarks"
+    / "results"
+    / "pelt-controlled-2026-07-14-cpython-3.14.2t-linux-x86_64.json"
+)
 _SPEC = importlib.util.spec_from_file_location("benchmarks.pelt", _PELT_PATH)
 assert _SPEC is not None
 assert _SPEC.loader is not None
@@ -206,3 +212,24 @@ def test_controlled_pelt_ci_pins_environment_and_uploads_raw_evidence() -> None:
     assert "--concurrency 1,2,4,8" in workflow
     assert "benchmark-artifacts/pelt-controlled.json" in workflow
     assert "actions/upload-artifact@v7" in workflow
+
+
+@pytest.mark.issue(692)
+def test_committed_controlled_pelt_result_is_complete_and_generates_readme() -> None:
+    report = json.loads(_CONTROLLED_RESULT_PATH.read_text(encoding="utf-8"))
+    readme = (_CONTROLLED_RESULT_PATH.parent.parent / "README.md").read_text(encoding="utf-8")
+    artifact_link = f"results/{_CONTROLLED_RESULT_PATH.name}"
+    generated = _CONTROLLED.render_controlled_result(report, artifact_link=artifact_link)
+
+    assert report["schema_version"] == 1
+    assert report["suite"] == "pelt-controlled-free-threaded"
+    assert report["source"]["dirty"] is False
+    assert report["environment"]["python"]["free_threaded"] is True
+    assert report["environment"]["processor"] != "x86_64"
+    assert report["accounting"] == {"attempted": 5, "succeeded": 5, "failed": 0}
+    assert len(report["attempts"]) == 5
+    assert all(attempt["ok"] for attempt in report["attempts"])
+    assert {item["concurrency"] for item in report["summary"]["aggregate_queries"]} == {1, 2, 4, 8}
+    assert (
+        f"{_CONTROLLED.README_RESULT_START}\n{generated}\n{_CONTROLLED.README_RESULT_END}"
+    ) in readme

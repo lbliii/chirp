@@ -154,7 +154,22 @@ configuration match. Loopback synthetic results are not production throughput
 claims, and no baseline should be published until repeated runs are stable.
 
 <!-- pelt-controlled-result:start -->
-No controlled Pelt result has been committed yet.
+### Committed controlled result
+
+Captured 2026-07-14 on x86_64 (AMD EPYC 7763 64-Core Processor) with CPython 3.14.2 (GIL disabled) and PostgreSQL 18.1 (Debian 18.1-1.pgdg12+2) from `postgres:18.1-bookworm`. 5 of 5 attempts succeeded. [Full artifact](results/pelt-controlled-2026-07-14-cpython-3.14.2t-linux-x86_64.json).
+
+Reproduce from the repository root: `CHIRP_BENCH_PG_DSN=postgresql://chirp:chirp@localhost:5432/chirp_bench uv run --python 3.14.2t python -m benchmarks.pelt_controlled --repetitions 5 --concurrency 1,2,4,8 --queries 1000 --warmup 10 --stream-rows 10000 --stream-batch-size 100 --bulk-rows 500 --postgresql-image postgres:18.1-bookworm --output benchmarks/results/pelt-controlled-2026-07-14-cpython-3.14.2t-linux-x86_64.json`
+
+| Connections | Median queries/s | QPS CV | Median speedup vs 1 | Speedup CV |
+|---:|---:|---:|---:|---:|
+| 1 | 3666.2 | 0.027 | 1.000x | 0.000 |
+| 2 | 5555.7 | 0.043 | 1.519x | 0.022 |
+| 4 | 6358.7 | 0.102 | 1.734x | 0.087 |
+| 8 | 7240.4 | 0.050 | 1.976x | 0.051 |
+
+Observed aggregate prepared-query throughput changed from 3666.2 queries/s at one connection to 7240.4 queries/s at 8 connections (1.976x median).
+
+The separate single ordered stream measured 96639.6 rows/s median (CV 0.042); the sequential `executemany` loop measured 4171.1 rows/s median (CV 0.038). Neither boundary is a pool-scaling result. This loopback evidence is not a production-capacity claim.
 <!-- pelt-controlled-result:end -->
 
 ## Core Regression Workloads

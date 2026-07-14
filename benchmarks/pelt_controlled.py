@@ -219,12 +219,15 @@ def render_controlled_result(report: dict[str, Any], *, artifact_link: str) -> s
     gil_mode = "GIL disabled" if python["free_threaded"] else "GIL enabled"
     concurrency_arg = ",".join(str(value) for value in config["concurrency"])
     command = (
+        "CHIRP_BENCH_PG_DSN=postgresql://chirp:chirp@localhost:5432/chirp_bench "
         "uv run --python 3.14.2t python -m benchmarks.pelt_controlled "
         f"--repetitions {config['repetitions']} --concurrency {concurrency_arg} "
         f"--queries {config['queries_per_level']} --warmup {config['warmup_per_connection']} "
         f"--stream-rows {config['stream_rows']} "
         f"--stream-batch-size {config['stream_batch_size']} "
-        f"--bulk-rows {config['bulk_rows']} --output benchmarks/{artifact_link}"
+        f"--bulk-rows {config['bulk_rows']} "
+        f"--postgresql-image {config['postgresql_image']} "
+        f"--output benchmarks/{artifact_link}"
     )
     lines = [
         "### Committed controlled result",
