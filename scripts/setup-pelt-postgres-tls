@@ -10,12 +10,18 @@ mkdir -p "${PELT_TLS_DIR}"
 openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
   -keyout "${PELT_TLS_DIR}/ca.key" \
   -out "${PELT_TLS_DIR}/ca.crt" \
-  -subj "/CN=Chirp Pelt Test CA"
+  -subj "/CN=Chirp Pelt Test CA" \
+  -addext "basicConstraints=critical,CA:TRUE" \
+  -addext "keyUsage=critical,keyCertSign,cRLSign" \
+  -addext "subjectKeyIdentifier=hash"
 
 openssl req -newkey rsa:2048 -sha256 -nodes \
   -keyout "${PELT_TLS_DIR}/server.key" \
   -out "${PELT_TLS_DIR}/server.csr" \
   -subj "/CN=localhost" \
+  -addext "basicConstraints=critical,CA:FALSE" \
+  -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+  -addext "extendedKeyUsage=serverAuth" \
   -addext "subjectAltName=DNS:localhost"
 
 openssl x509 -req -sha256 -days 1 \
@@ -29,7 +35,10 @@ openssl x509 -req -sha256 -days 1 \
 openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
   -keyout "${PELT_TLS_DIR}/bad-ca.key" \
   -out "${PELT_TLS_DIR}/bad-ca.crt" \
-  -subj "/CN=Untrusted Chirp Pelt Test CA"
+  -subj "/CN=Untrusted Chirp Pelt Test CA" \
+  -addext "basicConstraints=critical,CA:TRUE" \
+  -addext "keyUsage=critical,keyCertSign,cRLSign" \
+  -addext "subjectKeyIdentifier=hash"
 
 docker exec -i -u postgres "${PG_CONTAINER_ID}" \
   psql --username chirp --dbname chirp_test --set ON_ERROR_STOP=1 <<'SQL'

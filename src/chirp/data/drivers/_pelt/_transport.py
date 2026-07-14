@@ -25,6 +25,7 @@ from chirp.data.drivers._pelt import _auth
 from chirp.data.drivers._pelt._protocol import (
     AuthRequestEvent,
     BackendKeyDataEvent,
+    ErrorEvent,
     ParameterStatusEvent,
     ProtocolEvent,
     ProtocolState,
@@ -263,6 +264,8 @@ async def _drive_until_ready(
             elif isinstance(event, BackendKeyDataEvent):
                 backend_pid = event.pid
                 backend_secret = event.secret_key
+            elif isinstance(event, ErrorEvent):
+                raise event.error
 
     while protocol.state is not ProtocolState.READY:
         await _handle(protocol.receive_bytes(b""))
