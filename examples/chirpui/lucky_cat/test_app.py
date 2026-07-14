@@ -57,6 +57,15 @@ class TestContracts:
     def test_app_check_passes(self, example_app) -> None:
         example_app.check()
 
+    @pytest.mark.issue(723)
+    def test_enhancement_contracts_remain_declared_only(self, example_app) -> None:
+        """No ChirpUI default silently opts the canary into enhancement tiers."""
+        example_app.freeze()
+        program = example_app._runtime_state.hypermedia_program
+        assert program is not None
+        assert program.enhancements == ()
+        assert program.enhancement_edges == ()
+
 
 class TestHealth:
     """Container liveness and readiness probes."""

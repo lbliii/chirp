@@ -39,3 +39,18 @@ def test_enhancement_tier_rfc_preserves_constitutional_gates() -> None:
     assert "separate implementation check-ins" in text
     assert "No private Kida parser import or source-regex compatibility shim" in text
     assert "runtime must never substitute an empty block" in text
+
+
+@pytest.mark.issue(723)
+def test_enhancement_tier_rfc_records_the_evidence_decisions() -> None:
+    text = _RFC.read_text(encoding="utf-8")
+
+    for decision in (
+        "`fallback_declared` is false",
+        "Edge is preserved with `resolved=False`",
+        "**No-go now**",
+        "**Revise**",
+        "no implicit ChirpUI defaults",
+        "explicit severity check-in",
+    ):
+        assert decision in text
