@@ -44,9 +44,9 @@ class TestSmoke:
 """
 
 SSE_APP_PY = """\
-from chirp import App, EventStream, Fragment, Request, Template
+from chirp import App, AppConfig, EventStream, Fragment, Request, Template
 
-app = App()
+app = App(AppConfig.from_env(worker_mode="async"))
 
 
 @app.route("/")
@@ -60,6 +60,10 @@ async def stream(request: Request) -> EventStream:
         yield Fragment("index.html", "stream_block", text="Hello from SSE!")
 
     return EventStream(events())
+
+
+if __name__ == "__main__":
+    app.run()
 """
 
 SSE_INDEX_HTML = """\

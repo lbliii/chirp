@@ -46,27 +46,24 @@ CHIRP_ALLOWED_HOSTS=forum.example.com,healthcheck.railway.app
 
 ## Start Command
 
-Use the app's normal entrypoint and let Chirp launch Pounce in production mode:
+Generated projects include `railway.json`, which selects Railpack and starts the
+app through its normal entrypoint so Chirp launches Pounce in production mode:
 
 ```bash
-uv run python app.py
+python app.py
 ```
 
-The app entrypoint should call `app.run()` only under `if __name__ == "__main__"`.
+For local development outside Railpack, use `uv run python app.py`. The app
+entrypoint should call `app.run()` only under `if __name__ == "__main__"`.
 
 ## Healthcheck
 
-Add a cheap unauthenticated endpoint:
-
-```python
-@app.route("/health")
-def health():
-    return "ok"
-```
-
-Configure Railway's healthcheck path to `/health`. Railway only promotes the new
-deployment after this endpoint returns `200`; it does not use the healthcheck
-for continuous monitoring.
+Chirp auto-mounts `/health` for liveness and `/ready` for startup and dependency
+readiness. Generated `railway.json` configures Railway's healthcheck path to
+`/ready`, so a deployment is not promoted until startup completes and every
+registered `HealthCheck` passes. Applications do not need to hand-write a probe
+route. Railway uses this check during deployment promotion, not as continuous
+monitoring.
 
 ## Database Migrations
 

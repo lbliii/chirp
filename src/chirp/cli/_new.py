@@ -21,6 +21,7 @@ from chirp.cli.templates import (
     MINIMAL_APP_PY,
     MINIMAL_INDEX_HTML,
     PYPROJECT_TOML,
+    RAILWAY_JSON,
     SHELL_APP_PY,
     SHELL_CONTEXT_PY,
     SHELL_ITEMS_LAYOUT_HTML,
@@ -79,6 +80,7 @@ def _write_scaffold_extras(project_dir: Path, name: str) -> None:
         PYPROJECT_TOML.format(name=name),
         encoding="utf-8",
     )
+    (project_dir / "railway.json").write_text(RAILWAY_JSON, encoding="utf-8")
     mig = project_dir / "migrations"
     mig.mkdir(exist_ok=True)
     (mig / ".gitkeep").write_text("", encoding="utf-8")

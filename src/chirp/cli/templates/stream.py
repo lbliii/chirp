@@ -26,7 +26,13 @@ from chirp import (
 )
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
-app = App(AppConfig(template_dir=TEMPLATES_DIR, worker_mode="async", sse_close_event="close"))
+app = App(
+    AppConfig.from_env(
+        template_dir=TEMPLATES_DIR,
+        worker_mode="async",
+        sse_close_event="close",
+    )
+)
 TOKEN_DELAY = float(os.environ.get("STREAM_DELAY", "0.04"))
 
 
