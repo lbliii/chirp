@@ -1,3 +1,10 @@
+## [0.10.2] — 2026-07-14
+
+### Fixed
+
+- The `Database` facade now translates its portable `?` parameters to PostgreSQL `$N` parameters across reads, writes, batches, and streams, so migrations and normal parameterized queries work with the Pelt backend. ([#755](https://github.com/lbliii/chirp/issues/755))
+
+
 ## [0.10.1] — 2026-07-14
 
 ### Fixed
