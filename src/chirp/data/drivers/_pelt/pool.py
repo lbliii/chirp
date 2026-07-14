@@ -56,12 +56,17 @@ async def create_pool(config: PoolConfig) -> Pool:
     """Create a bounded pool of authenticated PostgreSQL connections."""
     size = max(1, config.max_size)
     connections: list[Connection] = []
-    for _ in range(size):
-        conn = await Connection.connect(
-            config.connection,
-            statement_cache_size=config.statement_cache_size,
-        )
-        connections.append(conn)
+    try:
+        for _ in range(size):
+            conn = await Connection.connect(
+                config.connection,
+                statement_cache_size=config.statement_cache_size,
+            )
+            connections.append(conn)
+    except BaseException:
+        for conn in connections:
+            await conn.close()
+        raise
     return Pool(connections)
 
 

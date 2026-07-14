@@ -12,11 +12,12 @@ from chirp.data.drivers._pelt.types import ConnectionConfig
 class _ScriptedStream:
     """Minimal anyio ByteStream that replays ``responses`` on receive."""
 
-    __slots__ = ("_responses", "_sent", "extra_attributes")
+    __slots__ = ("_closed", "_responses", "_sent", "extra_attributes")
 
     def __init__(self, responses: list[bytes]) -> None:
         self._responses = list(responses)
         self._sent: list[bytes] = []
+        self._closed = False
         self.extra_attributes = {}
 
     async def receive(self, max_bytes: int = 65536) -> bytes:
@@ -29,7 +30,11 @@ class _ScriptedStream:
         self._sent.append(data)
 
     async def aclose(self) -> None:
-        return None
+        self._closed = True
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
 
 
 @pytest.mark.issue(325)
@@ -63,6 +68,7 @@ async def test_pgstream_receive_into_buffer():
 @pytest.mark.anyio
 async def test_negotiate_tls_require_accepts_ssl(monkeypatch: pytest.MonkeyPatch):
     raw = _ScriptedStream([_transport._SSL_OK])
+    seen_hostname: str | None = None
 
     async def _passthrough_tls(
         stream: object,
@@ -70,6 +76,8 @@ async def test_negotiate_tls_require_accepts_ssl(monkeypatch: pytest.MonkeyPatch
         *,
         hostname: str | None = None,
     ) -> object:
+        nonlocal seen_hostname
+        seen_hostname = hostname
         return stream
 
     monkeypatch.setattr(_transport, "_upgrade_to_tls", _passthrough_tls)
@@ -78,6 +86,7 @@ async def test_negotiate_tls_require_accepts_ssl(monkeypatch: pytest.MonkeyPatch
     out = await _transport.negotiate_tls(stream, config)
     assert out.stream is raw
     assert raw._sent[0] == _transport._SSL_REQUEST
+    assert seen_hostname == "localhost"
 
 
 @pytest.mark.issue(753)
@@ -154,3 +163,33 @@ def test_ssl_context_verify_full_checks_hostname():
 def test_ssl_context_disable_returns_none():
     config = ConnectionConfig(user="u", ssl="disable")
     assert _transport._ssl_context_for(config) is None
+
+
+@pytest.mark.issue(691)
+def test_ssl_context_reports_unreadable_explicit_ca(tmp_path):
+    missing = tmp_path / "missing-ca.pem"
+    config = ConnectionConfig(user="u", ssl="verify-ca", sslrootcert=str(missing))
+
+    with pytest.raises(TLSError, match="could not load TLS CA file") as caught:
+        _transport._ssl_context_for(config)
+
+    assert caught.value.code == "PELT_TLS_FAILED"
+    assert caught.value.hint == "Set sslrootcert to a readable PEM CA certificate."
+
+
+@pytest.mark.issue(691)
+@pytest.mark.anyio
+async def test_connect_session_closes_stream_when_tls_negotiation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    raw = _ScriptedStream([_transport._SSL_NO])
+
+    async def _open_stream(config: ConnectionConfig) -> _transport.PGStream:
+        return _transport.PGStream(stream=raw)
+
+    monkeypatch.setattr(_transport, "open_stream", _open_stream)
+
+    with pytest.raises(TLSError, match="server refused SSL"):
+        await _transport.connect_session(ConnectionConfig(user="u", ssl="require"))
+
+    assert raw.closed is True

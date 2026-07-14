@@ -10,14 +10,16 @@ from chirp.data.drivers._pelt.types import ConnectionConfig, PoolConfig
 @pytest.mark.issue(266)
 def test_from_dsn_parses_all_components():
     cfg = ConnectionConfig.from_dsn(
-        "postgresql://alice:s3cr3t@db.example.com:6543/shop?sslmode=require"
+        "postgresql://alice:s3cr3t@db.example.com:6543/shop"
+        "?sslmode=verify-full&sslrootcert=%2Fetc%2Fssl%2Fcerts%2Fchirp-ca.crt"
     )
     assert cfg.host == "db.example.com"
     assert cfg.port == 6543
     assert cfg.database == "shop"
     assert cfg.user == "alice"
     assert cfg.password == "s3cr3t"
-    assert cfg.ssl == "require"
+    assert cfg.ssl == "verify-full"
+    assert cfg.sslrootcert == "/etc/ssl/certs/chirp-ca.crt"
 
 
 @pytest.mark.issue(266)

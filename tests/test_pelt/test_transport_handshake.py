@@ -3,6 +3,7 @@
 import pytest
 
 from chirp.data.drivers._pelt import _transport
+from chirp.data.drivers._pelt.errors import PostgresError
 from chirp.data.drivers._pelt.types import ConnectionConfig
 from tests.test_pelt.test_transport import _ScriptedStream
 
@@ -29,6 +30,11 @@ def _backend_key(pid: int, secret: int) -> bytes:
 
 def _ready() -> bytes:
     return _frame(b"Z", b"I")
+
+
+def _error_response(*, sqlstate: str, message: str) -> bytes:
+    payload = b"SFATAL\x00" + b"C" + sqlstate.encode() + b"\x00M" + message.encode() + b"\x00\x00"
+    return _frame(b"E", payload)
 
 
 @pytest.mark.issue(329)
@@ -60,6 +66,30 @@ async def test_connect_session_cleartext_handshake():
     assert session.protocol.state.name == "READY"
     assert stream._sent[0] == startup
     assert b"secret" in stream._sent[1]
+
+
+@pytest.mark.issue(691)
+@pytest.mark.anyio
+async def test_connect_session_raises_auth_error_and_closes_stream(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    raw = _ScriptedStream(
+        [_error_response(sqlstate="28P01", message="password authentication failed")]
+    )
+
+    async def _open_stream(config: ConnectionConfig) -> _transport.PGStream:
+        return _transport.PGStream(stream=raw)
+
+    monkeypatch.setattr(_transport, "open_stream", _open_stream)
+
+    with pytest.raises(PostgresError) as caught:
+        await _transport.connect_session(
+            ConnectionConfig(user="chirp", password="wrong", ssl="disable")
+        )
+
+    assert caught.value.sqlstate == "28P01"
+    assert caught.value.code == "PELT_PG_28P01"
+    assert raw.closed is True
 
 
 @pytest.mark.issue(330)
