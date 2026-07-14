@@ -9,13 +9,14 @@ _RFC = _ROOT / "docs" / "rfcs" / "018-signal-dataflow-graph.md"
 
 
 @pytest.mark.issue(343)
-def test_signal_graph_rfc_is_explicitly_non_shipping() -> None:
+def test_signal_graph_rfc_records_private_phase_one_without_public_shipping() -> None:
     text = _RFC.read_text(encoding="utf-8")
 
-    assert "**Status:** Proposed" in text
+    assert "**Status:** Phase 1 implemented (private compiler model)" in text
+    assert "Implemented by #683" in text
     assert "does not add it" in text
     assert "current `signal_orphan` result" in text
-    assert "No changelog: proposed RFC only" in text
+    assert "No changelog: the Phase 1 compiler model is private" in text
 
 
 @pytest.mark.issue(343)

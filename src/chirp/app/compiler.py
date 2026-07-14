@@ -813,6 +813,15 @@ class AppCompiler:
             fragment_target_registry=self._mutable.fragment_target_registry,
             template_declarations=self._mutable.template_declarations,
         )
+        from chirp.app._signal_graph import compile_signal_graph
+
+        self._runtime._signal_graph = compile_signal_graph(
+            registry=signal_registry,
+            program=self._runtime.hypermedia_program,
+            kida_env=self._runtime.kida_env,
+            route_templates=self._mutable.route_templates,
+            route_layout_chains=self._mutable.route_layout_chains,
+        )
 
         self._mutable.oob_registry.freeze()
         self._runtime.oob_registry = self._mutable.oob_registry

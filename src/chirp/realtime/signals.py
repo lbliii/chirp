@@ -282,6 +282,14 @@ class SignalRegistry:
         with self._lock:
             return tuple(s for s in self._specs.values() if s.source is not None)
 
+    def _topology_specs(self) -> tuple[tuple[SignalSpec, ...], tuple[DerivedSpec, ...]]:
+        """Snapshot setup declarations under the registry lock for freeze compilation."""
+        with self._lock:
+            return (
+                tuple(sorted(self._specs.values(), key=lambda spec: spec.name)),
+                tuple(sorted(self._derived.values(), key=lambda spec: spec.name)),
+            )
+
     def bind_backplane(self, plan: _SignalBackplanePlan) -> None:
         """Bind the freeze-compiled private plan exactly once."""
         with self._lock:

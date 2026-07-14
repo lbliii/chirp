@@ -1,6 +1,6 @@
 # RFC 018: Signal dataflow graph
 
-**Status:** Proposed
+**Status:** Phase 1 implemented (private compiler model)
 
 **Issue:** [#343](https://github.com/lbliii/chirp/issues/343)
 
@@ -276,10 +276,14 @@ framework-owned neutral model; it must not become a core runtime dependency.
 
 ### Phase 1: private compiler model
 
-- add frozen/slotted internal signal nodes and edges;
-- compile them at freeze without changing current check output;
-- prove deterministic identities and free-thread-safe snapshots; and
-- compare the compiled Lucky Cat graph with registry and template fixtures.
+- [x] add frozen/slotted internal signal nodes and edges;
+- [x] compile them at freeze without changing current check output;
+- [x] prove deterministic identities and free-thread-safe snapshots; and
+- [x] compare the compiled Lucky Cat graph with registry and template fixtures.
+
+Implemented by #683. The model remains private on frozen runtime state; contract
+migration, inspection projection, export, and severity decisions remain later
+phases.
 
 This phase touches the application compiler and requires the repository's
 explicit design check-in before implementation.
@@ -356,5 +360,6 @@ are observational evidence.
 
 ## Collateral
 
-No changelog: proposed RFC only. No public API, site, example, scaffold, CLI,
-or migration collateral moves until an implementation changes shipped behavior.
+No changelog: the Phase 1 compiler model is private and does not change shipped
+behavior. No public API, site, scaffold, CLI, or migration collateral moves
+until a later phase changes an observable contract.
