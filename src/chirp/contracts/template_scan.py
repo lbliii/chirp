@@ -1,11 +1,13 @@
 """Template source scanners used by contracts checker."""
 
 import logging
+import os
 import posixpath
 import re
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal
 
 from .patterns import ID_ATTR as _ID_PATTERN
@@ -105,6 +107,103 @@ class QueryClientReference:
     url: str
     content_type: str | None
     content_type_known: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _LoadedTemplateSource:
+    name: str
+    source: str
+    filename: str | None
+
+
+class CanonicalTemplateSources(dict[str, str]):
+    """Private scan mapping that iterates canonical names and resolves aliases."""
+
+    __slots__ = ("_alias_to_canonical",)
+
+    def __init__(self, sources: dict[str, str], alias_to_canonical: Mapping[str, str]) -> None:
+        super().__init__(sources)
+        self._alias_to_canonical = dict(alias_to_canonical)
+
+    def _canonical_key(self, key: object) -> object:
+        if isinstance(key, str):
+            return self._alias_to_canonical.get(key, key)
+        return key
+
+    def __contains__(self, key: object) -> bool:
+        return super().__contains__(self._canonical_key(key))
+
+    def __getitem__(self, key: str) -> str:
+        return super().__getitem__(self._alias_to_canonical.get(key, key))
+
+    def get(self, key: str, default: str | None = None) -> str | None:
+        return super().get(self._alias_to_canonical.get(key, key), default)
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalTemplateScan:
+    """Canonical built-in scan inputs derived from logical loader names."""
+
+    sources: CanonicalTemplateSources
+    alias_to_canonical: dict[str, str]
+    aliases_by_canonical: dict[str, tuple[str, ...]]
+
+
+@dataclass(frozen=True, slots=True)
+class TemplateSourceInventory:
+    """Loaded logical sources with private loader provenance."""
+
+    entries: tuple[_LoadedTemplateSource, ...]
+
+    @property
+    def sources(self) -> dict[str, str]:
+        return {entry.name: entry.source for entry in self.entries}
+
+    def canonicalize(self, referenced: Collection[str]) -> CanonicalTemplateScan:
+        """Group aliases by physical source and select deterministic names."""
+        referenced_names = set(referenced)
+        grouped: dict[tuple[str, str], list[_LoadedTemplateSource]] = {}
+        for entry in self.entries:
+            grouped.setdefault(_template_identity(entry), []).append(entry)
+
+        selected: list[tuple[str, str, tuple[str, ...]]] = []
+        alias_to_canonical: dict[str, str] = {}
+        for entries in grouped.values():
+            by_name = {entry.name: entry for entry in entries}
+            aliases = tuple(sorted(by_name))
+            canonical = min(
+                aliases,
+                key=lambda name: (
+                    name not in referenced_names,
+                    name.count("/"),
+                    len(name),
+                    name,
+                ),
+            )
+            selected.append((canonical, by_name[canonical].source, aliases))
+            alias_to_canonical.update(dict.fromkeys(aliases, canonical))
+
+        selected.sort(key=lambda item: item[0])
+        canonical_sources = {name: source for name, source, _aliases in selected}
+        aliases_by_canonical = {name: aliases for name, _source, aliases in selected}
+        return CanonicalTemplateScan(
+            sources=CanonicalTemplateSources(canonical_sources, alias_to_canonical),
+            alias_to_canonical=alias_to_canonical,
+            aliases_by_canonical=aliases_by_canonical,
+        )
+
+
+def _template_identity(entry: _LoadedTemplateSource) -> tuple[str, str]:
+    filename = entry.filename
+    if filename is not None:
+        try:
+            path = Path(os.fsdecode(filename)).resolve()
+        except TypeError, OSError, ValueError:
+            return ("logical", entry.name)
+        else:
+            if path.is_file():
+                return ("physical", os.path.normcase(str(path)))
+    return ("logical", entry.name)
 
 
 def _javascript_call_suffix(source: str, start: int) -> str:
@@ -491,37 +590,47 @@ def extract_htmx_partial_sources(source: str) -> list[str]:
     return urls
 
 
-def _load_one(loader: Any, name: str) -> tuple[str, str] | None:
-    """Load a single template; returns (name, source) or None on error."""
+def _load_one(loader: Any, name: str) -> _LoadedTemplateSource | None:
+    """Load one logical template while retaining loader provenance."""
     try:
-        source, _ = loader.get_source(name)
-        return (name, source)
+        source, filename = loader.get_source(name)
+        return _LoadedTemplateSource(name=name, source=source, filename=filename)
     except Exception:
+        logging.getLogger("chirp.contracts").debug(
+            "Template source loading failed for %s",
+            name,
+            exc_info=True,
+        )
         return None
 
 
-def load_template_sources(kida_env: Any) -> dict[str, str]:
-    """Load all template sources from environment loader (parallel disk reads)."""
-    sources: dict[str, str] = {}
+def load_template_inventory(kida_env: Any) -> TemplateSourceInventory:
+    """Load logical template sources and their private provenance."""
+    entries: list[_LoadedTemplateSource] = []
     loader = kida_env.loader
     if loader is None:
-        return sources
+        return TemplateSourceInventory(())
     list_fn = getattr(loader, "list_templates", None)
     if list_fn is None:
-        return sources
+        return TemplateSourceInventory(())
     try:
-        names = [n for n in list_fn() if n.endswith(_TEMPLATE_SOURCE_SUFFIXES)]
+        names = sorted(n for n in list_fn() if n.endswith(_TEMPLATE_SOURCE_SUFFIXES))
         if not names:
-            return sources
+            return TemplateSourceInventory(())
         with ThreadPoolExecutor(max_workers=min(8, len(names))) as pool:
             futures = {pool.submit(_load_one, loader, name): name for name in names}
             for future in as_completed(futures):
                 result = future.result()
                 if result is not None:
-                    sources[result[0]] = result[1]
+                    entries.append(result)
     except Exception:
         logging.getLogger("chirp.contracts").debug(
             "Template source loading failed during parallel scan",
             exc_info=True,
         )
-    return sources
+    return TemplateSourceInventory(tuple(sorted(entries, key=lambda entry: entry.name)))
+
+
+def load_template_sources(kida_env: Any) -> dict[str, str]:
+    """Load all logical template sources for the public contract snapshot."""
+    return load_template_inventory(kida_env).sources

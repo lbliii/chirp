@@ -1,11 +1,91 @@
-"""Tests for template scan — extract targets, extract template references."""
+"""Tests for template scan — extraction, references, and physical identity."""
+
+from pathlib import Path
+
+import pytest
+from kida import (
+    ChoiceLoader,
+    DictLoader,
+    Environment,
+    FileSystemLoader,
+    FunctionLoader,
+    PackageLoader,
+)
 
 from chirp.contracts.template_scan import (
     extract_legacy_action_contracts,
     extract_targets_from_source,
     extract_template_references,
+    load_template_inventory,
     resolve_template_reference,
 )
+
+
+@pytest.mark.issue(707)
+def test_nested_choice_loader_canonicalizes_one_physical_file_by_reference(
+    tmp_path: Path,
+) -> None:
+    nested = tmp_path / "templates" / "partials"
+    nested.mkdir(parents=True)
+    (nested / "x.html").write_text("<div>x</div>", encoding="utf-8")
+    env = Environment(
+        loader=ChoiceLoader([FileSystemLoader(tmp_path), FileSystemLoader(tmp_path / "templates")])
+    )
+
+    inventory = load_template_inventory(env)
+
+    assert set(inventory.sources) == {
+        "partials/x.html",
+        "templates/partials/x.html",
+    }
+    for referenced in ("partials/x.html", "templates/partials/x.html"):
+        scan = inventory.canonicalize({referenced})
+        assert list(scan.sources) == [referenced]
+        assert scan.alias_to_canonical == {
+            "partials/x.html": referenced,
+            "templates/partials/x.html": referenced,
+        }
+        assert scan.aliases_by_canonical[referenced] == (
+            "partials/x.html",
+            "templates/partials/x.html",
+        )
+        assert scan.sources["partials/x.html"] == "<div>x</div>"
+        assert scan.sources["templates/partials/x.html"] == "<div>x</div>"
+
+
+@pytest.mark.issue(707)
+def test_identical_content_at_distinct_paths_keeps_distinct_identity(tmp_path: Path) -> None:
+    (tmp_path / "a.html").write_text("same", encoding="utf-8")
+    (tmp_path / "b.html").write_text("same", encoding="utf-8")
+    inventory = load_template_inventory(Environment(loader=FileSystemLoader(tmp_path)))
+
+    scan = inventory.canonicalize({"a.html"})
+
+    assert set(scan.sources) == {"a.html", "b.html"}
+    assert scan.alias_to_canonical == {"a.html": "a.html", "b.html": "b.html"}
+
+
+@pytest.mark.issue(707)
+def test_nonfilesystem_loaders_fall_back_to_logical_identity() -> None:
+    dict_inventory = load_template_inventory(
+        Environment(loader=DictLoader({"a.html": "same", "b.html": "same"}))
+    )
+    package_inventory = load_template_inventory(
+        Environment(loader=PackageLoader("chirp.templating", "macros"))
+    )
+    function_inventory = load_template_inventory(
+        Environment(loader=FunctionLoader(lambda name: f"source:{name}"))
+    )
+
+    dict_scan = dict_inventory.canonicalize(set())
+    package_scan = package_inventory.canonicalize(set())
+
+    assert set(dict_scan.sources) == {"a.html", "b.html"}
+    assert all(len(aliases) == 1 for aliases in dict_scan.aliases_by_canonical.values())
+    assert package_scan.sources
+    assert len(package_scan.sources) == len(package_inventory.sources)
+    assert all(len(aliases) == 1 for aliases in package_scan.aliases_by_canonical.values())
+    assert function_inventory.sources == {}
 
 
 class TestExtractTargets:
