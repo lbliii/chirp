@@ -1,3 +1,10 @@
+## [0.10.1] — 2026-07-14
+
+### Fixed
+
+- PostgreSQL TLS connections now explicitly negotiate as clients, allowing managed PostgreSQL services such as Railway to work with Pelt's default SSL mode and preserving hostname verification for `sslmode=verify-full`. ([#753](https://github.com/lbliii/chirp/issues/753))
+
+
 ## [0.10.0] — 2026-07-08
 
 ### Added
