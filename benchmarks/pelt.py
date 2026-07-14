@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import contextlib
 import json
 import os
 import platform
@@ -49,10 +48,14 @@ class _ValueRow:
     value: int
 
 
-def _package_version(name: str) -> str | None:
-    with contextlib.suppress(metadata.PackageNotFoundError):
-        return metadata.version(name)
-    return None
+def _installed_packages() -> dict[str, str]:
+    """Capture exact installed distributions for software provenance."""
+    packages = {
+        name: distribution.version
+        for distribution in metadata.distributions()
+        if (name := distribution.metadata["Name"])
+    }
+    return dict(sorted(packages.items(), key=lambda item: item[0].casefold()))
 
 
 def _source_revision() -> dict[str, str | bool]:
@@ -94,6 +97,20 @@ def _python_metadata() -> dict[str, str | bool]:
         "gil_enabled": gil_enabled,
         "free_threaded": not gil_enabled,
     }
+
+
+def _processor_name() -> str:
+    """Return concrete CPU provenance across Linux and other hosts."""
+    cpuinfo = Path("/proc/cpuinfo")
+    if cpuinfo.is_file():
+        for line in cpuinfo.read_text(encoding="utf-8", errors="replace").splitlines():
+            key, separator, value = line.partition(":")
+            if separator and key.strip() in {"model name", "Hardware"}:
+                return value.strip()
+    processor = platform.processor().strip()
+    if processor:
+        return processor
+    return "unknown"
 
 
 def parse_concurrency(value: str) -> tuple[int, ...]:
@@ -349,13 +366,10 @@ async def run_pelt_benchmarks(
         "python": _python_metadata(),
         "platform": platform.platform(),
         "machine": platform.machine(),
-        "processor": platform.processor(),
+        "processor": _processor_name(),
         "logical_cpus": os.cpu_count(),
         "postgresql": {"server_version": server_version},
-        "packages": {
-            "bengal-chirp": _package_version("bengal-chirp"),
-            "bengal-pounce": _package_version("bengal-pounce"),
-        },
+        "packages": _installed_packages(),
     }
     config = {
         "concurrency": list(concurrency),

@@ -1,1 +1,1 @@
-"""Chirp web framework benchmarks."""
+"""Executable benchmark tooling for Chirp's reproducible evidence suites."""
