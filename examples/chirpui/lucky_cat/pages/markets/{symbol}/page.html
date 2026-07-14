@@ -43,8 +43,8 @@
     never collide; the data-attrs on the figure point the controller at it. -#}
 {% def hero_area(hero, symbol="") %}
 {% if (hero ?? none) is not none and hero.ok %}
-  {% set _grad = "lc-hero-" ~ symbol ~ "-" ~ ("up" if hero.up else "down") %}
-  {% set _island = "lc-chart-data-" ~ symbol %}
+  {% let _grad = "lc-hero-" ~ symbol ~ "-" ~ ("up" if hero.up else "down") %}
+  {% let _island = "lc-chart-data-" ~ symbol %}
   <figure class="luckycat-hero-chart-figure luckycat-spark--{{ 'up' if hero.up else 'down' }}"
           data-luckycat-chart
           data-chart-points="{{ _island }}"
@@ -126,7 +126,7 @@
     replaces the innerHTML the one-shot animation re-fires on every tick. -#}
 {% def ticker_body(symbol, ticker) %}
 {% if (ticker ?? none) is not none %}
-{% set up = ticker.change_pct_24h >= 0 %}
+{% let up = ticker.change_pct_24h >= 0 %}
 <div class="luckycat-hero-ticker {{ 'luckycat-flash--up' if up else 'luckycat-flash--down' }}">
   <div class="luckycat-hero-ticker__price-row">
     <span class="luckycat-hero-ticker__price">{{ ticker.price }}</span>
@@ -166,8 +166,8 @@
     value below is the real proportional size. -#}
 {% def book_body(book) %}
 {% if (book ?? none) is not none %}
-{% set _bid_max = (book.bids | map(attribute="size") | max) if (book.bids | length) > 0 else 1 %}
-{% set _ask_max = (book.asks | map(attribute="size") | max) if (book.asks | length) > 0 else 1 %}
+{% let _bid_max = (book.bids | map(attribute="size") | max) if (book.bids | length) > 0 else 1 %}
+{% let _ask_max = (book.asks | map(attribute="size") | max) if (book.asks | length) > 0 else 1 %}
 <div class="luckycat-orderbook">
   <div class="luckycat-orderbook__head luckycat-orderbook__row chirpui-text-muted chirpui-font-sm">
     <span>Bids (size)</span>

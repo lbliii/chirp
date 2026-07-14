@@ -21,7 +21,7 @@
     SVG so it never renders an empty/broken chart. -#}
 {% def sparkline(spark, symbol="") %}
 {% if (spark ?? none) is not none and spark.ok %}
-  {% set _grad = "lc-spark-" ~ symbol ~ "-" ~ ("up" if spark.up else "down") %}
+  {% let _grad = "lc-spark-" ~ symbol ~ "-" ~ ("up" if spark.up else "down") %}
   <svg class="luckycat-spark luckycat-spark--{{ 'up' if spark.up else 'down' }}"
        viewBox="0 0 100 36" preserveAspectRatio="none"
        role="img" aria-label="{{ symbol }} recent price trend, {{ 'up' if spark.up else 'down' }}"
