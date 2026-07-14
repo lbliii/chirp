@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import contextlib
 import json
 import os
 import platform
@@ -49,10 +48,14 @@ class _ValueRow:
     value: int
 
 
-def _package_version(name: str) -> str | None:
-    with contextlib.suppress(metadata.PackageNotFoundError):
-        return metadata.version(name)
-    return None
+def _installed_packages() -> dict[str, str]:
+    """Capture exact installed distributions for software provenance."""
+    packages = {
+        name: distribution.version
+        for distribution in metadata.distributions()
+        if (name := distribution.metadata["Name"])
+    }
+    return dict(sorted(packages.items(), key=lambda item: item[0].casefold()))
 
 
 def _source_revision() -> dict[str, str | bool]:
@@ -366,10 +369,7 @@ async def run_pelt_benchmarks(
         "processor": _processor_name(),
         "logical_cpus": os.cpu_count(),
         "postgresql": {"server_version": server_version},
-        "packages": {
-            "bengal-chirp": _package_version("bengal-chirp"),
-            "bengal-pounce": _package_version("bengal-pounce"),
-        },
+        "packages": _installed_packages(),
     }
     config = {
         "concurrency": list(concurrency),

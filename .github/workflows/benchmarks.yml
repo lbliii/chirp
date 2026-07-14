@@ -50,8 +50,8 @@ jobs:
           python-version: "3.14.2t"
           enable-cache: true
 
-      - name: Install locked dependencies
-        run: uv sync --frozen --group dev --extra data-pg
+      - name: Install declared dependencies
+        run: uv sync --no-sources --group dev --extra data-pg
 
       - name: Run controlled Pelt evidence
         run: >-

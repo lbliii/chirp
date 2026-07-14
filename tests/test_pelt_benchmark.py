@@ -94,6 +94,14 @@ def test_live_postgres_ci_smokes_the_pelt_benchmark() -> None:
     assert "--output /tmp/pelt-smoke.json" in workflow
 
 
+@pytest.mark.issue(692)
+def test_pelt_software_provenance_includes_every_installed_distribution() -> None:
+    packages = _PELT._installed_packages()
+
+    assert list(packages) == sorted(packages, key=str.casefold)
+    assert {"anyio", "bengal-chirp", "bengal-pounce"} <= packages.keys()
+
+
 def _pelt_attempt(attempt: int, qps: tuple[float, float], *, stream: float, bulk: float):
     report = _PELT.build_report(
         environment={
@@ -193,6 +201,7 @@ def test_controlled_pelt_ci_pins_environment_and_uploads_raw_evidence() -> None:
     assert "name: Run controlled Pelt evidence" in workflow
     assert 'python-version: "3.14.2t"' in workflow
     assert "postgres:18.1-bookworm" in workflow
+    assert "uv sync --no-sources --group dev --extra data-pg" in workflow
     assert "--repetitions 5" in workflow
     assert "--concurrency 1,2,4,8" in workflow
     assert "benchmark-artifacts/pelt-controlled.json" in workflow
