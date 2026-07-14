@@ -9,13 +9,13 @@ _RFC = _ROOT / "docs" / "rfcs" / "017-accessibility-interaction-contracts.md"
 
 
 @pytest.mark.issue(346)
-def test_accessibility_rfc_is_explicitly_non_shipping() -> None:
+def test_accessibility_rfc_records_evidence_phase_without_shipping_behavior() -> None:
     text = _RFC.read_text(encoding="utf-8")
 
-    assert "**Status:** Proposed" in text
+    assert "**Status:** Evidence phase complete" in text
     assert "does not add `chirp check --a11y strict`" in text
     assert "Changing existing accessibility severities in this RFC" in text
-    assert "No changelog: proposed RFC only" in text
+    assert "No changelog: the evidence phase adds fixtures" in text
 
 
 @pytest.mark.issue(346)
@@ -43,3 +43,14 @@ def test_accessibility_rfc_keeps_severity_and_runtime_gates_explicit() -> None:
     assert "Only invalid explicit declarations should start as `ERROR`" in text
     assert "requires a separate implementation review" in text
     assert "zero false `ERROR`s" in text
+
+
+@pytest.mark.issue(686)
+def test_accessibility_rfc_records_family_decisions_and_machine_receipt() -> None:
+    text = _RFC.read_text(encoding="utf-8")
+
+    assert "tests/contracts/a11y_interaction_evidence.json" in text
+    assert "| focus continuity | revise |" in text
+    assert "| live regions | accept |" in text
+    assert "| dialog and popover | revise |" in text
+    assert "| reduced motion | no-go |" in text
