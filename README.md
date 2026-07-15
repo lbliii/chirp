@@ -31,13 +31,13 @@ integrate at the seams — see [Non-goals](https://lbliii.github.io/chirp/docs/a
 
 Deploy a ready-to-run Chirp application on Railway:
 
-| Template | Deploy |
-|----------|--------|
-| Chirp Forum | [![Deploy Chirp Forum on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-forum?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
-| Chirp Feedback Board | [![Deploy Chirp Feedback Board on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-feedback-board?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
-| Chirp Changelog | [![Deploy Chirp Changelog on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-changelog?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
-| Chirp Launch Board | [![Deploy Chirp Launch Board on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-launch-board?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
-| Chirp Hookbox | [![Deploy Chirp Hookbox on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-hookbox?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
+| Template | Deploy | Live demo |
+|----------|--------|-----------|
+| Chirp Forum | [![Deploy Chirp Forum on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-forum?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) | [View demo](https://chirp-forum-production.up.railway.app) |
+| Chirp Feedback Board | [![Deploy Chirp Feedback Board on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-feedback-board?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) | [View demo](https://web-production-4a10d4.up.railway.app) |
+| Chirp Changelog | [![Deploy Chirp Changelog on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-changelog?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) | [View demo](https://web-production-4216d.up.railway.app) |
+| Chirp Launch Board | [![Deploy Chirp Launch Board on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-launch-board?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) | [View demo](https://web-production-e37a56.up.railway.app) |
+| Chirp Hookbox | [![Deploy Chirp Hookbox on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-hookbox?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) | [View demo](https://web-production-caa61.up.railway.app) |
 
 ---
 
