@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Railway Template"
+  short_description: "Create and verify zero-input Railway templates"
+  default_prompt: "Use $create-railway-template to create and validate a zero-input Chirp Railway template."
