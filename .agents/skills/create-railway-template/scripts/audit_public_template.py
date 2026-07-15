@@ -115,6 +115,8 @@ def audit(code: str, required_generated: list[str]) -> list[str]:
         if required_mount not in (None, POSTGRES_MOUNT):
             errors.append(f"Postgres requiredMountPath must be {POSTGRES_MOUNT}")
         mounts = target_postgres.get("volumeMounts") or {}
+        if len(mounts) != 1:
+            errors.append(f"Postgres must define exactly one volume mount; found {len(mounts)}")
         if POSTGRES_MOUNT not in {
             value.get("mountPath") for value in mounts.values() if isinstance(value, dict)
         }:

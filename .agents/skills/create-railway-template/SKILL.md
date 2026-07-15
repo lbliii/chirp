@@ -70,6 +70,8 @@ The audit compares PostgreSQL against Railway's current official template, check
 - Exercise `/health`, `/ready`, CSS, JavaScript, the linked favicon, administrator login, ingress capture, detail rendering, and restart persistence for Hookbox-like applications.
 - Assert that every full-page response contains a favicon link and that the target returns `200` with an image content type. Visually inspect it at browser-tab size.
 - Verify the application uses the newly created PostgreSQL service, not another database in the project.
+- List deployed volumes and require exactly one PostgreSQL volume attached at `/var/lib/postgresql/data`, with no unattached volumes left in the proof environment.
+- Inspect the deployed web service's raw environment configuration, not resolved variable-list output, without printing values and require `DATABASE_URL` to remain the exact `${{Postgres.DATABASE_URL}}` reference rather than a copied URL.
 - Record project, environment, service, deployment, and smoke-test IDs without printing credential values.
 
 ## Finalize collateral
