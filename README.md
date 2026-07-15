@@ -25,9 +25,19 @@ Database access uses [Shapes](https://lbliii.github.io/chirp/docs/build-apps/for
 and an optional in-tree PostgreSQL driver. Background jobs, admin UIs, and email delivery
 integrate at the seams — see [Non-goals](https://lbliii.github.io/chirp/docs/about/non-goals/).
 
-Status: **alpha** (0.10.x). See [Public API](docs/public-api.md) for stable vs provisional exports.
+---
 
-📚 **Documentation:** [lbliii.github.io/chirp](https://lbliii.github.io/chirp/)
+## Railway templates
+
+Deploy a ready-to-run Chirp application on Railway:
+
+| Template | Deploy |
+|----------|--------|
+| Chirp Forum | [![Deploy Chirp Forum on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-forum?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
+| Chirp Feedback Board | [![Deploy Chirp Feedback Board on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-feedback-board?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
+| Chirp Changelog | [![Deploy Chirp Changelog on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-changelog?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
+| Chirp Launch Board | [![Deploy Chirp Launch Board on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-launch-board?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
+| Chirp Hookbox | [![Deploy Chirp Hookbox on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-hookbox?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
 
 ---
 
@@ -419,20 +429,6 @@ window.ChirpHtmxDebug.exportRecordsJson()
 | Optional UI layer | [chirp-ui](https://github.com/lbliii/chirp-ui) |
 
 </details>
-
----
-
-## Railway templates
-
-Deploy a ready-to-run Chirp application on Railway:
-
-| Template | Deploy |
-|----------|--------|
-| Chirp Forum | [![Deploy Chirp Forum on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-forum?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
-| Chirp Feedback Board | [![Deploy Chirp Feedback Board on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-feedback-board?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
-| Chirp Changelog | [![Deploy Chirp Changelog on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-changelog?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
-| Chirp Launch Board | [![Deploy Chirp Launch Board on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-launch-board?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
-| Chirp Hookbox | [![Deploy Chirp Hookbox on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-hookbox?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
 
 ---
 
