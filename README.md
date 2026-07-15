@@ -422,6 +422,20 @@ window.ChirpHtmxDebug.exportRecordsJson()
 
 ---
 
+## Railway templates
+
+Deploy a ready-to-run Chirp application on Railway:
+
+| Template | Deploy |
+|----------|--------|
+| Chirp Forum | [![Deploy Chirp Forum on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-forum?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
+| Chirp Feedback Board | [![Deploy Chirp Feedback Board on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-feedback-board?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
+| Chirp Changelog | [![Deploy Chirp Changelog on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-changelog?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
+| Chirp Launch Board | [![Deploy Chirp Launch Board on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-launch-board?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
+| Chirp Hookbox | [![Deploy Chirp Hookbox on Railway](https://railway.com/button.svg)](https://railway.com/deploy/chirp-hookbox?referralCode=KU30ob&utm_medium=integration&utm_source=template&utm_campaign=generic) |
+
+---
+
 ## Production
 
 Chirp apps run on **[Pounce](https://github.com/lbliii/pounce)**, a production-grade ASGI server with
