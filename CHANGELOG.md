@@ -1,3 +1,10 @@
+## [0.10.3] — 2026-07-16
+
+### Fixed
+
+- PostgreSQL ``Database.execute()`` now returns affected-row counts for two-token command tags such as ``UPDATE 1`` and ``DELETE 1``, matching its documented behavior and SQLite semantics. ([#772](https://github.com/lbliii/chirp/issues/772))
+
+
 ## [0.10.2] — 2026-07-14
 
 ### Fixed
