@@ -922,8 +922,7 @@ async def _execute_statement(driver: str, conn: Any, sql: str, params: tuple[Any
 
     # PostgreSQL
     result = await conn.execute(_postgresql_sql(sql, len(params)), *params)
-    # PostgreSQL returns "INSERT 0 1" style command tags
-    parts = result.split()
-    if len(parts) >= 3:
-        return int(parts[-1])
-    return 0
+    # PostgreSQL command tags end with the affected-row count for DML:
+    # ``INSERT 0 1``, ``UPDATE 1``, and ``DELETE 1``.
+    _, separator, count = result.rpartition(" ")
+    return int(count) if separator and count.isdecimal() else 0
