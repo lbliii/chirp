@@ -28,4 +28,4 @@ As of the current Railway PostgreSQL 18 template, preserve these defaults:
 
 The official template also defaults `SSL_CERT_DAYS` to `820` and defines `DATABASE_PUBLIC_URL` through the TCP proxy. A Chirp application needs only the private `DATABASE_URL`; retain the public URL only when the template includes a TCP proxy or Railway's data panel requires it.
 
-Set both `deploy.requiredMountPath` and the volume mount to `/var/lib/postgresql/data`. On the application service, set `DATABASE_URL` to the exact case-sensitive service reference, normally `${{Postgres.DATABASE_URL}}`.
+Set both `deploy.requiredMountPath` and the volume mount to `/var/lib/postgresql/data` in the source template configuration. Railway may omit `deploy.requiredMountPath` from the serialized public template; the auditor accepts an omission, rejects a conflicting path, and always requires exactly one volume mount at the canonical path. On the application service, set `DATABASE_URL` to the exact case-sensitive service reference, normally `${{Postgres.DATABASE_URL}}`.

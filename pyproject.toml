@@ -311,7 +311,7 @@ dev = [
     "pytest-xdist>=3.5.0",
     "hypothesis>=6.100.0",
     # Type Checking
-    "ty>=0.0.11",
+    "ty==0.0.34", # 0.0.60 rejects guarded dataclass classes; keep CI deterministic
     # Linting & Formatting
     "ruff>=0.15.1", # Require ruff>=0.15.1 for correct handling of newer Python syntax
     # Changelog

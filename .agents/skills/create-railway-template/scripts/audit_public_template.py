@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import http.client
 import json
+import re
 import sys
 from typing import Any
 
@@ -30,6 +31,7 @@ POSTGRES_REQUIRED = (
     "RAILWAY_DEPLOYMENT_DRAINING_SECONDS",
 )
 POSTGRES_MOUNT = "/var/lib/postgresql/data"
+SECRET_EXPRESSION = re.compile(r"\$\{\{\s*secret\([^{}\r\n]+\)\s*\}\}")
 
 
 def fetch_template(code: str) -> dict[str, Any]:
@@ -83,6 +85,35 @@ def normalized(value: str) -> str:
     return "".join(value.split())
 
 
+def generated_variable(
+    items: list[dict[str, Any]], spec: str
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Find a generated variable, requiring qualification when its name is ambiguous."""
+    if "." in spec:
+        service_name, variable_name = spec.rsplit(".", 1)
+        matching_services = [item for item in items if item.get("name") == service_name]
+        if not matching_services:
+            return None, f"generated variable service {service_name!r} was not found"
+        variable = (matching_services[0].get("variables") or {}).get(variable_name)
+        if variable is None:
+            return None, f"generated variable {spec} was not found"
+        return variable, None
+
+    matches = [
+        (item.get("name") or "<unnamed>", variable)
+        for item in items
+        if (variable := (item.get("variables") or {}).get(spec)) is not None
+    ]
+    if not matches:
+        return None, f"generated variable {spec} was not found"
+    if len(matches) > 1:
+        service_names = ", ".join(name for name, _ in matches)
+        return None, (
+            f"generated variable {spec} is ambiguous across {service_names}; use SERVICE.VARIABLE"
+        )
+    return matches[0][1], None
+
+
 def audit(code: str, required_generated: list[str]) -> list[str]:
     target = fetch_template(code)
     target_services = services(target)
@@ -132,15 +163,14 @@ def audit(code: str, required_generated: list[str]) -> list[str]:
         if normalized(expected_reference) not in {normalized(value) for value in app_references}:
             errors.append(f"application DATABASE_URL must reference {expected_reference}")
 
-    all_variables = {
-        name: variable
-        for service in target_services
-        for name, variable in (service.get("variables") or {}).items()
-    }
-    for name in required_generated:
-        value = default(all_variables.get(name))
-        if "secret(" not in normalized(value):
-            errors.append(f"{name} must use a Railway secret() default")
+    for spec in required_generated:
+        variable, error = generated_variable(target_services, spec)
+        if error:
+            errors.append(error)
+            continue
+        value = default(variable)
+        if SECRET_EXPRESSION.fullmatch(value.strip()) is None:
+            errors.append(f"{spec} must use an exact Railway secret() expression")
 
     return errors
 
@@ -152,8 +182,10 @@ def main() -> int:
         "--require-generated",
         action="append",
         default=[],
-        metavar="NAME",
-        help="require NAME to have a Railway secret() default; repeat as needed",
+        metavar="[SERVICE.]VARIABLE",
+        help=(
+            "require [SERVICE.]VARIABLE to have an exact Railway secret() default; repeat as needed"
+        ),
     )
     args = parser.parse_args()
 
