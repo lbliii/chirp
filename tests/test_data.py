@@ -391,6 +391,35 @@ class TestExecute:
         users = await db.fetch(User, "SELECT * FROM users ORDER BY id")
         assert len(users) == 3
 
+    @pytest.mark.issue(772)
+    @pytest.mark.parametrize(
+        ("command_tag", "expected"),
+        [
+            ("INSERT 0 1", 1),
+            ("UPDATE 3", 3),
+            ("DELETE 2", 2),
+            ("CREATE TABLE", 0),
+            ("OK", 0),
+        ],
+    )
+    async def test_postgresql_execute_parses_affected_rows(
+        self,
+        command_tag: str,
+        expected: int,
+    ) -> None:
+        class Connection:
+            async def execute(self, sql: str, *params: object) -> str:
+                return command_tag
+
+        count = await db_mod._execute_statement(
+            "postgresql",
+            Connection(),
+            "UPDATE users SET email = ?",
+            ("new@example.test",),
+        )
+
+        assert count == expected
+
     async def test_execute_many_empty(self, db) -> None:
         count = await db.execute_many(
             "INSERT INTO users (name, email) VALUES (?, ?)",
