@@ -1,0 +1,31 @@
+{% template messages: list, current_user: dict %}
+{% block messages_oob transport="oob" swap="innerHTML" %}
+<section aria-labelledby="messages-heading">
+  <h1 id="messages-heading">Messages</h1>
+  <ol class="message-list">
+    {% for message in messages %}
+      <li class="message-row" data-message-id="{{ message.id }}">
+        <article>
+          <header>
+            <img src="{{ message.author.avatar }}" alt="">
+            <h2>{{ message.author.name }}</h2>
+            <time datetime="{{ message.created_at }}">{{ message.relative_time }}</time>
+          </header>
+          <p>{{ message.body }}</p>
+          <footer class="message-actions">
+            <a href="{{ message.permalink }}">Open</a>
+            {% if message.author.id == current_user.id %}
+              <button name="action" value="edit:{{ message.id }}">Edit</button>
+              <button name="action" value="delete:{{ message.id }}">Delete</button>
+            {% else %}
+              <button name="action" value="reply:{{ message.id }}">Reply</button>
+            {% endif %}
+          </footer>
+        </article>
+      </li>
+    {% else %}
+      <li>No messages yet.</li>
+    {% endfor %}
+  </ol>
+</section>
+{% endblock %}

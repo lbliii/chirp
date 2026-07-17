@@ -10,19 +10,26 @@ import sys
 from pathlib import Path
 
 import pytest
-from kida import Environment, FileSystemLoader, PrefixLoader
+from kida import Environment, FileSystemLoader, PrefixLoader, TemplateMetadata
 
 from chirp.templating.kida_adapter import KidaAdapter
+from chirp.templating.oob_registry import OOBRegionConfig, OOBRegistry
 
 _PILOT_ENV = "CHIRP_KIDA_MULTI_ROOT_PILOT"
 
 try:
-    from kida.inspection import TemplateRoot, diagnose_roots, inspect_components
-except ModuleNotFoundError as exc:
-    if exc.name != "kida.inspection" or os.environ.get(_PILOT_ENV) == "1":
+    from kida.analysis import AdviceContext, profile_source
+    from kida.inspection import (
+        TemplateRoot,
+        advise_encapsulation_roots,
+        diagnose_roots,
+        inspect_components,
+    )
+except ImportError as exc:
+    if exc.name not in {"kida.analysis", "kida.inspection"} or os.environ.get(_PILOT_ENV) == "1":
         raise
     pytest.skip(
-        "Kida's explicit multi-root inspection API is not released yet",
+        "Kida's multi-root adapter-advice API is not released yet",
         allow_module_level=True,
     )
 
@@ -48,6 +55,41 @@ def _environment() -> Environment:
         ),
         bytecode_cache=False,
     )
+
+
+def _chirp_oob_advice_context(
+    adapter: KidaAdapter,
+    source: str,
+    *,
+    name: str,
+    oob_registry: OOBRegistry,
+    repeated_consumers: frozenset[str],
+) -> tuple[AdviceContext, ...]:
+    """Translate Chirp-owned OOB facts without adding Chirp semantics to Kida."""
+    metadata = adapter.template_metadata(name)
+    if not isinstance(metadata, TemplateMetadata):
+        return ()
+
+    contexts: list[AdviceContext] = []
+    profiles = profile_source(source, name=name)
+    for profile in profiles.profiles:
+        if profile.kind != "block" or profile.name is None:
+            continue
+        block = metadata.blocks.get(profile.name)
+        config = oob_registry.get(profile.name)
+        transport = block.get_modifier("transport") if block is not None else None
+        if config is None or transport is None or transport.value != "oob":
+            continue
+        facts: list[tuple[str, str | bool]] = [
+            ("chirp.swap", config.swap),
+            ("preserve_boundary", True),
+            ("response_boundary", True),
+            ("role", "oob-response"),
+        ]
+        if profile.name in repeated_consumers:
+            facts.append(("consumer_context", "repeated"))
+        contexts.append(AdviceContext(profile.span, tuple(facts)))
+    return tuple(contexts)
 
 
 @pytest.mark.issue(860)
@@ -132,3 +174,77 @@ def test_explicit_root_failures_keep_actionable_ownership(tmp_path: Path) -> Non
         "owner": "broken",
         "source_path": str(malformed_path),
     }
+
+
+def test_chirp_oob_context_preserves_route_response_and_exposes_nested_candidate() -> None:
+    name = "app/messages.html"
+    source = (_APP_ROOT / "messages.html").read_text(encoding="utf-8")
+    environment = _environment()
+    adapter = KidaAdapter(environment)
+    registry = OOBRegistry()
+    registry.register(
+        "messages_oob",
+        OOBRegionConfig(target_id="messages", swap="innerHTML"),
+    )
+    registry.freeze()
+    contexts = _chirp_oob_advice_context(
+        adapter,
+        source,
+        name=name,
+        oob_registry=registry,
+        repeated_consumers=frozenset({"messages_oob"}),
+    )
+
+    without_chirp_context = advise_encapsulation_roots(_roots(), environment=environment)
+    with_chirp_context = advise_encapsulation_roots(
+        _roots(),
+        environment=environment,
+        context=contexts,
+    )
+
+    assert without_chirp_context.diagnostics == ()
+    assert len(contexts) == 1
+    assert [item.code for item in with_chirp_context.diagnostics] == ["K-MOD-102"]
+    diagnostic = with_chirp_context.diagnostics[0]
+    block_span = contexts[0].span
+    assert diagnostic.span.path == name
+    assert diagnostic.span != block_span
+    assert diagnostic.span.start is not None
+    assert diagnostic.span.end is not None
+    assert block_span.start is not None
+    assert block_span.end is not None
+    assert block_span.start.line <= diagnostic.span.start.line
+    assert diagnostic.span.end.line <= block_span.end.line
+    assert "preserves the outer boundary" in diagnostic.notes[-1]
+    advice_facts = json.loads(dict(diagnostic.metadata)["advice_context"])[0]["facts"]
+    assert advice_facts == {
+        "consumer_context": "repeated",
+        "preserve_boundary": True,
+        "response_boundary": True,
+        "role": "oob-response",
+    }
+
+    metadata = adapter.template_metadata(name)
+    assert isinstance(metadata, TemplateMetadata)
+    response_block = metadata.blocks["messages_oob"]
+    assert response_block.get_modifier("transport").value == "oob"
+    assert registry.registered_blocks == frozenset({"messages_oob"})
+    assert registry.resolve_serialization("messages") == ("innerHTML", True)
+    render_context = {
+        "current_user": {"id": "u1"},
+        "messages": [
+            {
+                "author": {"avatar": "/ada.png", "id": "u1", "name": "Ada"},
+                "body": "Adapter context stays downstream.",
+                "created_at": "2026-07-17T19:00:00Z",
+                "id": "m1",
+                "permalink": "/messages/m1",
+                "relative_time": "now",
+            }
+        ],
+    }
+    route_html = adapter.render_template(name, render_context)
+    response_html = adapter.render_block(name, "messages_oob", render_context)
+    assert 'class="message-row"' in route_html
+    assert response_html.strip() in route_html
+    assert ">Edit</button>" in response_html
