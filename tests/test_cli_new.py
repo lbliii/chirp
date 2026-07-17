@@ -75,8 +75,11 @@ class TestChirpNewDefaultV2:
         assert (project / "pages" / "login" / "page.html").is_file()
         assert (project / "pages" / "dashboard" / "page.py").is_file()
         assert (project / "pages" / "dashboard" / "page.html").is_file()
+        assert (project / "templates" / "components" / "chrome" / "panel.html").is_file()
+        assert (project / "templates" / "patterns" / "account_summary.html").is_file()
+        assert (project / "templates" / "_partials" / ".gitkeep").is_file()
         assert (project / "static" / "style.css").is_file()
-        assert (project / "static" / "theme.css").is_file()
+        assert not (project / "static" / "theme.css").exists()
         assert (project / "AGENTS.md").is_file()
         assert (project / "pyproject.toml").is_file()
         assert (project / "railway.json").is_file()
@@ -110,7 +113,7 @@ class TestChirpNewDefaultV2:
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(_new, "_has_chirpui", lambda: True)
-        main(["new", "myapp"])
+        main(["new", "myapp", "--with-chirpui"])
 
         layout = (tmp_path / "myapp" / "pages" / "_layout.html").read_text()
         assert "/static/chirpui.css" in layout
@@ -133,7 +136,7 @@ class TestChirpNewDefaultV2:
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(_new, "_has_chirpui", lambda: True)
-        main(["new", "myapp"])
+        main(["new", "myapp", "--with-chirpui"])
 
         layout = (tmp_path / "myapp" / "pages" / "_layout.html").read_text()
         assert "htmx.org@" in layout
@@ -289,7 +292,7 @@ class TestChirpNewShell:
         assert (project / "pages" / "items" / "page.html").is_file()
         assert (project / "AGENTS.md").is_file()
         assert (project / "pyproject.toml").is_file()
-        assert (project / "static" / "theme.css").is_file()
+        assert not (project / "static" / "theme.css").exists()
 
     def test_shell_app_is_valid_python(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

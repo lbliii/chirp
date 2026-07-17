@@ -258,7 +258,7 @@ def test_chirpui_scaffold_csp_nonce_posture(
     ``test_fires_in_production_with_forbidding_csp_no_nonce_mechanism`` paired
     with ``test_silent_with_csp_nonce_enabled_config``.
     """
-    project = scaffold(tmp_path, monkeypatch, mode="v2")
+    project = scaffold(tmp_path, monkeypatch, mode="v2_chirpui")
     result = run_and_parse(project, _CHIRPUI_CSP_NONCE_CODE)
     assert result.returncode == 0, (
         f"chirp-ui scaffold subprocess failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"

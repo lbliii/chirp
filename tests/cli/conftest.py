@@ -24,7 +24,7 @@ from typing import Any
 
 import pytest
 
-SCAFFOLD_MODES = ["minimal", "sse", "shell", "v2", "v2_plain"]
+SCAFFOLD_MODES = ["minimal", "sse", "shell", "v2", "v2_chirpui"]
 DEPLOYABLE_SCAFFOLD_MODES = [*SCAFFOLD_MODES, "stream", "ai"]
 
 
@@ -39,22 +39,18 @@ def _mode_args(mode: str) -> list[str]:
         return ["--stream"]
     if mode == "ai":
         return ["--ai"]
-    return []  # v2 / v2_plain
+    if mode == "v2_chirpui":
+        return ["--with-chirpui"]
+    return []
 
 
 def scaffold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, mode: str) -> Path:
     """Write a scaffold project into ``tmp_path/project`` and return its path.
 
-    ``mode="v2_plain"`` forces the non-chirpui variant by monkeypatching the
-    feature detector (the dev env has chirp-ui installed, so the default v2
-    branch would pick chirpui otherwise).
+    ``mode="v2"`` always emits the app-owned scaffold. ``mode="v2_chirpui"``
+    explicitly requests the compatibility scaffold.
     """
     from chirp.cli import main
-
-    if mode == "v2_plain":
-        import chirp.cli._new as _new_mod
-
-        monkeypatch.setattr(_new_mod, "_has_chirpui", lambda: False)
 
     monkeypatch.chdir(tmp_path)
     main(["new", "project", *_mode_args(mode)])

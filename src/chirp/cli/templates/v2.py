@@ -29,6 +29,7 @@ _debug = os.environ.get("CHIRP_DEBUG", "1" if _env != "production" else "0") not
 config = AppConfig.from_env(
     secret_key=_secret,
     template_dir="pages",
+    component_dirs=("templates",),
     env=_env,
     debug=_debug,
 )
@@ -242,10 +243,11 @@ V2_LAYOUT_HTML = """\
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}App{% endblock %}</title>
     <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" defer></script>
 </head>
 <body>
     {% set user = current_user() %}
-    <nav>
+    <nav hx-boost="true" hx-target="#page-root" hx-select="#page-root">
         <a href="/">Home</a>
         {% if user.is_authenticated %}
         <a href="/dashboard">Dashboard</a>
@@ -440,16 +442,43 @@ def get() -> Page:
 """
 
 V2_DASHBOARD_HTML = """\
+{% imports %}
+{% from "patterns/account_summary.html" import account_summary %}
+{% end %}
 {% block page_root %}
 <div id="page-root">
 {% block page_root_inner %}
 {% block page_content %}
 <h1>Dashboard</h1>
-<p>Welcome, <strong>{{ user.name }}</strong>!</p>
-<p>This page is protected by <code>@login_required</code>.</p>
+{% call account_summary(user.name, "Administrator") %}
+<p>This route page owns the named response block used for full and htmx requests.</p>
+{% end %}
 {% end %}
 {% end %}
 </div>
+{% end %}
+"""
+
+V2_PANEL_COMPONENT_HTML = """\
+{# Typed, reusable UI with an accessibility contract and caller-owned content. #}
+{% def panel(title: str, heading_id: str) %}
+<section class="panel" aria-labelledby="{{ heading_id }}">
+    <h2 id="{{ heading_id }}">{{ title }}</h2>
+    <div class="panel__body">{% slot %}</div>
+</section>
+{% end %}
+"""
+
+V2_PATTERN_ACCOUNT_SUMMARY_HTML = """\
+{# Product vocabulary belongs in patterns; route response blocks do not. #}
+{% imports %}
+{% from "components/chrome/panel.html" import panel %}
+{% end %}
+{% def account_summary(user_name: str, role: str) %}
+{% call panel("Account summary", "account-summary-title") %}
+<p>Welcome, <strong>{{ user_name }}</strong>!</p>
+<p><span class="status"><span class="sr-only">Access level:</span> {{ role }}</span></p>
+{% end %}
 {% end %}
 """
 
@@ -543,6 +572,10 @@ nav {{
 nav a {{ text-decoration: none; color: #94a3b8; }}
 nav a:hover {{ color: #f8fafc; }}
 nav form {{ margin-left: auto; }}
+.panel {{ border: 1px solid #334155; border-radius: 0.75rem; padding: 1rem; }}
+.panel__body {{ display: grid; gap: 0.75rem; margin-top: 0.75rem; }}
+.status {{ display: inline-flex; align-items: center; border-radius: 999px; padding: 0.25rem 0.6rem; background: #1e3a5f; }}
+.sr-only {{ position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }}
 .error {{ color: #f87171; margin-bottom: 1rem; font-size: 0.9rem; }}
 label {{ display: block; margin-top: 0.75rem; font-weight: 600; color: #f8fafc; }}
 input {{
@@ -628,6 +661,26 @@ async def test_login_failure():
         r = await client.post(
             "/login",
             body=f"username=admin&password=wrong&_csrf_token={{csrf}}".encode(),
+            headers={{
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Cookie": f"chirp_session={{cookie}}",
+            }},
+        )
+        assert r.status == 200
+        assert "Invalid" in r.text
+
+
+async def test_login_malformed_form():
+    \"\"\"Missing fields follow the async validation path without a server error.\"\"\"
+    from app import app
+    async with TestClient(app) as client:
+        r1 = await client.get("/login")
+        csrf = _extract_csrf_token(r1.text)
+        cookie = _extract_cookie(r1)
+        assert csrf and cookie
+        r = await client.post(
+            "/login",
+            body=f"_csrf_token={{csrf}}".encode(),
             headers={{
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Cookie": f"chirp_session={{cookie}}",
