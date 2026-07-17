@@ -98,8 +98,9 @@ commands are not discoverable or callable through MCP.
 
 `chirp new <name>` creates a project directory you can run immediately. The
 default scaffold is auth-ready: a filesystem-routed `pages/` tree with a login
-flow, a dashboard, the secure-by-default middleware stack, and a passing
-`chirp check`. Flags switch to a different starting point.
+flow, a dashboard, explicit app-owned Kida components and patterns, the
+secure-by-default middleware stack, and a passing `chirp check`. Flags switch to
+a different starting point.
 
 ```bash
 chirp new myapp
@@ -115,7 +116,7 @@ and a dashboard at `/dashboard`. It refuses to overwrite an existing directory.
 * - Flag
   - Result
 * - *(none)*
-  - Auth + dashboard + filesystem routing (`pages/`), tests, `pyproject.toml`.
+  - Auth + dashboard + filesystem routing (`pages/`), app-owned components and patterns (`templates/`), tests, `pyproject.toml`.
 * - `--minimal`
   - A single-file project: `app.py` plus `templates/index.html`.
 * - `--sse`
@@ -136,10 +137,10 @@ the secret key from `CHIRP_SECRET_KEY`, so a generated app passes `chirp check`
 out of the box.
 
 :::{note}
-`--with-chirpui` is a hard requirement, not a hint. The other scaffolds detect
-chirp-ui automatically: if it is installed they emit chirp-ui templates, and if
-it is not they fall back to plain HTML. `--with-chirpui` instead exits with an
-error when chirp-ui is missing, so a CI scaffold cannot silently degrade.
+Default generation is deterministic: merely installing chirp-ui never changes
+the files `chirp new` writes. `--with-chirpui` is the explicit compatibility
+choice and a hard requirement, not a hint; it exits with an error when chirp-ui
+is missing, so CI cannot silently produce a different scaffold.
 :::
 
 ## `chirp check` — validate contracts

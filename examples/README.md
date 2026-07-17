@@ -5,6 +5,13 @@ Examples are organized by runtime layer so the support matrix is obvious:
 - [`examples/standalone`](examples/standalone/README.md): baseline Chirp without `chirp_ui`
 - [`examples/chirpui`](examples/chirpui/README.md): app-shell and component-driven examples using ChirpUI
 
+For the maintained app-owned template architecture, generate the executable
+example directly with `chirp new modular_app`. Its `pages/` tree owns layouts
+and named full/fragment response blocks, while the explicit `templates/` root
+separates typed Kida components, product patterns, and rare private partials.
+Generation does not change when chirp-ui is installed; request the compatibility
+example deliberately with `--with-chirpui`.
+
 ## Learning path
 
 | Tier | Example | Teaches |

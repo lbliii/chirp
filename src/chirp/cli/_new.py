@@ -57,6 +57,8 @@ from chirp.cli.templates import (
     V2_LOGIN_HTML,
     V2_LOGIN_PAGE_PY,
     V2_MODELS_PY,
+    V2_PANEL_COMPONENT_HTML,
+    V2_PATTERN_ACCOUNT_SUMMARY_HTML,
     V2_STYLE_CHIRPUI_CSS,
     V2_STYLE_CSS,
     V2_TEST_APP_PY,
@@ -118,9 +120,17 @@ def create_project(args: argparse.Namespace) -> None:
     elif getattr(args, "sse", False):
         _create_sse(project_dir, args.name)
     elif getattr(args, "shell", False):
-        _create_shell(project_dir, args.name)
+        _create_shell(
+            project_dir,
+            args.name,
+            with_chirpui=getattr(args, "with_chirpui", False),
+        )
     else:
-        _create_v2(project_dir, args.name)
+        _create_v2(
+            project_dir,
+            args.name,
+            with_chirpui=getattr(args, "with_chirpui", False),
+        )
 
     print(f"Created project '{args.name}'")
     if (
@@ -136,18 +146,23 @@ def create_project(args: argparse.Namespace) -> None:
         print("  Dashboard: http://localhost:8000/dashboard")
 
 
-def _create_v2(project_dir: Path, name: str) -> None:
+def _create_v2(project_dir: Path, name: str, *, with_chirpui: bool) -> None:
     """Generate the v2 project layout (auth + dashboard + primitives)."""
-    use_chirpui = _has_chirpui()
+    use_chirpui = with_chirpui
     pages_dir = project_dir / "pages"
     static_dir = project_dir / "static"
     tests_dir = project_dir / "tests"
+    templates_dir = project_dir / "templates"
 
     project_dir.mkdir(parents=True)
     (project_dir / "models.py").write_text(V2_MODELS_PY)
     pages_dir.mkdir(parents=True)
     static_dir.mkdir(parents=True)
     tests_dir.mkdir(parents=True)
+    if not use_chirpui:
+        (templates_dir / "components" / "chrome").mkdir(parents=True)
+        (templates_dir / "patterns").mkdir(parents=True)
+        (templates_dir / "_partials").mkdir(parents=True)
 
     if use_chirpui:
         (project_dir / "app.py").write_text(V2_APP_CHIRPUI_PY)
@@ -176,20 +191,29 @@ def _create_v2(project_dir: Path, name: str) -> None:
         V2_DASHBOARD_CHIRPUI_HTML if use_chirpui else V2_DASHBOARD_HTML,
     )
 
-    (static_dir / "style.css").write_text(
-        V2_STYLE_CHIRPUI_CSS if use_chirpui else V2_STYLE_CSS,
-    )
+    if not use_chirpui:
+        (templates_dir / "components" / "chrome" / "panel.html").write_text(
+            V2_PANEL_COMPONENT_HTML,
+        )
+        (templates_dir / "patterns" / "account_summary.html").write_text(
+            V2_PATTERN_ACCOUNT_SUMMARY_HTML,
+        )
+        (templates_dir / "_partials" / ".gitkeep").write_text("")
+
+    style = V2_STYLE_CHIRPUI_CSS if use_chirpui else V2_STYLE_CSS
+    (static_dir / "style.css").write_text(style.format())
 
     (tests_dir / "conftest.py").write_text(V2_CONFTEST_PY)
     (tests_dir / "test_app.py").write_text(V2_TEST_APP_PY.format(name=name))
 
     _write_scaffold_extras(project_dir, name)
-    (static_dir / "theme.css").write_text(THEME_CSS_STUB, encoding="utf-8")
+    if use_chirpui:
+        (static_dir / "theme.css").write_text(THEME_CSS_STUB, encoding="utf-8")
 
 
-def _create_shell(project_dir: Path, name: str) -> None:
+def _create_shell(project_dir: Path, name: str, *, with_chirpui: bool) -> None:
     """Generate project with persistent app shell (topbar, sidebar)."""
-    use_chirpui = _has_chirpui()
+    use_chirpui = with_chirpui
     pages_dir = project_dir / "pages"
     static_dir = project_dir / "static"
 
@@ -212,7 +236,8 @@ def _create_shell(project_dir: Path, name: str) -> None:
     (items_dir / "page.html").write_text(SHELL_ITEMS_PAGE_HTML)
 
     _write_scaffold_extras(project_dir, name)
-    (static_dir / "theme.css").write_text(THEME_CSS_STUB, encoding="utf-8")
+    if use_chirpui:
+        (static_dir / "theme.css").write_text(THEME_CSS_STUB, encoding="utf-8")
 
 
 def _create_minimal(project_dir: Path, name: str) -> None:

@@ -7,6 +7,24 @@ This is a Chirp app. Chirp renders server-side HTML and uses return types
 (`Page`, `Fragment`, `OOB`, `Suspense`, `EventStream`, `ValidationError`) to
 declare browser behavior.
 
+## Template ownership
+
+The default filesystem-routed scaffold uses these boundaries. A smaller
+scaffold variant may omit directories it does not need.
+
+- `pages/` owns routes, layouts, and each route's named response blocks. Reuse
+  those blocks for full-page and htmx responses; do not add a parallel partial
+  response tree.
+- `templates/components/` owns reusable Kida components with meaningful typed
+  props, slots, or accessibility behavior.
+- `templates/patterns/` owns product-specific compositions of components.
+- `templates/_partials/` is reserved for rare, private markup coupled to one
+  owner. Promote shared or input-sensitive markup to a component or pattern.
+- `static/` is app-owned source. Chirp does not own this app's visual identity.
+
+Keep short, route-specific markup inline. Extract a component when its props,
+slots, reuse, or accessibility contract form a useful stable interface.
+
 ## Debugging
 
 When debugging htmx swaps, OOB updates, Suspense blocks, SSE, fragment targets,

@@ -345,9 +345,11 @@ on `<html>`. To load an alternate theme, add its stylesheet:
 
 ## Scaffolding
 
-When chirp-ui is installed, `chirp new <name>` scaffolds a project with
-`use_chirp_ui(app)` already wired into the app module and `chirpui.css` linked
-in the base template.
+`chirp new <name>` always emits the deterministic app-owned scaffold, regardless
+of which optional packages happen to be installed. Use
+`chirp new <name> --with-chirpui` to explicitly scaffold the compatibility
+variant with `use_chirp_ui(app)` wired into the app module and `chirpui.css`
+linked in the base template. The command fails if chirp-ui is unavailable.
 
 ## Next steps
 

@@ -36,10 +36,16 @@ myapp/
       page.html       # Login template
     dashboard/
       page.py         # Protected dashboard handler
-      page.html       # Dashboard template
+      page.html       # Route-owned full + fragment response blocks
+  templates/          # Explicit AppConfig.component_dirs root
+    components/
+      chrome/
+        panel.html    # Typed, slotted Kida component with a11y behavior
+    patterns/
+      account_summary.html  # Product-specific component composition
+    _partials/        # Rare private details coupled to one owner
   static/
-    style.css         # CSS, JS, images
-    theme.css         # Optional ChirpUI token overrides
+    style.css         # App-owned CSS and visual identity
   migrations/         # SQL migration files (empty to start)
     README.md
   tests/
@@ -60,6 +66,9 @@ full set.
 | `app.py` | App creation, middleware setup, auth routes, `if __name__ == "__main__": app.run()` |
 | `models.py` | User model and credential verification helpers for scaffolded auth |
 | `pages/` | Filesystem routes. Paths are relative to `AppConfig(template_dir="pages")`. |
+| `templates/components/` | Reusable Kida components with meaningful typed props, slots, or accessibility behavior. |
+| `templates/patterns/` | Product-specific compositions; route pages still own response blocks. |
+| `templates/_partials/` | Rare private markup coupled to one owner, never a parallel HTMX response tree. |
 | `static/` | CSS, JS, images. Served at `/static` by default. |
 | `migrations/` | SQL migration files. `chirp makemigrations` writes here. |
 | `tests/` | Pytest tests. Use `TestClient(app)` for requests. |
@@ -74,6 +83,12 @@ writes `pyproject.toml`, `AGENTS.md`, and an empty `migrations/` directory.
 The auth + dashboard starter above (`chirp new myapp`). Filesystem routing under
 `pages/`, a login flow, and a protected dashboard. This is the recommended
 starting point for a real app.
+
+The dashboard demonstrates the ownership boundary: its route page declares
+`page_root` and `page_content`, imports an account-summary product pattern, and
+that pattern composes a typed, slotted panel component. Normal and HTMX requests
+select blocks from the same route page; do not create a second partial-template
+tree for HTMX.
 :::{/tab-item}
 
 :::{tab-item} Minimal
@@ -129,7 +144,7 @@ dataclass:
 
 - **Template directory:** `AppConfig(template_dir="pages")`
 - **Static directory:** `AppConfig(static_dir="assets")`
-- **Component libraries:** `AppConfig(component_dirs=("components",))` for shared partials
+- **Component libraries:** `AppConfig(component_dirs=("templates",))` for the scaffold's explicit components and patterns root
 
 ## Next Steps
 
