@@ -83,7 +83,7 @@ def base_url() -> Iterator[str]:
             if proc.poll() is not None:
                 raise RuntimeError(f"server exited early code={proc.returncode}")
             try:
-                with urllib.request.urlopen(url, timeout=2) as resp:  # noqa: S310
+                with urllib.request.urlopen(url, timeout=2) as resp:  # noqa: S310, RUF100 -- fixed loopback URL
                     if resp.status == 200:
                         break
             except urllib.error.URLError, ConnectionError, OSError:

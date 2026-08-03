@@ -1,8 +1,12 @@
 """Focused repair and redaction guarantees for contract diagnostics."""
 
+import pytest
+
 from chirp import App, AppConfig
 from chirp.contracts import CheckResult, check_hypermedia_surface
 from chirp.contracts.serialize import issue_to_dict
+
+pytestmark = pytest.mark.issue(879)
 
 
 def test_plugin_failure_has_compact_terminal_and_json_repair_guidance(tmp_path) -> None:

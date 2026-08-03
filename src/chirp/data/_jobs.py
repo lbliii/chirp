@@ -20,7 +20,7 @@ from chirp.data._mapping import map_row
 from chirp.data.database import Database, _execute_fetch_one, _execute_statement
 from chirp.data.errors import DataError, QueryError
 
-type JSONValue = None | bool | int | float | str | list[JSONValue] | dict[str, JSONValue]
+type JSONValue = bool | int | float | str | list[JSONValue] | dict[str, JSONValue] | None
 type JobState = Literal["pending", "running", "succeeded", "failed"]
 
 _SCHEMA_VERSION = 1
