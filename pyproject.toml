@@ -313,7 +313,7 @@ dev = [
     # Type Checking
     "ty==0.0.34", # 0.0.60 rejects guarded dataclass classes; keep CI deterministic
     # Linting & Formatting
-    "ruff>=0.15.1", # Require ruff>=0.15.1 for correct handling of newer Python syntax
+    "ruff==0.15.12", # Keep CI lint/format deterministic; 0.16 reformats Markdown code fences
     # Changelog
     "towncrier>=24.8.0",
     # Task runner — `poe <task>` / the `poe preflight` pre-push hook + docs rely on it
