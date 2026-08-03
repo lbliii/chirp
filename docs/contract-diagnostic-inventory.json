@@ -1,0 +1,54 @@
+{
+  "schema_version": 5,
+  "scope": "recursive src/chirp/contracts/**/*.py ContractIssue emission sites",
+  "family_assignment": "Emitter rows carry explicit audit-family assignments; the AST test only guards source identity drift.",
+  "field_order": [
+    "id",
+    "severity_expression",
+    "category_expression",
+    "message_family_hash",
+    "message_expression",
+    "line",
+    "audit_family"
+  ],
+  "audit_families": {
+    "declared_surface": {
+      "classification": "actionable",
+      "repair_surface": "The route and/or template metadata on the finding.",
+      "repair_rationale": "The message identifies a broken declared relationship and the metadata points to the owning source.",
+      "uncertainty": "Static analysis cannot prove dynamic request data or browser behavior."
+    },
+    "rule_specific_detail": {
+      "classification": "actionable",
+      "repair_surface": "The rule-specific declaration or configuration named in details.",
+      "repair_rationale": "The rule author supplied a concrete alternative, discovered value, or source location beyond the stable message.",
+      "uncertainty": "Static analysis cannot prove dynamic request data or browser behavior."
+    },
+    "self_describing_configuration": {
+      "classification": "actionable",
+      "repair_surface": "The explicitly named application registration, middleware, or configuration subject in the message.",
+      "repair_rationale": "These emitters have no route/template metadata or detail because the stable message itself names the exact setting or registration to change.",
+      "uncertainty": "Static analysis cannot prove runtime values supplied outside the compiled application."
+    },
+    "contextual_static_evidence": {
+      "classification": "contextual",
+      "repair_surface": "The template or content construct named by the warning.",
+      "repair_rationale": "The warning intentionally requests human content/design review rather than claiming a runtime failure or a single mandatory implementation.",
+      "uncertainty": "Static source evidence cannot prove user intent, accessible name quality, or browser behavior."
+    },
+    "redacted_plugin_wrapper": {
+      "classification": "actionable",
+      "repair_surface": "The registered custom check named in the finding.",
+      "repair_rationale": "The wrapper preserves the check identity and exception type while details explain the local repair path without exposing exception text.",
+      "uncertainty": "The original exception text is deliberately unavailable in shared contract output."
+    },
+    "dynamic_category": {
+      "classification": "actionable",
+      "repair_surface": "The dynamic category expression and its owning rule source in the emitter id.",
+      "repair_rationale": "The source expression is retained verbatim so dynamic category selection is auditable without pretending it is a fixed literal.",
+      "uncertainty": "The selected category depends on compiled application inputs and static analysis cannot predict every runtime value."
+    }
+  },
+  "emitter_inventory": "contract-diagnostic-inventory.jsonl",
+  "emitter_count": 204
+}

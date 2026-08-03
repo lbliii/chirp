@@ -1,0 +1,341 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:chirp:internal:agent-buildability-eval-v1",
+  "title": "Proposed internal Chirp coding-agent evaluation receipt v1",
+  "description": "Decision collateral for RFC 026; not a public Chirp compatibility surface.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "run_kind",
+    "task",
+    "environment",
+    "lane",
+    "context",
+    "permissions",
+    "artifacts",
+    "events",
+    "interventions",
+    "repairs",
+    "suppressions",
+    "checks",
+    "failures",
+    "redaction",
+    "reproducibility",
+    "handoff",
+    "result"
+  ],
+  "properties": {
+    "schema_version": {"const": "agent-buildability-eval-v1"},
+    "run_id": {"$ref": "#/$defs/id"},
+    "run_kind": {"enum": ["construction", "handoff"]},
+    "task": {"$ref": "#/$defs/task"},
+    "environment": {"$ref": "#/$defs/environment"},
+    "lane": {"$ref": "#/$defs/lane"},
+    "context": {"$ref": "#/$defs/context"},
+    "permissions": {"$ref": "#/$defs/permissions"},
+    "artifacts": {"type": "array", "items": {"$ref": "#/$defs/artifact"}},
+    "events": {"type": "array", "items": {"$ref": "#/$defs/event"}},
+    "interventions": {"type": "array", "items": {"$ref": "#/$defs/intervention"}},
+    "repairs": {"type": "array", "items": {"$ref": "#/$defs/repair"}},
+    "suppressions": {"type": "array", "items": {"$ref": "#/$defs/suppression"}},
+    "checks": {"type": "array", "items": {"$ref": "#/$defs/check"}},
+    "failures": {"type": "array", "items": {"$ref": "#/$defs/failure"}},
+    "redaction": {"$ref": "#/$defs/redaction"},
+    "reproducibility": {"$ref": "#/$defs/reproducibility"},
+    "handoff": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/handoff"}]},
+    "result": {"$ref": "#/$defs/result"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"run_kind": {"const": "construction"}}},
+      "then": {"properties": {"handoff": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"run_kind": {"const": "handoff"}}},
+      "then": {
+        "properties": {
+          "handoff": {"$ref": "#/$defs/handoff"},
+          "context": {
+            "allOf": [
+              {"$ref": "#/$defs/context"},
+              {"properties": {"prior_conversation": {"const": "none"}}}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"result": {"properties": {"status": {"const": "pass"}}}}},
+      "then": {
+        "properties": {
+          "result": {
+            "allOf": [
+              {"$ref": "#/$defs/result"},
+              {
+                "properties": {
+                  "required_checks_passed": {"const": true},
+                  "undeclared_interventions": {"const": 0},
+                  "invalid_suppressions": {"const": 0},
+                  "missing_artifacts": {"const": 0}
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "minLength": 1},
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "nullable_id": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+    "nullable_digest": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/digest"}]},
+    "string_list": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "id_list": {"type": "array", "items": {"$ref": "#/$defs/id"}, "uniqueItems": true},
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "packet_sha256", "objective_sha256"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "packet_sha256": {"$ref": "#/$defs/digest"},
+        "objective_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_revision", "platform", "python_version", "chirp_revision", "dependency_lock_sha256", "locale", "timezone"],
+      "properties": {
+        "repository_revision": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "platform": {"type": "string", "minLength": 1},
+        "python_version": {"type": "string", "minLength": 1},
+        "chirp_revision": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "dependency_lock_sha256": {"$ref": "#/$defs/digest"},
+        "locale": {"type": "string", "minLength": 1},
+        "timezone": {"type": "string", "minLength": 1}
+      }
+    },
+    "lane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "executor_kind", "provider", "model", "model_revision", "parameters_sha256", "attempt"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "executor_kind": {"enum": ["deterministic", "live_model"]},
+        "provider": {"type": ["string", "null"]},
+        "model": {"type": ["string", "null"]},
+        "model_revision": {"type": ["string", "null"]},
+        "parameters_sha256": {"$ref": "#/$defs/nullable_digest"},
+        "attempt": {"type": "integer", "minimum": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"executor_kind": {"const": "deterministic"}}},
+          "then": {
+            "properties": {
+              "provider": {"type": "null"},
+              "model": {"type": "null"},
+              "model_revision": {"type": "null"},
+              "parameters_sha256": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"executor_kind": {"const": "live_model"}}},
+          "then": {
+            "properties": {
+              "provider": {"type": "string", "minLength": 1},
+              "model": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      ]
+    },
+    "context_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "locator", "sha256"],
+      "properties": {
+        "kind": {"enum": ["task", "repository_instructions", "documentation", "example", "tool_help", "source"]},
+        "locator": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["public_only", "bundle_sha256", "entries", "prior_conversation", "private_instructions"],
+      "properties": {
+        "public_only": {"type": "boolean"},
+        "bundle_sha256": {"$ref": "#/$defs/digest"},
+        "entries": {"type": "array", "items": {"$ref": "#/$defs/context_entry"}, "minItems": 1},
+        "prior_conversation": {"enum": ["none", "public_task_only", "full"]},
+        "private_instructions": {"type": "boolean"}
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tools", "write_roots", "network", "network_allowlist"],
+      "properties": {
+        "tools": {"$ref": "#/$defs/string_list"},
+        "write_roots": {"$ref": "#/$defs/string_list"},
+        "network": {"enum": ["denied", "allowlisted", "unrestricted"]},
+        "network_allowlist": {"$ref": "#/$defs/string_list"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "uri", "sha256", "media_type", "redacted", "producer_event_id"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "minLength": 1},
+        "uri": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "media_type": {"type": "string", "minLength": 1},
+        "redacted": {"type": "boolean"},
+        "producer_event_id": {"$ref": "#/$defs/nullable_id"}
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sequence", "actor", "kind", "summary", "command", "exit_code", "artifact_ids", "intervention_id"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "sequence": {"type": "integer", "minimum": 1},
+        "actor": {"enum": ["agent", "human", "harness"]},
+        "kind": {"type": "string", "minLength": 1},
+        "summary": {"type": "string", "minLength": 1},
+        "command": {"type": ["string", "null"]},
+        "exit_code": {"type": ["integer", "null"]},
+        "artifact_ids": {"$ref": "#/$defs/id_list"},
+        "intervention_id": {"$ref": "#/$defs/nullable_id"}
+      }
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "declared", "summary", "event_id", "material"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["instruction", "implementation", "edit", "environment", "credential", "retry_selection", "other"]},
+        "declared": {"type": "boolean"},
+        "summary": {"type": "string", "minLength": 1},
+        "event_id": {"$ref": "#/$defs/id"},
+        "material": {"type": "boolean"}
+      }
+    },
+    "repair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "failure_ids", "finding_ids", "iteration", "event_ids", "outcome", "bypass_kind"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "failure_ids": {"$ref": "#/$defs/id_list"},
+        "finding_ids": {"$ref": "#/$defs/string_list"},
+        "iteration": {"type": "integer", "minimum": 1},
+        "event_ids": {"$ref": "#/$defs/id_list"},
+        "outcome": {"enum": ["repaired", "failed", "bypassed"]},
+        "bypass_kind": {"type": ["string", "null"]}
+      }
+    },
+    "suppression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "mechanism", "location", "justification", "required_finding", "disposition"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "mechanism": {"type": "string", "minLength": 1},
+        "location": {"type": "string", "minLength": 1},
+        "justification": {"type": "string", "minLength": 1},
+        "required_finding": {"type": "boolean"},
+        "disposition": {"enum": ["approved", "invalid", "removed"]}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "status", "required", "artifact_ids", "summary"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["inspection", "contract_diff", "test", "browser", "security", "accessibility", "no_js", "artifact_integrity", "redaction", "task_assertion"]},
+        "status": {"enum": ["pass", "fail", "not_run"]},
+        "required": {"type": "boolean"},
+        "artifact_ids": {"$ref": "#/$defs/id_list"},
+        "summary": {"type": "string", "minLength": 1}
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "class", "owner", "summary", "artifact_ids"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "class": {"enum": ["task", "framework", "executor", "environment", "harness", "nondeterminism", "privacy"]},
+        "owner": {"enum": ["chirp", "evaluation_task", "executor", "environment", "harness", "unclassified"]},
+        "summary": {"type": "string", "minLength": 1},
+        "artifact_ids": {"$ref": "#/$defs/id_list"}
+      }
+    },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_version", "secret_scan", "privacy_scan", "removed_items", "unresolved"],
+      "properties": {
+        "policy_version": {"type": "string", "minLength": 1},
+        "secret_scan": {"enum": ["pass", "fail", "not_run"]},
+        "privacy_scan": {"enum": ["pass", "fail", "not_run"]},
+        "removed_items": {"type": "integer", "minimum": 0},
+        "unresolved": {"type": "boolean"}
+      }
+    },
+    "reproducibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offline_replay", "replay_of", "deterministic_checks_sha256", "repeated_run_ids", "variance_notes"],
+      "properties": {
+        "offline_replay": {"enum": ["pass", "fail", "not_run"]},
+        "replay_of": {"$ref": "#/$defs/nullable_id"},
+        "deterministic_checks_sha256": {"$ref": "#/$defs/digest"},
+        "repeated_run_ids": {"$ref": "#/$defs/id_list"},
+        "variance_notes": {"$ref": "#/$defs/string_list"}
+      }
+    },
+    "handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_run_id", "source_receipt_sha256", "context_reset", "original_conversation_provided", "change_request_sha256", "topology_summary_artifact_id", "before_graph_artifact_id", "after_graph_artifact_id", "obsolete_surface_check_id"],
+      "properties": {
+        "source_run_id": {"$ref": "#/$defs/id"},
+        "source_receipt_sha256": {"$ref": "#/$defs/digest"},
+        "context_reset": {"const": true},
+        "original_conversation_provided": {"const": false},
+        "change_request_sha256": {"$ref": "#/$defs/digest"},
+        "topology_summary_artifact_id": {"$ref": "#/$defs/id"},
+        "before_graph_artifact_id": {"$ref": "#/$defs/id"},
+        "after_graph_artifact_id": {"$ref": "#/$defs/id"},
+        "obsolete_surface_check_id": {"$ref": "#/$defs/id"}
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "required_checks_passed", "undeclared_interventions", "invalid_suppressions", "missing_artifacts", "framework_failure_ids", "reasons"],
+      "properties": {
+        "status": {"enum": ["pass", "fail", "incomplete"]},
+        "required_checks_passed": {"type": "boolean"},
+        "undeclared_interventions": {"type": "integer", "minimum": 0},
+        "invalid_suppressions": {"type": "integer", "minimum": 0},
+        "missing_artifacts": {"type": "integer", "minimum": 0},
+        "framework_failure_ids": {"$ref": "#/$defs/id_list"},
+        "reasons": {"$ref": "#/$defs/string_list"}
+      }
+    }
+  }
+}
