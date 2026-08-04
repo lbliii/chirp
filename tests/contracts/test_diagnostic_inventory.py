@@ -17,12 +17,18 @@ def _emitted_contract_issue_identities() -> list[list[str]]:
     for source_path in sorted(_CONTRACTS.rglob("*.py")):
         source = source_path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(source_path))
-        relative = str(source_path.relative_to(_ROOT))
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
-                continue
-            if node.func.id != "ContractIssue":
-                continue
+        relative = source_path.relative_to(_ROOT).as_posix()
+        issue_calls = sorted(
+            (
+                node
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "ContractIssue"
+            ),
+            key=lambda node: (node.lineno, node.col_offset),
+        )
+        for node in issue_calls:
             keywords = {item.arg: item.value for item in node.keywords if item.arg is not None}
             category = keywords.get("category")
             severity = keywords.get("severity")
