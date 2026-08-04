@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:chirp:internal:agent-buildability-quality-v1",
+  "title": "Proposed internal Chirp agent-buildability quality report v1",
+  "description": "Decision collateral for RFC 027; not a public Chirp compatibility surface.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_version",
+    "report_id",
+    "subject",
+    "overall_status",
+    "evidence_set_sha256",
+    "artifacts",
+    "dimensions",
+    "excluded_claims",
+    "integrity",
+    "signoffs"
+  ],
+  "properties": {
+    "profile_version": {"const": "agent-buildability-quality-v1"},
+    "report_id": {"$ref": "#/$defs/id"},
+    "subject": {"$ref": "#/$defs/subject"},
+    "overall_status": {"enum": ["pass", "fail", "incomplete"]},
+    "evidence_set_sha256": {"$ref": "#/$defs/digest"},
+    "artifacts": {"type": "array", "items": {"$ref": "#/$defs/artifact"}},
+    "dimensions": {"type": "array", "items": {"$ref": "#/$defs/dimension"}, "minItems": 1},
+    "excluded_claims": {"type": "array", "items": {"$ref": "#/$defs/excluded_claim"}, "minItems": 1},
+    "integrity": {"$ref": "#/$defs/integrity"},
+    "signoffs": {"$ref": "#/$defs/signoffs"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"overall_status": {"const": "pass"}}},
+      "then": {
+        "properties": {
+          "integrity": {
+            "allOf": [
+              {"$ref": "#/$defs/integrity"},
+              {
+                "properties": {
+                  "missing_artifacts": {"const": 0},
+                  "suppression_count": {"const": 0},
+                  "unresolved_redactions": {"const": 0}
+                }
+              }
+            ]
+          },
+          "signoffs": {
+            "properties": {
+              "contracts": {"allOf": [{"$ref": "#/$defs/signoff"}, {"properties": {"status": {"const": "approved"}}}]},
+              "security": {"allOf": [{"$ref": "#/$defs/signoff"}, {"properties": {"status": {"const": "approved"}}}]},
+              "accessibility": {"allOf": [{"$ref": "#/$defs/signoff"}, {"properties": {"status": {"const": "approved"}}}]}
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "id_list": {"type": "array", "items": {"$ref": "#/$defs/id"}, "uniqueItems": true},
+    "string_list": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["app_id", "revision", "task_receipt_id"],
+      "properties": {
+        "app_id": {"$ref": "#/$defs/id"},
+        "revision": {"type": "string", "minLength": 1},
+        "task_receipt_id": {"type": ["string", "null"]}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "authority", "locator", "capture_status", "notes"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "minLength": 1},
+        "authority": {"enum": ["inspection", "testclient", "transition", "browser", "security_test", "evaluation_receipt", "human_review"]},
+        "locator": {"type": "string", "minLength": 1},
+        "capture_status": {"enum": ["captured", "skipped", "missing"]},
+        "notes": {"type": "string", "minLength": 1}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "severity", "category", "summary", "disposition"],
+      "properties": {
+        "source_id": {"$ref": "#/$defs/id"},
+        "severity": {"enum": ["error", "warning", "info"]},
+        "category": {"type": "string", "minLength": 1},
+        "summary": {"type": "string", "minLength": 1},
+        "disposition": {"enum": ["open", "resolved", "suppressed"]}
+      }
+    },
+    "dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "required",
+        "status",
+        "claim",
+        "authority_artifact_ids",
+        "observed_cases",
+        "unobserved_cases",
+        "findings",
+        "suppression_count",
+        "failure_meaning",
+        "unobserved_meaning",
+        "repair_surface",
+        "not_applicable_reason"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "structural_contracts",
+            "production_posture",
+            "security_journeys",
+            "full_page_behavior",
+            "htmx_behavior",
+            "invalid_form_behavior",
+            "transition_coverage",
+            "no_javascript_browser",
+            "static_accessibility",
+            "dynamic_accessibility",
+            "proof_integrity",
+            "human_review"
+          ]
+        },
+        "required": {"type": "boolean"},
+        "status": {"enum": ["pass", "fail", "unobserved", "suppressed", "human_review", "not_applicable"]},
+        "claim": {"type": "string", "minLength": 1},
+        "authority_artifact_ids": {"$ref": "#/$defs/id_list"},
+        "observed_cases": {"$ref": "#/$defs/string_list"},
+        "unobserved_cases": {"$ref": "#/$defs/string_list"},
+        "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+        "suppression_count": {"type": "integer", "minimum": 0},
+        "failure_meaning": {"type": "string", "minLength": 1},
+        "unobserved_meaning": {"type": "string", "minLength": 1},
+        "repair_surface": {"type": "string", "minLength": 1},
+        "not_applicable_reason": {"type": ["string", "null"]}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "pass"}}},
+          "then": {"properties": {"suppression_count": {"const": 0}, "unobserved_cases": {"maxItems": 0}, "not_applicable_reason": {"type": "null"}}}
+        },
+        {
+          "if": {"properties": {"status": {"const": "suppressed"}}},
+          "then": {"properties": {"suppression_count": {"minimum": 1}}}
+        },
+        {
+          "if": {"properties": {"status": {"const": "unobserved"}}},
+          "then": {"properties": {"unobserved_cases": {"minItems": 1}}}
+        },
+        {
+          "if": {"properties": {"status": {"const": "not_applicable"}}},
+          "then": {"properties": {"not_applicable_reason": {"type": "string", "minLength": 1}}}
+        }
+      ]
+    },
+    "excluded_claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "reason"],
+      "properties": {
+        "name": {"enum": ["aggregate_score", "wcag_conformance", "performance", "aesthetics", "ethics", "content_truth", "arbitrary_business_logic", "security_certification"]},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["missing_artifacts", "suppression_count", "unresolved_redactions"],
+      "properties": {
+        "missing_artifacts": {"type": "integer", "minimum": 0},
+        "suppression_count": {"type": "integer", "minimum": 0},
+        "unresolved_redactions": {"type": "integer", "minimum": 0}
+      }
+    },
+    "signoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reviewer", "evidence_artifact_id"],
+      "properties": {
+        "status": {"enum": ["pending", "approved", "rejected"]},
+        "reviewer": {"type": ["string", "null"]},
+        "evidence_artifact_id": {"type": ["string", "null"]}
+      }
+    },
+    "signoffs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contracts", "security", "accessibility"],
+      "properties": {
+        "contracts": {"$ref": "#/$defs/signoff"},
+        "security": {"$ref": "#/$defs/signoff"},
+        "accessibility": {"$ref": "#/$defs/signoff"}
+      }
+    }
+  }
+}

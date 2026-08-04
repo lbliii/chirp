@@ -1,0 +1,1 @@
+**Contract diagnostics** — custom contract-check failures now name the check to repair while redacting exception text that could leak sensitive local details; core route, fragment, SSE, and partial-route findings now include direct repair guidance.

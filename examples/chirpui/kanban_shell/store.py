@@ -194,7 +194,7 @@ def add_task(
         return task
 
 
-def update_task(task_id: int, **fields: str | None | tuple[str, ...]) -> Task | None:
+def update_task(task_id: int, **fields: str | tuple[str, ...] | None) -> Task | None:
     with _lock:
         for i, t in enumerate(_tasks):
             if t.id == task_id:

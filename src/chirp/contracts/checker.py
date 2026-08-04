@@ -271,6 +271,7 @@ def _route_prepass(
                         f"Got: {path!r}. See docs/routing/routes.md"
                     ),
                     route=path,
+                    details="Replace each '<name>' segment in this route registration with '{name}'.",
                 )
             )
         if getattr(route, "referenced", False):
@@ -309,6 +310,10 @@ def _route_prepass(
                                 ),
                                 route=path,
                                 template=returns.template,
+                                details=(
+                                    f"Add {{% block {returns.block} %}} to the template, or "
+                                    "correct FragmentContract.template/block on this route."
+                                ),
                             )
                         )
                 except Exception:
@@ -322,6 +327,10 @@ def _route_prepass(
                             ),
                             route=path,
                             template=returns.template,
+                            details=(
+                                "Create the declared template, or correct "
+                                "FragmentContract.template on this route."
+                            ),
                         )
                     )
         elif isinstance(returns, SSEContract) and kida_env is not None:
@@ -343,6 +352,10 @@ def _route_prepass(
                                 ),
                                 route=path,
                                 template=frag.template,
+                                details=(
+                                    f"Add {{% block {frag.block} %}} to the template, or correct "
+                                    "the Fragment declaration yielded by this SSE route."
+                                ),
                             )
                         )
                 except Exception:
@@ -356,6 +369,10 @@ def _route_prepass(
                             ),
                             route=path,
                             template=frag.template,
+                            details=(
+                                "Create the declared template, or correct the Fragment declaration "
+                                "yielded by this SSE route."
+                            ),
                         )
                     )
     referenced_templates.update(_python_template_references(router))
@@ -503,6 +520,7 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
                 severity=Severity.ERROR,
                 category="setup",
                 message="No router available — app may not have routes.",
+                details="Register at least one route or mount pages before calling app.check().",
             )
         )
         return result
@@ -633,6 +651,10 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
                                 ),
                                 template=template_name,
                                 route=matched_route,
+                                details=(
+                                    f"Change {attr_name!r} in this template or add {method} "
+                                    f"to the registered route {matched_route!r}."
+                                ),
                             )
                         )
                 else:
@@ -642,6 +664,9 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
                             category="target",
                             message=f"'{attr_name}=\"{url}\"' has no matching route.",
                             template=template_name,
+                            details=(
+                                f"Register {url!r} as a route, or correct {attr_name!r} in this template."
+                            ),
                         )
                     )
             s = extract_static_ids(source) | literal_static_ids(literal_attrs)
@@ -674,6 +699,9 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
                             category="htmx_partial",
                             message=(f'<htmx-partial src="{partial_url}"> has no matching route.'),
                             template=template_name,
+                            details=(
+                                f"Register {partial_url!r} as a route, or correct the partial src attribute."
+                            ),
                         )
                     )
 
@@ -1268,7 +1296,15 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
                     ContractIssue(
                         severity=Severity.ERROR,
                         category="plugin_check_error",
-                        message=f"Custom check '{name}' raised: {exc}",
+                        message=(
+                            f"Custom check '{name}' raised {type(exc).__name__} "
+                            "before it produced findings."
+                        ),
+                        details=(
+                            f"Repair surface: custom check {name!r}. Inspect its local "
+                            "implementation; exception text is omitted so contract output "
+                            "cannot leak credentials, private paths, or application data."
+                        ),
                     )
                 )
 

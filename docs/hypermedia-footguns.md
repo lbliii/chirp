@@ -31,3 +31,29 @@ prefer a typed return or a startup contract over documentation alone. Examples
 then become executable design notes: standalone examples show raw hypermedia
 contracts, and ChirpUI examples show how the same contracts behave inside a
 shell and component layer.
+
+## Contract diagnostic author checklist
+
+Every `ERROR` and `WARNING` emitted through `app.check()` is an actionable
+contract, not a generic lint observation. Rule authors keep the primary
+message precise and short:
+
+- Name the broken subject and the declared surface that owns it.
+- State the user-visible or runtime consequence without guessing at a fix.
+- Put rule-specific alternatives, discovered values, or locations in `details`.
+- Do not include secrets, exception text, private absolute paths, or request data.
+
+The checked-in [diagnostic inventory](contract-diagnostic-inventory.json) is
+the audit receipt for every core category, while `chirp check --json` remains
+the machine-readable inventory for findings from a particular application.
+Both preserve stable severity/category/message identity plus route, template,
+and optional detail fields. Add rule-specific repair text only where a message
+cannot already name the source, consequence, and next surface to change. Avoid
+generic suffixes: they make terminal output harder to use and do not give an
+agent a more concrete repair. Static analysis must state its limit when the
+result depends on request data or browser behavior.
+
+The audit assigns each emitter an explicit family in its readable JSONL
+receipt. The inventory test protects source identity and message-family drift;
+it does not claim that a syntax heuristic can decide whether a diagnostic is
+useful.

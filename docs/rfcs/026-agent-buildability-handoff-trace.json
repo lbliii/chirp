@@ -1,0 +1,183 @@
+{
+  "schema_version": "agent-buildability-eval-v1",
+  "run_id": "fixture-handoff-001",
+  "run_kind": "handoff",
+  "task": {
+    "id": "fixture-handoff-change",
+    "version": "1.0.0",
+    "packet_sha256": "456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123",
+    "objective_sha256": "56789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234"
+  },
+  "environment": {
+    "repository_revision": "3333333333333333333333333333333333333333",
+    "platform": "fixture-platform",
+    "python_version": "3.14.0",
+    "chirp_revision": "4444444444444444444444444444444444444444",
+    "dependency_lock_sha256": "6789abcdef0123456789abcdef0123456789abcdef0123456789abcdef012345",
+    "locale": "C.UTF-8",
+    "timezone": "UTC"
+  },
+  "lane": {
+    "id": "fixture-live-lane-b",
+    "executor_kind": "live_model",
+    "provider": "fixture-provider",
+    "model": "fixture-model",
+    "model_revision": "fixture-revision",
+    "parameters_sha256": "789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456",
+    "attempt": 1
+  },
+  "context": {
+    "public_only": true,
+    "bundle_sha256": "89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567",
+    "entries": [
+      {
+        "kind": "task",
+        "locator": "fixture://handoff/change-request.md",
+        "sha256": "56789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234"
+      },
+      {
+        "kind": "documentation",
+        "locator": "fixture://public/chirp-docs-manifest.json",
+        "sha256": "9abcdef0123456789abcdef0123456789abcdef0123456789abcdef012345678"
+      }
+    ],
+    "prior_conversation": "none",
+    "private_instructions": false
+  },
+  "permissions": {
+    "tools": ["apply_patch", "shell"],
+    "write_roots": ["workspace"],
+    "network": "denied",
+    "network_allowlist": []
+  },
+  "artifacts": [
+    {
+      "id": "artifact-topology-summary",
+      "kind": "topology_summary",
+      "uri": "fixture://handoff/topology-summary.md",
+      "sha256": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+      "media_type": "text/markdown",
+      "redacted": true,
+      "producer_event_id": "event-topology-summary"
+    },
+    {
+      "id": "artifact-graph-before",
+      "kind": "contract_projection",
+      "uri": "fixture://handoff/graph-before.json",
+      "sha256": "bcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789a",
+      "media_type": "application/json",
+      "redacted": true,
+      "producer_event_id": null
+    },
+    {
+      "id": "artifact-graph-after",
+      "kind": "contract_projection",
+      "uri": "fixture://handoff/graph-after.json",
+      "sha256": "cdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+      "media_type": "application/json",
+      "redacted": true,
+      "producer_event_id": "event-graph-after"
+    }
+  ],
+  "events": [
+    {
+      "id": "event-topology-summary",
+      "sequence": 1,
+      "actor": "agent",
+      "kind": "analysis",
+      "summary": "Recorded a pre-change topology explanation from public context.",
+      "command": null,
+      "exit_code": null,
+      "artifact_ids": ["artifact-topology-summary"],
+      "intervention_id": null
+    },
+    {
+      "id": "event-agent-edit",
+      "sequence": 2,
+      "actor": "agent",
+      "kind": "edit",
+      "summary": "Attempted the requested route and template change.",
+      "command": null,
+      "exit_code": null,
+      "artifact_ids": [],
+      "intervention_id": null
+    },
+    {
+      "id": "event-graph-after",
+      "sequence": 3,
+      "actor": "harness",
+      "kind": "command",
+      "summary": "Captured a post-change projection with one obsolete surface.",
+      "command": "chirp diff fixture://handoff/graph-before.json",
+      "exit_code": 1,
+      "artifact_ids": ["artifact-graph-after"],
+      "intervention_id": null
+    }
+  ],
+  "interventions": [],
+  "repairs": [
+    {
+      "id": "repair-obsolete-route",
+      "failure_ids": ["failure-obsolete-route"],
+      "finding_ids": ["fixture.obsolete_route"],
+      "iteration": 1,
+      "event_ids": ["event-agent-edit", "event-graph-after"],
+      "outcome": "failed",
+      "bypass_kind": null
+    }
+  ],
+  "suppressions": [],
+  "checks": [
+    {
+      "id": "check-obsolete-surfaces",
+      "kind": "contract_diff",
+      "status": "fail",
+      "required": true,
+      "artifact_ids": ["artifact-graph-before", "artifact-graph-after"],
+      "summary": "The fixture intentionally retains one obsolete route."
+    }
+  ],
+  "failures": [
+    {
+      "id": "failure-obsolete-route",
+      "class": "executor",
+      "owner": "executor",
+      "summary": "The handoff fixture did not remove the obsolete route.",
+      "artifact_ids": ["artifact-graph-after"]
+    }
+  ],
+  "redaction": {
+    "policy_version": "fixture-v1",
+    "secret_scan": "pass",
+    "privacy_scan": "pass",
+    "removed_items": 0,
+    "unresolved": false
+  },
+  "reproducibility": {
+    "offline_replay": "not_run",
+    "replay_of": null,
+    "deterministic_checks_sha256": "def0123456789abcdef0123456789abcdef0123456789abcdef0123456789abc",
+    "repeated_run_ids": [],
+    "variance_notes": ["Contract fixture only; no model performance was measured."]
+  },
+  "handoff": {
+    "source_run_id": "fixture-construction-001",
+    "source_receipt_sha256": "ef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd",
+    "context_reset": true,
+    "original_conversation_provided": false,
+    "change_request_sha256": "56789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234",
+    "topology_summary_artifact_id": "artifact-topology-summary",
+    "before_graph_artifact_id": "artifact-graph-before",
+    "after_graph_artifact_id": "artifact-graph-after",
+    "obsolete_surface_check_id": "check-obsolete-surfaces"
+  },
+  "result": {
+    "status": "incomplete",
+    "required_checks_passed": false,
+    "undeclared_interventions": 0,
+    "invalid_suppressions": 0,
+    "missing_artifacts": 1,
+    "framework_failure_ids": [],
+    "reasons": ["The trace intentionally exercises a failed handoff repair and is not a product receipt."]
+  }
+}
