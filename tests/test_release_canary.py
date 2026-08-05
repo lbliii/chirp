@@ -54,6 +54,22 @@ def test_release_canary_is_pinned_artifact_based_and_advisory() -> None:
 
 
 @pytest.mark.issue(500)
+def test_pypi_publish_does_not_inherit_python_gil() -> None:
+    """pypa upload container is not free-threaded; GIL=0 belongs on our jobs only."""
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "\nenv:\n  PYTHON_GIL:" not in workflow
+    assert "Never set PYTHON_GIL at workflow scope" in workflow
+    assert workflow.index("release-build:") < workflow.index('PYTHON_GIL: "0"')
+    assert 'PYTHON_GIL: "0"' in workflow.split("pypi-publish:", 1)[0]
+    assert 'PYTHON_GIL: "0"' in workflow.split("furatena-canary:", 1)[1].split(
+        "steps:", 1
+    )[0]
+    publish_job = workflow.split("pypi-publish:", 1)[1].split("furatena-canary:", 1)[0]
+    assert "PYTHON_GIL" not in publish_job
+
+
+@pytest.mark.issue(500)
 def test_release_policy_owns_canary_triage_and_pin_cadence() -> None:
     policy = POLICY.read_text(encoding="utf-8")
 
