@@ -1,0 +1,21 @@
+{#- Chirp hypermedia handoff helpers (UI-neutral)
+
+   Focus, title/history, and live-region markup Chirp owns. Compatible with
+   full-page and HTMX paths. No component classes.
+-#}
+
+{% def live_region(id="chirp-announcements", politeness="polite", label="Announcements") %}
+<div id="{{ id }}" data-chirp-live-region role="status" aria-live="{{ politeness }}" aria-atomic="true" aria-label="{{ label }}"></div>
+{% end %}
+
+{% def title_oob(page_title, element_id="chirpui-document-title") %}
+<title id="{{ element_id }}" hx-swap-oob="true">{{ page_title }}</title>
+{% end %}
+
+{% def focus_attrs(target="", fallback="#main") %}
+{% if target %}data-chirp-focus="{{ target }}" {% end %}data-chirp-focus-fallback="{{ fallback }}"
+{% end %}
+
+{% def handoff_runtime_script(src="/_chirp/handoff.js") %}
+<script src="{{ src }}" defer data-chirp="handoff"></script>
+{% end %}

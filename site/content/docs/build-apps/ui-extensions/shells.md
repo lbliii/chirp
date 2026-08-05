@@ -117,3 +117,36 @@ See `examples/chirpui/kanban_shell` for a worked example.
 - [[docs/build-apps/ui-extensions/ui-layers|UI layers & shell regions]] — vocabulary for app shell vs page chrome vs surface chrome
 - [[docs/build-apps/html-fragments/layout-patterns|Layout Patterns]] — block, include, call constructs inside any shell
 :::
+
+## UI-neutral shell actions and handoff
+
+Chirp owns the **transport** for route-scoped shell actions (OOB target
+`chirp-shell-actions`) and ships a **UI-neutral** HTML renderer under
+`chirp/shell_actions.html` — semantic markup with `data-chirp-shell-*` hooks,
+no component classes.
+
+Applications may:
+
+- style the default markup with local CSS; or
+- call `app.set_shell_actions_renderer("my/shell_actions.html")` to supply an
+  explicit renderer without changing the OOB contract.
+
+`use_chirp_ui()` registers the chirp-ui visual adapter so existing chirp-ui
+shells keep their controls during the compatibility window.
+
+### Hypermedia handoff helpers
+
+Import `HypermediaHandoff`, `FocusHandoff`, `TitleHandoff`, `AnnouncementHandoff`,
+and `apply_handoff` for focus/title/history/announcement payloads that work on
+full-page and HTMX responses. Include the CSP-safe runtime once in the shell:
+
+```html
+{% from "chirp/handoff.html" import live_region, handoff_runtime_script %}
+{{ handoff_runtime_script() }}
+{{ live_region() }}
+```
+
+Focus is delivered as `HX-Trigger-After-Settle` event `chirp:focus` (not inline
+`hx-on` handlers). Title updates use the existing document-title OOB id; live
+announcements target `#chirp-announcements`.
+

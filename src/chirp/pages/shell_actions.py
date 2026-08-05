@@ -14,13 +14,16 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from chirp.shell_actions import (
+    DEFAULT_SHELL_ACTIONS_RENDERER,
     SHELL_ACTIONS_BLOCK,
     SHELL_ACTIONS_CONTEXT_KEY,
     SHELL_ACTIONS_TARGET,
     SHELL_ACTIONS_TEMPLATE,
+    ShellActionsRenderer,
 )
 
 __all__ = [
+    "DEFAULT_SHELL_ACTIONS_RENDERER",
     "SHELL_ACTIONS_BLOCK",
     "SHELL_ACTIONS_CONTEXT_KEY",
     "SHELL_ACTIONS_TARGET",
@@ -28,6 +31,7 @@ __all__ = [
     "ShellAction",
     "ShellActionZone",
     "ShellActions",
+    "ShellActionsRenderer",
     "ShellMenuItem",
     "ShellSubmitSurface",
     "merge_shell_actions",
@@ -76,7 +80,7 @@ class ShellAction:
     size: str = "sm"
     disabled: bool = False
     menu_items: tuple[ShellMenuItem, ...] = ()
-    # kind="form": POST form with optional HTMX attributes (rendered by chirp-ui).
+    # kind="form": POST form with optional HTMX attributes (neutral or chirp-ui renderer).
     form_action: str | None = None
     form_method: str = "post"
     hidden_fields: tuple[tuple[str, str], ...] = ()
@@ -169,11 +173,19 @@ def normalize_shell_actions(value: Any) -> ShellActions | None:
     raise TypeError(msg)
 
 
-def shell_actions_fragment(actions: ShellActions | None) -> tuple[str, str, str] | None:
-    """Return the template, block, and target for shell OOB rendering."""
+def shell_actions_fragment(
+    actions: ShellActions | None,
+    renderer: ShellActionsRenderer | None = None,
+) -> tuple[str, str, str] | None:
+    """Return the template, block, and target for shell OOB rendering.
+
+    ``renderer`` selects the HTML template; the OOB target and wrap contract
+    remain unchanged so applications can swap visuals without rewiring transport.
+    """
     if actions is None:
         return None
-    return (SHELL_ACTIONS_TEMPLATE, SHELL_ACTIONS_BLOCK, actions.target)
+    active = renderer or DEFAULT_SHELL_ACTIONS_RENDERER
+    return (active.template, active.block, actions.target)
 
 
 def validate_shell_actions(actions: ShellActions) -> None:

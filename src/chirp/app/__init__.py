@@ -408,6 +408,26 @@ class App:
             ),
         )
 
+    def set_shell_actions_renderer(
+        self,
+        template: str,
+        block: str = "content",
+    ) -> None:
+        """Override the HTML renderer used for shell-actions OOB transport.
+
+        The OOB target id and wrap contract stay fixed (``chirp-shell-actions``).
+        Call during setup. ``use_chirp_ui`` registers the chirp-ui adapter so
+        existing shells keep their visual controls while core Chirp stays
+        UI-neutral by default.
+        """
+        from chirp.shell_actions import ShellActionsRenderer
+
+        self._check_not_frozen()
+        self._mutable_state.shell_actions_renderer = ShellActionsRenderer(
+            template=template,
+            block=block,
+        )
+
     def register_fragment_target(
         self,
         target_id: str,

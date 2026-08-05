@@ -10,8 +10,10 @@ import anyio.to_thread
 from kida import Environment
 
 from chirp.pages.shell_actions import (
+    DEFAULT_SHELL_ACTIONS_RENDERER,
     SHELL_ACTIONS_CONTEXT_KEY,
     SHELL_ACTIONS_TARGET,
+    ShellActionsRenderer,
     normalize_shell_actions,
     shell_actions_fragment,
 )
@@ -90,15 +92,17 @@ def compute_shell_region_updates(
     composition: PageComposition,
     request: Request | None,
     fragment_target_registry: FragmentTargetRegistry | None,
+    shell_actions_renderer: ShellActionsRenderer | None = None,
 ) -> tuple[RegionUpdate, ...]:
     """Compute shell OOB region updates for boosted/fragment requests."""
     if not _triggers_shell_update(request, fragment_target_registry):
         return ()
+    renderer = shell_actions_renderer or DEFAULT_SHELL_ACTIONS_RENDERER
     try:
         actions = normalize_shell_actions(composition.context.get(SHELL_ACTIONS_CONTEXT_KEY))
     except TypeError:
         actions = None
-    frag = shell_actions_fragment(actions) if actions is not None else None
+    frag = shell_actions_fragment(actions, renderer) if actions is not None else None
     if frag is not None:
         template_name, block_name, target = frag
         return (
@@ -119,12 +123,17 @@ def compute_shell_region_updates(
     )
 
 
-def render_shell_actions_oob(context: dict[str, Any], kida_env: Environment) -> str:
+def render_shell_actions_oob(
+    context: dict[str, Any],
+    kida_env: Environment,
+    shell_actions_renderer: ShellActionsRenderer | None = None,
+) -> str:
     """Render shell action OOB markup for boosted layout navigations."""
     from kida.environment.exceptions import TemplateNotFoundError
 
+    renderer = shell_actions_renderer or DEFAULT_SHELL_ACTIONS_RENDERER
     actions = normalize_shell_actions(context.get(SHELL_ACTIONS_CONTEXT_KEY))
-    fragment = shell_actions_fragment(actions)
+    fragment = shell_actions_fragment(actions, renderer)
     if fragment is None or actions is None:
         target = SHELL_ACTIONS_TARGET
         html = ""
@@ -144,13 +153,16 @@ async def append_shell_actions_oob_stream(
     chunks: AsyncIterator[str],
     context: dict[str, Any],
     kida_env: Environment,
+    shell_actions_renderer: ShellActionsRenderer | None = None,
 ) -> AsyncIterator[str]:
     """Append shell action OOB markup to the first streamed chunk."""
     first_chunk = True
     # render_shell_actions_oob is a discrete CPU-bound render — keep it off the
     # loop so the chained shell-actions OOB stream does not re-block the
     # LayoutSuspense path (#193).
-    oob = await _render_off_loop(lambda: render_shell_actions_oob(context, kida_env))
+    oob = await _render_off_loop(
+        lambda: render_shell_actions_oob(context, kida_env, shell_actions_renderer)
+    )
     async for chunk in chunks:
         if first_chunk:
             yield "\n".join((chunk, oob))

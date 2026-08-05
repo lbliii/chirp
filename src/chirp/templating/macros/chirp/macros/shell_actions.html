@@ -1,0 +1,86 @@
+{#- Chirp UI-neutral shell action macros
+
+   Safe default HTML for ShellActions. No chirp-ui classes. Style with
+   [data-chirp-shell-actions] / [data-chirp-shell-zone] / [data-chirp-shell-kind]
+   or replace the renderer entirely.
+-#}
+
+{% def shell_action(action, id_suffix="") %}
+{% set aid = "chirp-shell-action-" ~ action.id ~ id_suffix %}
+{% if action.kind == "menu" %}
+<details id="{{ aid }}" data-chirp-shell-kind="menu" data-chirp-shell-action="{{ action.id }}"{% if action.variant %} data-variant="{{ action.variant }}"{% end %}{% if action.disabled %} data-disabled="true"{% end %}>
+  <summary{% if action.disabled %} aria-disabled="true"{% end %}>{% if action.icon %}<span data-chirp-shell-icon="{{ action.icon }}" aria-hidden="true"></span> {% end %}{{ action.label }}</summary>
+  <ul role="menu">
+    {% for item in action.menu_items %}
+    {% if item.divider %}
+    <li role="separator"></li>
+    {% elif item.href %}
+    <li role="none"><a role="menuitem" href="{{ item.href }}"{% if item.variant %} data-variant="{{ item.variant }}"{% end %}{% if item.action %} data-action="{{ item.action }}"{% end %}>{% if item.icon %}<span data-chirp-shell-icon="{{ item.icon }}" aria-hidden="true"></span> {% end %}{{ item.label }}</a></li>
+    {% else %}
+    <li role="none"><button type="button" role="menuitem"{% if item.variant %} data-variant="{{ item.variant }}"{% end %}{% if item.action %} data-action="{{ item.action }}"{% end %}>{% if item.icon %}<span data-chirp-shell-icon="{{ item.icon }}" aria-hidden="true"></span> {% end %}{{ item.label }}</button></li>
+    {% end %}
+    {% end %}
+  </ul>
+</details>
+{% elif action.kind == "form" %}
+<form id="{{ aid }}" method="{{ action.form_method }}" action="{{ action.form_action }}" data-chirp-shell-kind="form" data-chirp-shell-action="{{ action.id }}"{% if action.variant %} data-variant="{{ action.variant }}"{% end %}
+      {% if action.hx_post %}hx-post="{{ action.hx_post }}"{% end %}
+      {% if action.hx_target %}hx-target="{{ action.hx_target }}"{% end %}
+      {% if action.hx_swap %}hx-swap="{{ action.hx_swap }}"{% end %}
+      {% if action.hx_disinherit %}hx-disinherit="{{ action.hx_disinherit }}"{% end %}
+      {% if action.hx_post and "hx-sync" not in action.attrs %}hx-sync="this:drop"{% end %}
+      {% if action.hx_post and "hx-disabled-elt" not in action.attrs %}hx-disabled-elt="find button, find input[type=submit]"{% end %}
+      {{ action.attrs | html_attrs }}>
+  {% if action.include_csrf and csrf_field is defined %}
+  {{ csrf_field() }}
+  {% end %}
+  {% for name, value in action.hidden_fields %}
+  <input type="hidden" name="{{ name }}" value="{{ value }}">
+  {% endfor %}
+  <button type="submit"{% if action.disabled %} disabled{% end %} data-chirp-shell-submit{% if action.submit_surface %} data-surface="{{ action.submit_surface }}"{% end %}>{% if action.icon %}<span data-chirp-shell-icon="{{ action.icon }}" aria-hidden="true"></span> {% end %}{{ action.label }}</button>
+</form>
+{% elif action.href %}
+<a id="{{ aid }}" href="{{ action.href }}" data-chirp-shell-kind="link" data-chirp-shell-action="{{ action.id }}"{% if action.variant %} data-variant="{{ action.variant }}"{% end %}{% if action.size %} data-size="{{ action.size }}"{% end %}{% if action.action %} data-action="{{ action.action }}"{% end %}{% if action.disabled %} aria-disabled="true" tabindex="-1"{% end %} {{ action.attrs | html_attrs }}>{% if action.icon %}<span data-chirp-shell-icon="{{ action.icon }}" aria-hidden="true"></span> {% end %}{{ action.label }}</a>
+{% else %}
+<button id="{{ aid }}" type="button" data-chirp-shell-kind="button" data-chirp-shell-action="{{ action.id }}"{% if action.variant %} data-variant="{{ action.variant }}"{% end %}{% if action.size %} data-size="{{ action.size }}"{% end %}{% if action.action %} data-action="{{ action.action }}"{% end %}{% if action.disabled %} disabled{% end %} {{ action.attrs | html_attrs }}>{% if action.icon %}<span data-chirp-shell-icon="{{ action.icon }}" aria-hidden="true"></span> {% end %}{{ action.label }}</button>
+{% end %}
+{% end %}
+
+{% def shell_actions_bar(shell_actions, id_suffix="") %}
+{% if shell_actions and shell_actions.has_items %}
+<nav class="chirp-shell-actions" data-chirp-shell-actions aria-label="Shell actions">
+  {% if shell_actions.primary.items %}
+  <div data-chirp-shell-zone="primary">
+    {% for action in shell_actions.primary.items %}
+    {{ shell_action(action, id_suffix=id_suffix) }}
+    {% end %}
+  </div>
+  {% end %}
+  {% if shell_actions.controls.items %}
+  <div data-chirp-shell-zone="controls">
+    {% for action in shell_actions.controls.items %}
+    {{ shell_action(action, id_suffix=id_suffix) }}
+    {% end %}
+  </div>
+  {% end %}
+  {% if shell_actions.overflow.items %}
+  <div data-chirp-shell-zone="overflow">
+    <details id="{{ shell_actions.target }}-overflow{{ id_suffix }}" data-chirp-shell-kind="overflow">
+      <summary>More</summary>
+      <ul role="menu">
+        {% for item in shell_actions.overflow.overflow_items %}
+        {% if item.divider %}
+        <li role="separator"></li>
+        {% elif item.href %}
+        <li role="none"><a role="menuitem" href="{{ item.href }}"{% if item.variant %} data-variant="{{ item.variant }}"{% end %}{% if item.action %} data-action="{{ item.action }}"{% end %}>{% if item.icon %}<span data-chirp-shell-icon="{{ item.icon }}" aria-hidden="true"></span> {% end %}{{ item.label }}</a></li>
+        {% else %}
+        <li role="none"><button type="button" role="menuitem"{% if item.variant %} data-variant="{{ item.variant }}"{% end %}{% if item.action %} data-action="{{ item.action }}"{% end %}>{% if item.icon %}<span data-chirp-shell-icon="{{ item.icon }}" aria-hidden="true"></span> {% end %}{{ item.label }}</button></li>
+        {% end %}
+        {% end %}
+      </ul>
+    </details>
+  </div>
+  {% end %}
+</nav>
+{% end %}
+{% end %}

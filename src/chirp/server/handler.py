@@ -224,6 +224,7 @@ def create_request_handler(
     kida_env: Environment | None,
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    shell_actions_renderer: object | None = None,
     route_layout_chains: Mapping[str, Any] | None = None,
     swap_scope_map: Mapping[str, str] | None = None,
     discovered_routes: list[Any] | None = None,
@@ -419,6 +420,7 @@ def create_request_handler(
             force_inline_sync=force_inline_sync_var.get(),
             oob_registry=oob_registry,
             fragment_target_registry=fragment_target_registry,
+            shell_actions_renderer=shell_actions_renderer,
             route_layout_chains=route_layout_chains,
             swap_scope_map=swap_scope_map,
             suspense_error_template=suspense_error_template,
@@ -471,6 +473,7 @@ async def handle_request(
     compiled_handler: Callable[[Request], Any] | None = None,
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    shell_actions_renderer: object | None = None,
     url_for: Callable[..., str] | None = None,
     debug_wiring: RuntimeDebugWiring | None = None,
     htmx_manifest: HtmxProvisioningManifest | None = None,
@@ -532,6 +535,7 @@ async def handle_request(
             debug,
             oob_registry=oob_registry,
             fragment_target_registry=fragment_target_registry,
+            shell_actions_renderer=shell_actions_renderer,
         )
     except Exception as exc:
         response = await handle_internal_error(
@@ -542,6 +546,7 @@ async def handle_request(
             debug,
             oob_registry=oob_registry,
             fragment_target_registry=fragment_target_registry,
+            shell_actions_renderer=shell_actions_renderer,
         )
         if isinstance(exc, HtmxTimingHeaderError) and isinstance(response, Response):
             response = response.with_vary("HX-Request", "HX-Request-Type")
@@ -661,6 +666,7 @@ async def _invoke_handler(
     force_inline_sync: bool = False,
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    shell_actions_renderer: object | None = None,
     route_layout_chains: Mapping[str, Any] | None = None,
     swap_scope_map: Mapping[str, str] | None = None,
     suspense_error_template: str | None = None,
@@ -728,6 +734,7 @@ async def _invoke_handler(
         fragment_target_registry=fragment_target_registry,
         suspense_error_template=suspense_error_template,
         suspense_error_block=suspense_error_block,
+        shell_actions_renderer=shell_actions_renderer,
     )
     validate_query_response(match.route, request, response)
     if hypermedia_program is not None:

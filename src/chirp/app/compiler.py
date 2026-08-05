@@ -111,6 +111,20 @@ def _collect_builtin_middleware(
                     stream_threshold=config.static_stream_threshold,
                 )
             )
+    # Framework handoff runtime (focus after settle). External script keeps
+    # CSP nonce / no-inline policies intact (#859). Served at /_chirp/handoff.js.
+    from importlib import resources as _resources
+
+    from chirp.middleware.static import StaticFiles as _ChirpPackageStatic
+
+    _chirp_static = _resources.files("chirp") / "static"
+    middleware_list.append(
+        _ChirpPackageStatic(
+            directory=str(_chirp_static),
+            prefix="/_chirp",
+            cache_control="public, max-age=3600",
+        )
+    )
     # Every framework inline-script injection below is registered with a
     # per-request snippet *factory* (``nonce -> snippet``) rather than a fixed
     # string, so each ``<script>`` carries the live CSP nonce when a nonce
@@ -783,6 +797,7 @@ class AppCompiler:
             ],
             self._mutable.tool_events,
         )
+
         from chirp.shell_actions import SHELL_ACTIONS_TARGET
         from chirp.templating.oob_registry import OOBRegionConfig
 
@@ -825,6 +840,7 @@ class AppCompiler:
 
         self._mutable.oob_registry.freeze()
         self._runtime.oob_registry = self._mutable.oob_registry
+        self._runtime.shell_actions_renderer = self._mutable.shell_actions_renderer
 
         self._mutable.fragment_target_registry.freeze()
         self._runtime.fragment_target_registry = self._mutable.fragment_target_registry
