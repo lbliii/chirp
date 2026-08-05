@@ -1,0 +1,238 @@
+{
+  "issue": 923,
+  "parent": 900,
+  "saga": 896,
+  "profile": "collect",
+  "purpose": "Representative local/CI test-duration baseline before execution strategy changes. Measurement only.",
+  "environment": {
+    "recorded_at": "2026-08-05T14:04:52.575573+00:00",
+    "git_revision": "81f0b51aa3133ddcd4584a69d05e6a3a07626786",
+    "cwd": "/Users/llane/Documents/github/python/b-stack/chirp/ovrtx/issue-923-test-baselines",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "processor": "arm",
+    "python_version": "3.14.2 free-threading build (main, Dec 17 2025, 21:08:58) [Clang 21.1.4 ]",
+    "python_implementation": "CPython",
+    "executable": "/Users/llane/Documents/github/python/b-stack/chirp/ovrtx/issue-923-test-baselines/.venv/bin/python3",
+    "gil_enabled": false,
+    "cpu_count": 11,
+    "env_flags": {}
+  },
+  "commands": [
+    {
+      "name": "collect:all_default_paths",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "--collect-only",
+        "-q"
+      ],
+      "wall_s": 4.949,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "",
+      "parsed": {
+        "per_file_modules": 474,
+        "collected_from_per_file": 6965,
+        "collected": 6965,
+        "skipped_reported": 11
+      }
+    },
+    {
+      "name": "collect:tests_only",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "tests"
+      ],
+      "wall_s": 4.089,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "",
+      "parsed": {
+        "per_file_modules": 400,
+        "collected_from_per_file": 6059,
+        "collected": 6059,
+        "skipped_reported": 4
+      }
+    },
+    {
+      "name": "collect:examples_only",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "examples"
+      ],
+      "wall_s": 6.282,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "",
+      "parsed": {
+        "per_file_modules": 74,
+        "collected_from_per_file": 906,
+        "collected": 906,
+        "skipped_reported": 7
+      }
+    },
+    {
+      "name": "collect:invariants",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "tests/test_lazy_imports.py",
+        "tests/test_public_api_docs.py"
+      ],
+      "wall_s": 2.621,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "",
+      "parsed": {
+        "per_file_modules": 2,
+        "collected_from_per_file": 109,
+        "collected": 109
+      }
+    },
+    {
+      "name": "collect:contracts",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "tests/contracts"
+      ],
+      "wall_s": 3.206,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "",
+      "parsed": {
+        "per_file_modules": 82,
+        "collected_from_per_file": 1023,
+        "collected": 1023,
+        "skipped_reported": 3
+      }
+    },
+    {
+      "name": "collect:interop_query",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "tests/interop/test_query_wire.py"
+      ],
+      "wall_s": 2.109,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "",
+      "parsed": {
+        "per_file_modules": 1,
+        "collected_from_per_file": 11,
+        "collected": 11
+      }
+    },
+    {
+      "name": "collect:postgres_live_paths",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "tests/test_schema_introspect.py",
+        "tests/test_pelt/test_connection_integration.py",
+        "tests/test_pelt/test_tls_auth_integration.py",
+        "tests/test_jobs_postgres.py"
+      ],
+      "wall_s": 2.044,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "",
+      "parsed": {
+        "per_file_modules": 4,
+        "collected_from_per_file": 49,
+        "collected": 49
+      }
+    },
+    {
+      "name": "collect:browser_smoke_paths",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "examples/chirpui/lucky_cat/test_browser_smoke.py",
+        "examples/standalone/htmx_managed/test_browser_smoke.py",
+        "examples/standalone/devtools_htmx4/test_browser_smoke.py",
+        "examples/standalone/webmcp_form/test_browser_smoke.py",
+        "tests/contracts/test_query_devtools_browser.py",
+        "tests/contracts/test_query_cors_browser.py",
+        "tests/contracts/test_accessibility_interactions_browser.py"
+      ],
+      "wall_s": 1.785,
+      "returncode": 5,
+      "stdout_tail": "",
+      "stderr_tail": "",
+      "parsed": {
+        "skipped_reported": 7
+      }
+    },
+    {
+      "name": "collect:ci_mirror_shape",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "-m",
+        "not slow",
+        "--ignore=examples/chirpui/lucky_cat/test_browser_smoke.py"
+      ],
+      "wall_s": 6.312,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "",
+      "parsed": {
+        "per_file_modules": 474,
+        "collected_from_per_file": 6963,
+        "collected": 6963,
+        "skipped_reported": 10
+      }
+    }
+  ],
+  "variance": {
+    "preflight": {},
+    "invariants": {}
+  },
+  "notes": [
+    "Do not treat service-dominated CI jobs as interchangeable with the main free-threaded pytest job when setting budgets (#919).",
+    "Acceptance #923: n/a \u2014 measurement receipt; no behavioral test.",
+    "browser_smoke_paths collection requires `uv sync --group dev --group browser`; failure without Playwright is recorded, not treated as a hard baseline error."
+  ],
+  "ci_methodology": {
+    "workflow": ".github/workflows/ci.yml",
+    "source": "GitHub Actions job startedAt/completedAt via gh run view",
+    "main_test_command": "pytest -q --tb=short --timeout=60 -m not slow --ignore=examples/chirpui/lucky_cat/test_browser_smoke.py -n 4 --dist loadgroup --cov --cov-report=term",
+    "critical_path_job": "test",
+    "service_dominated_jobs": [
+      "test-postgres (matrix)",
+      "data-pg-gil-gate",
+      "browser-smoke (Playwright install + Chromium)",
+      "query-interop (nginx + optional protocol clients)"
+    ]
+  }
+}
