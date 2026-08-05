@@ -1,11 +1,10 @@
-"""passkeys contract rule (Wave 5): webauthn-dep ERROR + cookie-store WARNING.
+"""passkeys contract rule: webauthn-dep ERROR; cookie sessions stay first-class (#871).
 
 Unit tests over AppConfig + stub middleware, mirroring test_password_extra.py /
 test_cookie_secure.py. The rule imports ``_has_webauthn`` lazily from
 ``chirp.security.passkeys`` inside the function body, so the monkeypatch target
-is the source attribute ``chirp.security.passkeys._has_webauthn``. The
-store/middleware are detected by class NAME, so the stubs are named to match.
-The orchestrator-wiring proof is at the bottom (mirrors test_password_extra.py).
+is the source attribute ``chirp.security.passkeys._has_webauthn``. Cookie-store
+session posture no longer emits a Redis-preferring WARNING (#871).
 """
 
 import pytest
@@ -13,7 +12,7 @@ import pytest
 from chirp.config import AppConfig
 from chirp.contracts.rules_passkeys import check_passkeys
 
-# -- Stubs (class names are load-bearing — the rule uses type(x).__name__). --
+# -- Stubs (call-site parity; middleware list is unused by the rule since #871). --
 
 
 class CookieSessionStore:
@@ -65,7 +64,7 @@ def test_noop_when_passkeys_disabled(no_webauthn) -> None:
 @pytest.mark.parametrize("env", ["development", "staging", "production"])
 def test_webauthn_missing_errors_in_every_env(no_webauthn, env) -> None:
     cfg = AppConfig(passkeys=True, env=env, secret_key="x" * 32)
-    issues = check_passkeys(cfg, _redis_stack())  # redis → no bloat warning to confuse
+    issues = check_passkeys(cfg, _redis_stack())
     errors = [i for i in issues if i.severity.name == "ERROR"]
     assert [i.category for i in errors] == ["passkeys"]
     assert "chirp[passkeys]" in errors[0].message
@@ -78,46 +77,33 @@ def test_webauthn_present_no_error(with_webauthn) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Cookie-store challenge bloat → WARNING, env-aware (prod/staging, silent dev).
+# Cookie sessions remain first-class — no Redis-preferring WARNING (#871).
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("env", ["production", "staging"])
-def test_cookie_store_warns_in_prod_and_staging(with_webauthn, env) -> None:
+@pytest.mark.issue(871)
+@pytest.mark.parametrize("env", ["development", "staging", "production"])
+def test_cookie_store_no_redis_recommendation(with_webauthn, env) -> None:
     cfg = AppConfig(passkeys=True, env=env, secret_key="x" * 32)
-    issues = check_passkeys(cfg, _cookie_stack())
-    warnings = [i for i in issues if i.severity.name == "WARNING"]
-    assert [i.category for i in warnings] == ["passkeys"]
-    assert "CookieSessionStore" in warnings[0].message
-
-
-def test_cookie_store_silent_in_development(with_webauthn) -> None:
-    cfg = AppConfig(passkeys=True, env="development", secret_key="x" * 32)
     assert check_passkeys(cfg, _cookie_stack()) == []
 
 
-def test_redis_store_no_bloat_warning(with_webauthn) -> None:
+@pytest.mark.issue(871)
+def test_redis_store_silent_when_webauthn_present(with_webauthn) -> None:
     cfg = AppConfig(passkeys=True, env="production", secret_key="x" * 32)
     assert check_passkeys(cfg, _redis_stack()) == []
 
 
-def test_only_one_bloat_warning(with_webauthn) -> None:
-    cfg = AppConfig(passkeys=True, env="production", secret_key="x" * 32)
-    stack = [SessionMiddleware(CookieSessionStore()), SessionMiddleware(CookieSessionStore())]
-    warnings = [i for i in check_passkeys(cfg, stack) if i.severity.name == "WARNING"]
-    assert len(warnings) == 1
-
-
-def test_webauthn_missing_and_cookie_store_in_prod_reports_both(no_webauthn) -> None:
+@pytest.mark.issue(871)
+def test_webauthn_missing_in_prod_reports_error_only(no_webauthn) -> None:
     cfg = AppConfig(passkeys=True, env="production", secret_key="x" * 32)
     issues = check_passkeys(cfg, _cookie_stack())
-    severities = sorted(i.severity.name for i in issues)
-    assert severities == ["ERROR", "WARNING"]
+    assert [i.severity.name for i in issues] == ["ERROR"]
     assert all(i.category == "passkeys" for i in issues)
 
 
 # ---------------------------------------------------------------------------
-# Orchestrator wiring + --deploy escalation (mirrors test_password_extra.py).
+# Orchestrator wiring (mirrors test_password_extra.py).
 # ---------------------------------------------------------------------------
 
 
@@ -148,8 +134,9 @@ def test_passkeys_rule_fires_through_orchestrator(monkeypatch, tmp_path) -> None
     assert app.config.env == "development"
 
 
-def test_cookie_bloat_escalates_under_deploy(monkeypatch, tmp_path) -> None:
-    """Cookie-store bloat is silent in dev posture and WARNs under --deploy."""
+@pytest.mark.issue(871)
+def test_cookie_passkeys_clean_under_deploy(monkeypatch, tmp_path) -> None:
+    """Cookie-backed passkeys stay clean under --deploy (no Redis nudge)."""
     from chirp import App, AppConfig
     from chirp.contracts import check_hypermedia_surface
 
@@ -171,11 +158,8 @@ def test_cookie_bloat_escalates_under_deploy(monkeypatch, tmp_path) -> None:
     app.add_middleware(SessionMiddleware(SessionConfig(secret_key="x" * 32)))
     app.freeze()
 
-    dev = [i for i in check_hypermedia_surface(app).issues if i.category == "passkeys"]
-    assert not dev, "cookie-store bloat should be silent in development posture"
-
     deploy = [
         i for i in check_hypermedia_surface(app, deploy=True).issues if i.category == "passkeys"
     ]
-    assert [i.severity.name for i in deploy] == ["WARNING"]
+    assert deploy == []
     assert app.config.env == "development"

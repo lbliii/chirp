@@ -191,7 +191,7 @@ original origin.
 | `cookie_secure` | ERROR / WARNING | Make the session cookie `Secure`. Keep `SessionConfig(secure="auto")` (resolves to `Secure` in production/staging) or set `secure=True`. A `samesite="none"` cookie that is not `Secure` is an env-independent ERROR. See the dropdown below. |
 | `hsts` | WARNING | Set `AppConfig(strict_transport_security="max-age=63072000; includeSubDomains")` on a production app with an auth/mutating surface — once you have confirmed it is only ever reached over HTTPS. Never auto-emitted. See the dropdown below. |
 | `password_extra` | WARNING | Install `chirp[auth]` (argon2id) on a production app with a login/mutating surface — without it password hashing falls back to stdlib scrypt. Advisory only (silent in development); existing scrypt hashes upgrade on next login. See the dropdown below. |
-| `passkeys` | ERROR / WARNING | Install `chirp[passkeys]` when `AppConfig(passkeys=True)` — without `webauthn` every ceremony fails at runtime (env-independent ERROR). With a `CookieSessionStore` the single-use challenge bloats the signed cookie — prefer `RedisSessionStore` or a short `absolute_timeout_seconds` (env-aware WARNING, silent dev). See the dropdown below. |
+| `passkeys` | ERROR | Install `chirp[passkeys]` when `AppConfig(passkeys=True)` — without `webauthn` every ceremony fails at runtime (env-independent ERROR). Cookie and Redis session stores both preserve the single-use challenge; Redis is optional for scale, not required for passkeys. See the dropdown below. |
 | `csp_nonce` | ERROR / WARNING | Enable a per-request nonce mechanism (`AppConfig(csp_nonce_enabled=True)`) so framework inline scripts carry a nonce under an inline-forbidding CSP. See the dropdown below. |
 | `chirpui_csp` | ERROR / WARNING | **chirp-ui apps only.** Remove a conflicting static CSP so `use_chirp_ui`'s auto-wired nonce CSP can keep Alpine alive. See the dropdown below. |
 | `middleware_signature` | ERROR / WARNING | Make middleware callable as `async __call__(request, next)`. |
@@ -399,7 +399,7 @@ in if you wire `verify_and_upgrade()` (see
 
 ### `passkeys`: WebAuthn ceremony posture
 
-Fires only when `AppConfig(passkeys=True)`. Two distinct tracks:
+Fires only when `AppConfig(passkeys=True)`:
 
 - **`webauthn` not installed → ERROR, env-independent.** Passkeys have no stdlib
   fallback (unlike `password_extra`'s scrypt path), so without the `webauthn`
@@ -408,14 +408,15 @@ Fires only when `AppConfig(passkeys=True)`. Two distinct tracks:
   regardless of `env` — like the `samesite="none"` cookie-drop ERROR in
   `cookie_secure`. Availability is read via the same `_has_webauthn()` find-spec
   probe the runtime uses, so the check and runtime never disagree.
-- **`CookieSessionStore` for the challenge → WARNING, env-aware (silent dev /
-  WARNING staging+production).** The single-use WebAuthn challenge lives in the
-  session between the begin and finish ceremonies, and the cookie store signs the
-  *entire* session — including the ~86-char base64url challenge — into the client
-  cookie, whereas `RedisSessionStore` strips `__`-prefixed keys from durable
-  storage. The challenge is popped on finish, but abandoned begin-flows carry it
-  until session timeout. Advisory only (mirrors `password_extra`); escalates under
-  `chirp check --deploy`.
+
+Cookie-backed sessions are a **first-class** production path for passkeys. The
+single-use WebAuthn challenge (~86-char base64url) lives in the session between
+begin and finish on both `CookieSessionStore` and `RedisSessionStore`. Redis is
+optional for horizontal scaling / shared session state — enabling passkeys does
+**not** imply a Redis dependency. `RedisSessionStore` persists framework
+security-transaction keys such as `__passkey_challenge` (and timeout stamps);
+only request-scoped bookkeeping like `__session_id` is excluded from durable
+storage.
 
 What this rule deliberately does **not** re-check, to stay non-redundant:
 `security_stack` already requires `SessionMiddleware`/`CSRFMiddleware` on the
@@ -425,8 +426,9 @@ HTTPS/secure-context posture is covered by `cookie_secure` (a `Secure` cookie
 implies HTTPS).
 
 **Fix:** `pip install chirp[passkeys]` (pulls in `webauthn`, which pins
-`cryptography`). For passkey-heavy traffic on the cookie store, switch to
-`RedisSessionStore` or set a short `SessionConfig(absolute_timeout_seconds=...)`.
+`cryptography`). Use the default cookie session store for a low-infrastructure
+deploy; add `RedisSessionStore` (`pip install chirp[redis]`) only when you need
+shared sessions across workers/replicas.
 
 ### `auth_middleware`: auth-declaring routes need `AuthMiddleware`
 
