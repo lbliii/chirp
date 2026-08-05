@@ -106,7 +106,7 @@ class ASGIRuntime:
             compiled_handler=self._get_compiled_handler(),
             oob_registry=self._runtime.oob_registry,
             fragment_target_registry=self._runtime.fragment_target_registry,
-                shell_actions_renderer=self._runtime.shell_actions_renderer,
+            shell_actions_renderer=self._runtime.shell_actions_renderer,
             url_for=url_for,
             debug_wiring=self._runtime.debug_wiring,
             htmx_manifest=self._runtime.htmx_manifest,

@@ -14,6 +14,7 @@ from chirp.middleware.protocol import Middleware
 from chirp.pages.types import LayoutPreset, PageHandlerFinding, RouteMeta, Section
 from chirp.routing.route import Route
 from chirp.routing.router import Router
+from chirp.shell_actions import ShellActionsRenderer
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.oob_registry import OOBRegistry
 from chirp.tools.events import ToolEventBus
@@ -260,8 +261,8 @@ class MutableAppState:
     #: Explicit shell-actions HTML renderer (template/block). Transport
     #: (OOB target/wrap) stays fixed; ``use_chirp_ui`` sets the chirp-ui
     #: adapter. Default ``None`` means the UI-neutral Chirp renderer.
-    shell_actions_renderer: object | None = None
-        #: Startup-complete gate for the ``/ready`` probe. This is a
+    shell_actions_renderer: ShellActionsRenderer | None = None
+    #: Startup-complete gate for the ``/ready`` probe. This is a
     #: lifecycle-bounded flag, NOT a freeze violation: it has a single writer
     #: (``LifecycleCoordinator._on_startup`` sets it ``True`` after all startup
     #: hooks run; ``_on_shutdown`` resets it), is monotonic within a process
@@ -284,7 +285,7 @@ class RuntimeAppState:
     tool_registry: ToolRegistry | None = None
     oob_registry: OOBRegistry | None = None
     fragment_target_registry: FragmentTargetRegistry | None = None
-    shell_actions_renderer: object | None = None
+    shell_actions_renderer: ShellActionsRenderer | None = None
     discovered_routes: list[Any] = field(default_factory=list)
     route_layout_chains: dict[str, Any] = field(default_factory=dict)
     swap_scope_map: dict[str, str] = field(default_factory=dict)
