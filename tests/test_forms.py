@@ -14,6 +14,7 @@ from chirp.config import AppConfig
 from chirp.http.forms import (
     FormBindingError,
     FormData,
+    FormFileFieldError,
     UploadFile,
     form_from,
     form_or_errors,
@@ -87,6 +88,116 @@ class TestFormData:
         )
         form = FormData({"name": ["alice"]}, files={"avatar": upload})
         assert form.files["avatar"].filename == "test.txt"
+
+
+# ---------------------------------------------------------------------------
+# File-only field accessors (issue #874) — fail loud, do not silently drop
+# ---------------------------------------------------------------------------
+
+
+def _file_only_form() -> FormData:
+    """Mixed string + file payload matching the #874 repro."""
+    return FormData(
+        data={"title": ["hi"]},
+        files={
+            "session_file": UploadFile.from_bytes(
+                filename="run.jsonl",
+                content_type="application/json",
+                content=b"{}",
+            )
+        },
+    )
+
+
+@pytest.mark.issue(874)
+class TestFormDataFileOnlyAccessors:
+    """String accessors must not report a present upload as absent."""
+
+    def test_get_raises_for_file_only_field(self) -> None:
+        form = _file_only_form()
+        with pytest.raises(FormFileFieldError, match=r"form\.files\['session_file'\]") as exc:
+            form.get("session_file")
+        assert exc.value.key == "session_file"
+        assert isinstance(exc.value, TypeError)
+
+    def test_getitem_raises_for_file_only_field(self) -> None:
+        form = _file_only_form()
+        with pytest.raises(FormFileFieldError, match="uploaded file") as exc:
+            _ = form["session_file"]
+        assert exc.value.key == "session_file"
+        # Present upload is not a missing key — KeyError handlers stay quiet.
+        assert not isinstance(exc.value, KeyError)
+
+    def test_get_default_still_raises_for_file_only_field(self) -> None:
+        """A default must not paper over a present file-only field."""
+        form = _file_only_form()
+        with pytest.raises(FormFileFieldError):
+            form.get("session_file", "fallback")
+
+    def test_contains_and_files_for_mixed_payload(self) -> None:
+        form = _file_only_form()
+        assert "title" in form
+        assert "session_file" not in form  # string membership only
+        assert "session_file" in form.files
+        assert form["title"] == "hi"
+        assert form.get("title") == "hi"
+        assert form.files["session_file"].filename == "run.jsonl"
+
+    def test_truly_missing_string_access_unchanged(self) -> None:
+        form = _file_only_form()
+        assert form.get("missing") is None
+        assert form.get("missing", "fallback") == "fallback"
+        with pytest.raises(KeyError):
+            _ = form["missing"]
+
+
+@pytest.mark.issue(874)
+class TestMultipartFileOnlyAccessors:
+    """Multipart parse path: string accessors fail loud for file parts."""
+
+    async def test_parse_multipart_file_field_is_loud_via_string_accessors(self) -> None:
+        body = _multipart_body(
+            [
+                ("title", None, b"hi"),
+                ("session_file", "run.jsonl", b"{}"),
+            ]
+        )
+        form = await parse_form_data(body, _MP_CT)
+        assert form["title"] == "hi"
+        assert form.files["session_file"].filename == "run.jsonl"
+        with pytest.raises(FormFileFieldError, match=r"form\.files\['session_file'\]"):
+            form.get("session_file")
+        with pytest.raises(FormFileFieldError):
+            _ = form["session_file"]
+
+    async def test_request_form_rejects_silent_file_drop(self) -> None:
+        """Handler-style footgun: form.get('file') must not return None."""
+        app = App(AppConfig(template_dir=".", skip_contract_checks=True))
+
+        @app.route("/upload", methods=["POST"])
+        async def upload(request: Request) -> str:
+            form = await request.form()
+            # The broken pattern from #874 — must raise, not silently miss.
+            try:
+                form.get("session_file")
+            except FormFileFieldError as exc:
+                return f"loud:{exc.key}"
+            return "silent-drop"
+
+        body = _multipart_body(
+            [
+                ("title", None, b"hi"),
+                ("session_file", "run.jsonl", b"{}"),
+            ]
+        )
+        async with TestClient(app) as client:
+            resp = await client.post(
+                "/upload",
+                body=body,
+                headers={"Content-Type": _MP_CT},
+            )
+        assert resp.status == 200
+        assert resp.text == "loud:session_file"
 
 
 class TestUploadFile:
