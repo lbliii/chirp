@@ -1,10 +1,20 @@
-# This workflow will upload a Python Package to PyPI when a release is created
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries
-
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
+# Upload to PyPI when a GitHub release is published.
+#
+# Authentication: PyPI Trusted Publishing (OIDC). No API token in this repo.
+#
+# Free-threaded rule (shared across chirp / kida / furatena / pounce / milo-cli):
+#   - Set PYTHON_GIL=0 only on jobs that run this repo's 3.14t code
+#     (release-build and free-threaded canaries).
+#   - Never set PYTHON_GIL at workflow scope, and never on pypi-publish —
+#     pypa/gh-action-pypi-publish uses a non-free-threaded interpreter and
+#     aborts if PYTHON_GIL=0 is inherited.
+#
+# Trusted Publishing registration:
+#   PyPI project name: bengal-chirp
+#   Owner:             lbliii
+#   Repository:        chirp
+#   Workflow name:     python-publish.yml
+#   Environment name:  pypi
 
 name: Upload Python Package
 
@@ -18,7 +28,8 @@ permissions:
 jobs:
   release-build:
     runs-on: ubuntu-latest
-
+    env:
+      PYTHON_GIL: "0"
     steps:
       - uses: actions/checkout@v7
 
@@ -68,6 +79,7 @@ jobs:
     continue-on-error: true
     timeout-minutes: 20
     env:
+      PYTHON_GIL: "0"
       FURATENA_REVISION: da584bf9fe19ec1376fdc0b23c7fb1b657b026b8
 
     steps:
