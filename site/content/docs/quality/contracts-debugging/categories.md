@@ -673,7 +673,7 @@ No-op when `kida_env` is `None` (registry drift still runs).
 | Category | Default severity | Fix target |
 |---|---|---|
 | `debug_wiring` | ERROR | Fix debug/DevTools route, asset, or runtime wiring so diagnostics work in debug mode. |
-| `chirpui_runtime` | INFO | Call `use_chirp_ui(app)` or install/configure the optional UI runtime required by ChirpUI templates. |
+| `chirpui_runtime` | INFO | Call `use_chirp_ui(app)` (or an equivalent explicit `App.add_loader` + filter registration) — package presence alone does not activate ChirpUI templates, CSS, or Alpine runtime. |
 | `chirpui_alpine_runtime` | ERROR / WARNING | Wire `chirpui-alpine.js` registration in the served HTML when templates use interactive ChirpUI Alpine factories (theme toggle, dialogs, dropdowns). `ERROR` when `debug=True`, `WARNING` otherwise. |
 | `alpine_cdn_url` | ERROR | Replace bare jsDelivr Alpine package URLs with explicit `/dist/cdn.min.js` URLs or Chirp injection helpers. |
 | `defer_falsy` | WARNING | Use `{% if key is deferred %}` or `"key" in __chirp_defer_pending__` to distinguish loading from loaded before testing resolved values. See [[docs/build-apps/request-pipeline/render-plan|Suspense deferred keys]]. |

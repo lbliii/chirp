@@ -57,9 +57,11 @@ uv add chirp-ui
 
 ::::{steps}
 :::{step} Wire chirp-ui into your app
-Call `use_chirp_ui(app)` after creating the app. It serves `chirpui.css`,
-themes, and transitions, and registers the filters chirp-ui components need
-(`bem`, `field_errors`, `html_attrs`, `validate_variant`).
+Call `use_chirp_ui(app)` after creating the app. It registers an explicit
+chirp-ui template loader, serves `chirpui.css`, themes, and transitions, and
+registers the filters chirp-ui components need (`bem`, `field_errors`,
+`html_attrs`, `validate_variant`). Installing the package alone does nothing —
+activation is opt-in.
 
 ```python
 from chirp import App, AppConfig, use_chirp_ui
@@ -96,12 +98,15 @@ skips re-adding the core script, so you will not double-load. See
 Alpine injection.
 :::
 
-### Template auto-detection
+### Explicit template loader
 
-When chirp-ui is installed, Chirp's template loader adds the chirp-ui package
-automatically. No configuration is needed for `{% from "chirpui/..." %}`
-imports — `chirpui/layout.html`, `chirpui/card.html`, and the rest resolve from
-the package.
+Installing chirp-ui alone does **not** change Chirp's template environment.
+`use_chirp_ui(app)` registers an explicit `PackageLoader` for chirp-ui templates
+(plus filters, static assets, and contract checks). After that call,
+`{% from "chirpui/..." %}` imports resolve — for example `chirpui/layout.html`
+and `chirpui/card.html`. Apps that skip `use_chirp_ui` keep app-owned
+`component_dirs` only; the `chirpui_runtime` contract check flags templates that
+still import `chirpui/...` without the integration.
 
 ## Quick example
 

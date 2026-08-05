@@ -1,8 +1,23 @@
 # RFC 001: Component Filter Contract — Loader/Filter Coherence
 
-**Status:** Draft  
+**Status:** Superseded by [#860](https://github.com/lbliii/chirp/issues/860) /
+[RFC 025](025-app-owned-ui-contracts.md) (explicit integration only)  
 **Author:** (proposal)  
 **Created:** 2025-03-04
+
+---
+
+## Supersession note
+
+Issue #860 removed ambient chirp-ui discovery from `create_environment`. Chirp
+no longer adds `PackageLoader("chirp_ui", "templates")` or env-level chirp-ui
+filter fallbacks merely because the package is importable. The compatibility
+path is explicit: `use_chirp_ui(app)` registers the package loader, filters,
+static assets, and contract checks together. Loader/filter coherence remains a
+valid principle — it is now enforced at the explicit integration boundary, not
+via ambient package detection.
+
+The historical analysis below is retained for context.
 
 ---
 
