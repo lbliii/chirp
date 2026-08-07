@@ -336,10 +336,11 @@ class AuthenticatedCredential:
 # Session-backed challenge lifecycle (single-use, embedded TTL, pop-before-login)
 # ---------------------------------------------------------------------------
 
-#: Session key holding the in-flight ceremony challenge. ``__``-prefixed so
-#: RedisSessionStore strips it from durable storage (it is request-scoped
-#: scratch, not user data); the cookie store keeps it (a ~86-char b64url string)
-#: only until the matching finish pops it.
+#: Session key holding the in-flight ceremony challenge. ``__``-prefixed as
+#: framework-private (not app user data). Both ``CookieSessionStore`` and
+#: ``RedisSessionStore`` persist it across begin → finish; finish pops it
+#: (single-use). Redis excludes only request-scoped bookkeeping such as
+#: ``__session_id``, not this security transaction key (#871).
 CHALLENGE_SESSION_KEY = "__passkey_challenge"
 
 

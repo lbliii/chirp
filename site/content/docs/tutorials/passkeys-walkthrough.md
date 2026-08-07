@@ -169,15 +169,18 @@ Errors thrown by the bridge carry `.passkeyReason` of `cancelled`, `duplicate`,
 
 ## app.check() passkeys category
 
-When `passkeys=True`, startup checks two tracks (see
+When `passkeys=True`, startup checks the `webauthn` dependency (see
 [[docs/quality/contracts-debugging/categories#passkeys-webauthn-ceremony-posture|passkeys category]]):
 
 | Check | Severity | Fix |
 |---|---|---|
 | `webauthn` not installed | ERROR (all envs) | `pip install chirp[passkeys]` |
-| Cookie session store + passkeys | WARNING (prod/staging) | Prefer `RedisSessionStore` or shorten session TTL |
 
-Run `chirp check --deploy` before shipping to catch production-only posture failures.
+Cookie sessions are first-class for passkeys — the begin → finish challenge is
+stored in the session on both `CookieSessionStore` and optional
+`RedisSessionStore`. Redis is for shared/horizontal session state, not a
+passkeys requirement. Run `chirp check --deploy` before shipping to catch
+production-only posture failures elsewhere in the security stack.
 
 ## Clone-and-run references
 
