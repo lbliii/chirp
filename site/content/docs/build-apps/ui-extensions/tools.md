@@ -76,26 +76,29 @@ The schema is built at freeze time from each parameter's annotation:
 ## The MCP endpoint
 
 When at least one tool is registered, Chirp mounts a JSON-RPC endpoint at `/mcp`.
-It speaks MCP protocol version `2024-11-05` with the `tools` capability. The
-endpoint handshakes in three sequential calls — initialize, list, then call:
+It speaks MCP protocol version `2026-07-28` (stateless core) with the `tools`
+capability. There is no handshake or session: each request is independent and
+carries protocol version, client identity, and capabilities in
+`params._meta`. Optional `server/discover` advertises supported versions;
+legacy `initialize` / `notifications/initialized` are accepted as no-ops.
 
 ::::{steps}
-:::{step} Initialize
-Negotiate capabilities. The server replies with its `protocolVersion`.
+:::{step} Discover (optional)
+Ask the server for supported versions and capabilities.
 
 ```bash
 curl -X POST http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{}}'
+  -d '{"jsonrpc":"2.0","method":"server/discover","id":1,"params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"curl","version":"1.0"},"io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 :::{/step}
 :::{step} List tools
-Fetch the registered tools and their input schemas.
+Fetch the registered tools and their input schemas. No prior call required.
 
 ```bash
 curl -X POST http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"tools/list","id":2,"params":{}}'
+  -d '{"jsonrpc":"2.0","method":"tools/list","id":2,"params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 :::{/step}
 :::{step} Call a tool
@@ -104,7 +107,7 @@ Dispatch a tool by name with arguments.
 ```bash
 curl -X POST http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"tools/call","id":3,"params":{"name":"add_note","arguments":{"text":"Hello"}}}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","id":3,"params":{"name":"add_note","arguments":{"text":"Hello"},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 :::{/step}
 ::::{/steps}
