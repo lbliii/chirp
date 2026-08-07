@@ -257,6 +257,9 @@ These you opt into through `AppConfig` or CLI flags:
 * - `worker_mode`
   - `"auto"`
   - Pounce worker execution mode; use `"async"` when you register worker lifecycle hooks.
+* - `display`
+  - `None`
+  - Optional Pounce [`DisplayConfig`](https://github.com/lbliii/pounce/blob/main/site/content/docs/configuration/display.md) forwarded as startup identity. Pounce owns signage and JSON fields.
 * - `metrics_enabled`
   - `False`
   - Prometheus endpoint at `/metrics`.

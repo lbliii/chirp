@@ -33,6 +33,8 @@ def fake_app_debug_off(monkeypatch: pytest.MonkeyPatch) -> App:
 @pytest.fixture
 def fake_prod_app(monkeypatch: pytest.MonkeyPatch) -> App:
     """Register a production-configured app for ``chirp run --production`` tests."""
+    from pounce.display import DisplayConfig
+
     app = App(
         config=AppConfig(
             host="127.0.0.1",
@@ -46,6 +48,7 @@ def fake_prod_app(monkeypatch: pytest.MonkeyPatch) -> App:
             trusted_proxies=("10.0.0.1", "10.0.0.2"),
             max_request_body_size=3 * 1024 * 1024,
             max_upload_size=3 * 1024 * 1024,
+            display=DisplayConfig(name="CLI Prod", signage="minimal"),
         )
     )
     mod = types.ModuleType("_run_test_app")
@@ -166,6 +169,19 @@ class TestChirpRun:
         assert kwargs["rate_limit_max_tracked_ips"] == 12_345
         assert kwargs["forwarded_for_trusted_hops"] == 3
         assert kwargs["trusted_proxies"] == ("10.0.0.1", "10.0.0.2")
+
+    @patch("chirp.server.production.run_production_server")
+    def test_production_forwards_display(
+        self,
+        mock_server: MagicMock,
+        fake_prod_app: App,
+    ) -> None:
+        """Production CLI launch forwards AppConfig.display (#875)."""
+        main(["run", "_run_test_app:app"])
+
+        kwargs = mock_server.call_args.kwargs
+        assert kwargs["display"] is fake_prod_app.config.display
+        assert kwargs["display"].name == "CLI Prod"
 
     def test_invalid_import_string(self, capsys: pytest.CaptureFixture[str]) -> None:
         """run exits 1 with error message for bad import string."""

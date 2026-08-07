@@ -47,6 +47,33 @@ chirp run myapp:app --production --workers 4 --metrics --rate-limit
 When you start through `app.run()` or `chirp run`, Chirp reads `AppConfig`.
 `pounce.toml` is not read by `app.run()` or `chirp run` today.
 
+### Startup display identity
+
+Optional application banner identity is Pounce's
+[`DisplayConfig`](https://github.com/lbliii/pounce/blob/main/site/content/docs/configuration/display.md).
+Set it once on `AppConfig.display`; Chirp forwards that value unchanged through
+`app.run()`, `chirp run`, and the production/dev launchers as
+`ServerConfig.display`. Chirp does not redefine branding schemas, signage
+modes, or JSON startup formatting — leave those to Pounce (CLI / `POUNCE_*`
+env still outrank `AppConfig.display`).
+
+```python
+from pounce.display import DisplayConfig
+from chirp import App, AppConfig
+
+config = AppConfig(
+    debug=False,
+    secret_key="your-secret-key-here",
+    display=DisplayConfig(
+        name="My App",
+        tagline="Hypermedia-native",
+        version="1.2.0",
+        lines=("mode: production",),
+        signage="minimal",
+    ),
+)
+```
+
 ### Pounce Entrypoint
 
 Use Pounce-native config when starting directly through Pounce:

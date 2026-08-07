@@ -252,6 +252,7 @@ wire the secure-by-default stack, see
 | `backlog` | `int` | `2048` | Socket listen backlog |
 | `keep_alive_timeout` | `float` | `5.0` | HTTP keep-alive timeout |
 | `request_timeout` | `float` | `30.0` | Request timeout |
+| `display` | `pounce.display.DisplayConfig \| None` | `None` | Optional Pounce startup identity (name, tagline, version, lines, signage). Forwarded unchanged as `ServerConfig.display`. Pounce owns precedence, signage modes, and JSON startup fields — see [Pounce Display & Signage](https://github.com/lbliii/pounce/blob/main/site/content/docs/configuration/display.md). Not loaded from `CHIRP_*` env (use `POUNCE_APP_*` / `POUNCE_SIGNAGE` or code). |
 | `ssl_certfile` | `str \| None` | `None` | TLS certificate path |
 | `ssl_keyfile` | `str \| None` | `None` | TLS key path |
 ::::{/dropdown}
