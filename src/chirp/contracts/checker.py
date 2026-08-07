@@ -67,6 +67,7 @@ from .rules_kida_analysis import (
 from .rules_layout import check_layout_chains
 from .rules_live_blocks import check_live_blocks
 from .rules_macro_css import check_macro_css
+from .rules_mcp_legacy import check_mcp_legacy_offramp
 from .rules_mount_app import check_mount_app_merge
 from .rules_oob_registry import check_oob_registry_coverage
 from .rules_oob_targets import check_oob_targets
@@ -862,6 +863,13 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
                 middleware_list,
                 snapshot.extras.get("webmcp_compile_diagnostics", ()),
                 snapshot.extras.get("webmcp_valid_tools", ()),
+            )
+        )
+        tool_registry = getattr(getattr(app, "_runtime_state", None), "tool_registry", None)
+        result.issues.extend(
+            check_mcp_legacy_offramp(
+                tool_registry,
+                mcp_path=getattr(getattr(app, "config", None), "mcp_path", "/mcp"),
             )
         )
         result.issues.extend(check_oob_targets(template_sources, all_ids))

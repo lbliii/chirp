@@ -10,6 +10,31 @@ from chirp import App
 from chirp.config import AppConfig
 from chirp.tools.events import ToolEventBus
 
+_META_PROTOCOL_VERSION = "io.modelcontextprotocol/protocolVersion"
+
+
+def _modern_mcp_params(**extra: Any) -> dict[str, Any]:
+    """Build tools/* params with 2026-07-28 ``_meta`` (avoids legacy offramp warn)."""
+    params: dict[str, Any] = {
+        "_meta": {
+            _META_PROTOCOL_VERSION: "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities": {},
+        },
+    }
+    params.update(extra)
+    return params
+
+
+def _modern_mcp_headers(method: str, name: str | None = None) -> list[tuple[bytes, bytes]]:
+    headers = [
+        (b"content-type", b"application/json"),
+        (b"mcp-protocol-version", b"2026-07-28"),
+        (b"mcp-method", method.encode("latin-1")),
+    ]
+    if name is not None:
+        headers.append((b"mcp-name", name.encode("latin-1")))
+    return headers
+
 
 def _make_asgi_harness() -> tuple[
     Any,  # receive
@@ -97,7 +122,10 @@ class TestAppToolIntegration:
                 "jsonrpc": "2.0",
                 "method": "tools/call",
                 "id": 1,
-                "params": {"name": "echo", "arguments": {"message": "test"}},
+                "params": _modern_mcp_params(
+                    name="echo",
+                    arguments={"message": "test"},
+                ),
             }
         ).encode("utf-8")
 
@@ -124,7 +152,7 @@ class TestAppToolIntegration:
             "type": "http",
             "method": "POST",
             "path": "/mcp",
-            "headers": [(b"content-type", b"application/json")],
+            "headers": _modern_mcp_headers("tools/call", "echo"),
             "query_string": b"",
         }
 
@@ -204,7 +232,7 @@ class TestAppToolIntegration:
                 "jsonrpc": "2.0",
                 "method": "tools/list",
                 "id": 1,
-                "params": {},
+                "params": _modern_mcp_params(),
             }
         ).encode("utf-8")
 
@@ -233,7 +261,7 @@ class TestAppToolIntegration:
             "type": "http",
             "method": "POST",
             "path": "/mcp",
-            "headers": [(b"content-type", b"application/json")],
+            "headers": _modern_mcp_headers("tools/list"),
             "query_string": b"",
         }
 
@@ -264,7 +292,7 @@ class TestAppToolIntegration:
                 "jsonrpc": "2.0",
                 "method": "tools/list",
                 "id": 1,
-                "params": {},
+                "params": _modern_mcp_params(),
             }
         ).encode("utf-8")
 
@@ -292,7 +320,7 @@ class TestAppToolIntegration:
             "type": "http",
             "method": "POST",
             "path": "/api/mcp",
-            "headers": [(b"content-type", b"application/json")],
+            "headers": _modern_mcp_headers("tools/list"),
             "query_string": b"",
         }
 

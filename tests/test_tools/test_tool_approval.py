@@ -121,14 +121,25 @@ class TestMcpApprovalRequired:
 
             @property
             def headers(self) -> dict[str, str]:
-                return {}
+                return {
+                    "MCP-Protocol-Version": "2026-07-28",
+                    "Mcp-Method": "tools/call",
+                    "Mcp-Name": "delete_all",
+                }
 
             async def body(self) -> bytes:
                 payload = {
                     "jsonrpc": "2.0",
                     "method": "tools/call",
                     "id": 1,
-                    "params": {"name": "delete_all", "arguments": {}},
+                    "params": {
+                        "name": "delete_all",
+                        "arguments": {},
+                        "_meta": {
+                            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                            "io.modelcontextprotocol/clientCapabilities": {},
+                        },
+                    },
                 }
                 return json.dumps(payload).encode()
 

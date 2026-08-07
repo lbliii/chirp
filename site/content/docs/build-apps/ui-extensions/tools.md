@@ -97,11 +97,23 @@ JSON-RPC body:
 | `Mcp-Name` | `tools/call` (also `resources/read`, `prompts/get`) | `params.name` (or `params.uri`) |
 
 Enforcement is gated: if **neither** the `MCP-Protocol-Version` header **nor**
-`params._meta` protocol version is present, Chirp stays on the legacy path and
-does not require these headers. Once either advertises a modern version, missing
-or mismatched headers return **HTTP 400** with JSON-RPC error
+`params._meta` protocol version is present — or only the legacy `2024-11-05`
+version is advertised — Chirp stays on the legacy offramp path and does not
+require these headers. Once either advertises a modern (non-legacy) version,
+missing or mismatched headers return **HTTP 400** with JSON-RPC error
 `HeaderMismatch` (`-32020`). `Mcp-Name` may use a Base64 sentinel form
 `=?base64?<data>?=` when the name is not header-safe.
+
+:::{warning} Legacy `2024-11-05` clients — bridged through 2027-07-28
+Handshake-era clients (explicit `2024-11-05`, `initialize` /
+`notifications/initialized`, or no protocol-version advertisement) still work:
+Chirp bridges them with a `DeprecationWarning` and a structured note on
+`initialize` responses. SEP-2243 routing-header enforcement applies only when a
+**modern** protocol version is advertised. `app.check()` emits an INFO
+`mcp_legacy` issue when tools are registered. Migrate clients to `2026-07-28`
+with per-request `_meta` and `MCP-Protocol-Version` / `Mcp-Method` / `Mcp-Name`
+before the offramp ends.
+:::
 
 ::::{steps}
 :::{step} Discover (optional)

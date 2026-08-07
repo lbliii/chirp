@@ -125,13 +125,18 @@ class TestMCPHandler:
         request = _make_request(
             body={"jsonrpc": "2.0", "method": "initialize", "id": 1, "params": {}},
         )
-        response = await handle_mcp_request(request, registry)
+        with pytest.warns(DeprecationWarning, match="2024-11-05"):
+            response = await handle_mcp_request(request, registry)
         status, body = _parse_response(response)
         assert status == 200
         assert body["id"] == 1
         assert body["result"]["protocolVersion"] == "2026-07-28"
         assert "capabilities" in body["result"]
         assert "tools" in body["result"]["capabilities"]
+        offramp = body["result"]["_meta"]["chirp/legacyOfframp"]
+        assert offramp["legacyProtocol"] == "2024-11-05"
+        assert offramp["supportedProtocol"] == "2026-07-28"
+        assert offramp["removeAfter"] == "2027-07-28"
 
     @pytest.mark.issue(965)
     @pytest.mark.asyncio
@@ -178,11 +183,12 @@ class TestMCPHandler:
         """Missing handshake and legacy initialize must not error."""
         registry = self._make_registry()
 
-        # No initialize — tools/list succeeds
+        # No initialize — tools/list succeeds (legacy unversioned path warns)
         list_req = _make_request(
             body={"jsonrpc": "2.0", "method": "tools/list", "id": 1, "params": {}},
         )
-        list_resp = await handle_mcp_request(list_req, registry)
+        with pytest.warns(DeprecationWarning, match="2024-11-05"):
+            list_resp = await handle_mcp_request(list_req, registry)
         list_status, list_body = _parse_response(list_resp)
         assert list_status == 200
         assert "tools" in list_body["result"]
@@ -192,7 +198,8 @@ class TestMCPHandler:
         init_req = _make_request(
             body={"jsonrpc": "2.0", "method": "initialize", "id": 2, "params": {}},
         )
-        init_resp = await handle_mcp_request(init_req, registry)
+        with pytest.warns(DeprecationWarning, match="2024-11-05"):
+            init_resp = await handle_mcp_request(init_req, registry)
         init_status, init_body = _parse_response(init_resp)
         assert init_status == 200
         assert "error" not in init_body
@@ -202,7 +209,8 @@ class TestMCPHandler:
         note_req = _make_request(
             body={"jsonrpc": "2.0", "method": "notifications/initialized"},
         )
-        note_resp = await handle_mcp_request(note_req, registry)
+        with pytest.warns(DeprecationWarning, match="2024-11-05"):
+            note_resp = await handle_mcp_request(note_req, registry)
         assert note_resp.status == 204
 
         # Second call with no ordering dependency
@@ -275,7 +283,8 @@ class TestMCPHandler:
                 "params": {"_meta": "not-an-object"},
             },
         )
-        response = await handle_mcp_request(request, registry)
+        with pytest.warns(DeprecationWarning, match="2024-11-05"):
+            response = await handle_mcp_request(request, registry)
         status, body = _parse_response(response)
         assert status == 200
         assert body["error"]["code"] == -32602
@@ -401,7 +410,13 @@ class TestMCPHandler:
     async def test_tools_list(self) -> None:
         registry = self._make_registry()
         request = _make_request(
-            body={"jsonrpc": "2.0", "method": "tools/list", "id": 2, "params": {}},
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "id": 2,
+                "params": {"_meta": _stateless_meta()},
+            },
+            headers=_routing_headers(method="tools/list"),
         )
         response = await handle_mcp_request(request, registry)
         status, body = _parse_response(response)
@@ -415,7 +430,13 @@ class TestMCPHandler:
     async def test_tools_list_schema(self) -> None:
         registry = self._make_registry()
         request = _make_request(
-            body={"jsonrpc": "2.0", "method": "tools/list", "id": 3, "params": {}},
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "id": 3,
+                "params": {"_meta": _stateless_meta()},
+            },
+            headers=_routing_headers(method="tools/list"),
         )
         response = await handle_mcp_request(request, registry)
         _status, body = _parse_response(response)
@@ -434,8 +455,13 @@ class TestMCPHandler:
                 "jsonrpc": "2.0",
                 "method": "tools/call",
                 "id": 4,
-                "params": {"name": "greet", "arguments": {"name": "World"}},
-            }
+                "params": {
+                    "name": "greet",
+                    "arguments": {"name": "World"},
+                    "_meta": _stateless_meta(),
+                },
+            },
+            headers=_routing_headers(method="tools/call", name="greet"),
         )
         response = await handle_mcp_request(request, registry)
         status, body = _parse_response(response)
@@ -454,8 +480,13 @@ class TestMCPHandler:
                 "jsonrpc": "2.0",
                 "method": "tools/call",
                 "id": 5,
-                "params": {"name": "search", "arguments": {"query": "test"}},
-            }
+                "params": {
+                    "name": "search",
+                    "arguments": {"query": "test"},
+                    "_meta": _stateless_meta(),
+                },
+            },
+            headers=_routing_headers(method="tools/call", name="search"),
         )
         response = await handle_mcp_request(request, registry)
         status, body = _parse_response(response)
@@ -472,8 +503,13 @@ class TestMCPHandler:
                 "jsonrpc": "2.0",
                 "method": "tools/call",
                 "id": 6,
-                "params": {"name": "missing", "arguments": {}},
-            }
+                "params": {
+                    "name": "missing",
+                    "arguments": {},
+                    "_meta": _stateless_meta(),
+                },
+            },
+            headers=_routing_headers(method="tools/call", name="missing"),
         )
         response = await handle_mcp_request(request, registry)
         status, body = _parse_response(response)
@@ -489,8 +525,9 @@ class TestMCPHandler:
                 "jsonrpc": "2.0",
                 "method": "unknown/method",
                 "id": 7,
-                "params": {},
-            }
+                "params": {"_meta": _stateless_meta()},
+            },
+            headers=_routing_headers(method="unknown/method"),
         )
         response = await handle_mcp_request(request, registry)
         status, body = _parse_response(response)
@@ -543,7 +580,8 @@ class TestMCPHandler:
                 # No "id" — this is a JSON-RPC notification
             }
         )
-        response = await handle_mcp_request(request, registry)
+        with pytest.warns(DeprecationWarning, match="2024-11-05"):
+            response = await handle_mcp_request(request, registry)
         assert response.status == 204
 
     @pytest.mark.asyncio
@@ -556,5 +594,131 @@ class TestMCPHandler:
                 "method": "notifications/something_else",
             }
         )
-        response = await handle_mcp_request(request, registry)
+        with pytest.warns(DeprecationWarning, match="2024-11-05"):
+            response = await handle_mcp_request(request, registry)
         assert response.status == 204
+
+
+class TestLegacyOfframp967:
+    """#967 — documented bridge for handshake-era clients (not a silent break)."""
+
+    def _make_registry(self) -> ToolRegistry:
+        def greet(name: str) -> str:
+            return f"Hello, {name}!"
+
+        return compile_tools(
+            [("greet", "Greet someone", greet)],
+            ToolEventBus(),
+        )
+
+    @pytest.mark.issue(967)
+    def test_is_legacy_detection(self) -> None:
+        from chirp.tools.handler import _is_legacy_mcp_request
+
+        legacy_init = _make_request(
+            body={"jsonrpc": "2.0", "method": "initialize", "id": 1, "params": {}},
+        )
+        assert _is_legacy_mcp_request(
+            legacy_init,
+            {"jsonrpc": "2.0", "method": "initialize", "id": 1, "params": {}},
+        )
+
+        explicit_legacy = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "id": 1,
+                "params": {
+                    "_meta": {_META_PROTOCOL_VERSION: "2024-11-05"},
+                },
+            },
+            headers={"MCP-Protocol-Version": "2024-11-05"},
+        )
+        assert _is_legacy_mcp_request(
+            explicit_legacy,
+            {
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "id": 1,
+                "params": {"_meta": {_META_PROTOCOL_VERSION: "2024-11-05"}},
+            },
+        )
+
+        modern = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "id": 1,
+                "params": {"_meta": _stateless_meta()},
+            },
+            headers=_routing_headers(method="tools/list"),
+        )
+        assert not _is_legacy_mcp_request(
+            modern,
+            {
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "id": 1,
+                "params": {"_meta": _stateless_meta()},
+            },
+        )
+
+    @pytest.mark.issue(967)
+    @pytest.mark.asyncio
+    async def test_legacy_initialize_bridged_with_warning_and_meta(self) -> None:
+        """Legacy initialize succeeds with DeprecationWarning + offramp _meta."""
+        registry = self._make_registry()
+        request = _make_request(
+            body={"jsonrpc": "2.0", "method": "initialize", "id": 1, "params": {}},
+        )
+        with pytest.warns(DeprecationWarning, match="2027-07-28"):
+            response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
+        assert status == 200
+        assert "error" not in body
+        result = body["result"]
+        assert result["protocolVersion"] == "2026-07-28"
+        offramp = result["_meta"]["chirp/legacyOfframp"]
+        assert offramp["removeAfter"] == "2027-07-28"
+        assert "Migrate" in offramp["message"]
+
+    @pytest.mark.issue(967)
+    @pytest.mark.asyncio
+    async def test_explicit_legacy_version_skips_header_enforcement(self) -> None:
+        """Advertising only 2024-11-05 does not trigger HeaderMismatch."""
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "id": 1,
+                "params": {"_meta": {_META_PROTOCOL_VERSION: "2024-11-05"}},
+            },
+            headers={"MCP-Protocol-Version": "2024-11-05"},
+            # Intentionally omit Mcp-Method — must remain bridged, not -32020.
+        )
+        with pytest.warns(DeprecationWarning, match="2024-11-05"):
+            response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
+        assert status == 200
+        assert "error" not in body
+        assert "tools" in body["result"]
+
+    @pytest.mark.issue(967)
+    @pytest.mark.asyncio
+    async def test_modern_path_still_enforces_headers(self) -> None:
+        """Modern advertisement without Mcp-Method still returns HeaderMismatch."""
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "id": 1,
+                "params": {"_meta": _stateless_meta()},
+            },
+            headers={"MCP-Protocol-Version": "2026-07-28"},
+        )
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
+        assert status == 400
+        assert body["error"]["code"] == -32020

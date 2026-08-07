@@ -18,6 +18,12 @@ and capabilities. There is no handshake or session state.
 Streamable HTTP routing headers (SEP-2243) are validated when a modern
 protocol version is advertised via ``MCP-Protocol-Version`` or
 ``params._meta`` — see ``_validate_routing_headers``.
+
+Legacy ``2024-11-05`` clients are **bridged** (not hard-errored) through a
+12-month offramp ending ``2027-07-28`` (MCP feature-lifecycle minimum).
+Detection emits ``DeprecationWarning`` and documents the window in
+``initialize`` result ``_meta``; ``app.check()`` surfaces an INFO
+``mcp_legacy`` issue when tools are registered.
 """
 
 from __future__ import annotations
@@ -25,6 +31,7 @@ from __future__ import annotations
 import base64
 import json as json_module
 import re
+import warnings
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from typing import Any, TypedDict
@@ -38,6 +45,7 @@ _META_PROTOCOL_VERSION = "io.modelcontextprotocol/protocolVersion"
 _META_CLIENT_INFO = "io.modelcontextprotocol/clientInfo"
 _META_CLIENT_CAPABILITIES = "io.modelcontextprotocol/clientCapabilities"
 _META_SERVER_INFO = "io.modelcontextprotocol/serverInfo"
+_META_LEGACY_OFFRAMP = "chirp/legacyOfframp"
 
 # SEP-2243 / Streamable HTTP 2026-07-28
 _HEADER_PROTOCOL_VERSION = "MCP-Protocol-Version"
@@ -46,6 +54,12 @@ _HEADER_NAME = "Mcp-Name"
 _HEADER_MISMATCH_CODE = -32020
 _METHODS_REQUIRING_NAME = frozenset({"tools/call", "resources/read", "prompts/get"})
 _BASE64_SENTINEL = re.compile(r"^=\?base64\?(?P<data>.+)\?=$")
+
+# Legacy handshake-era protocol (pre-stateless). Bridged until offramp date.
+_LEGACY_PROTOCOL_VERSION = "2024-11-05"
+# 12 months after 2026-07-28 per MCP feature-lifecycle deprecation policy.
+_LEGACY_OFFRAMP_UNTIL = "2027-07-28"
+_LEGACY_HANDSHAKE_METHODS = frozenset({"initialize", "notifications/initialized"})
 
 
 class JsonRpcError(TypedDict):
@@ -104,6 +118,13 @@ _SERVER_CAPABILITIES = {
     "tools": {},
 }
 
+_LEGACY_DEPRECATION_MESSAGE = (
+    f"MCP protocol {_LEGACY_PROTOCOL_VERSION} (handshake-era) clients are deprecated. "
+    f"Migrate to {_MCP_VERSION} with per-request params._meta and SEP-2243 routing "
+    f"headers (MCP-Protocol-Version, Mcp-Method, Mcp-Name). "
+    f"Legacy bridge remains until {_LEGACY_OFFRAMP_UNTIL}."
+)
+
 _mcp_meta_var: ContextVar[McpRequestMeta | None] = ContextVar(
     "chirp_mcp_request_meta",
     default=None,
@@ -151,6 +172,64 @@ def _body_protocol_version(request_body: dict[str, Any]) -> str | None:
     return version if isinstance(version, str) else None
 
 
+def _advertised_protocol_versions(
+    request: Request,
+    request_body: dict[str, Any],
+) -> tuple[str | None, str | None]:
+    """Return ``(header_version, body_version)`` advertisements, if any."""
+    return (
+        _header_value(request, _HEADER_PROTOCOL_VERSION),
+        _body_protocol_version(request_body),
+    )
+
+
+def _has_modern_protocol_advertisement(
+    header_version: str | None,
+    body_version: str | None,
+) -> bool:
+    """Return whether any non-legacy protocol version is advertised."""
+    for version in (header_version, body_version):
+        if version is not None and version != _LEGACY_PROTOCOL_VERSION:
+            return True
+    return False
+
+
+def _is_legacy_mcp_request(request: Request, request_body: dict[str, Any]) -> bool:
+    """Detect handshake-era / unversioned MCP clients on the legacy offramp.
+
+    A request is legacy when:
+
+    - it advertises ``2024-11-05`` via header or ``params._meta``, or
+    - it uses the handshake methods ``initialize`` /
+      ``notifications/initialized``, or
+    - it advertises no protocol version at all (SEP-2243 not enforced).
+
+    Modern ``2026-07-28`` (or other non-legacy) advertisements are not legacy.
+    """
+    header_version, body_version = _advertised_protocol_versions(request, request_body)
+    if header_version == _LEGACY_PROTOCOL_VERSION or body_version == _LEGACY_PROTOCOL_VERSION:
+        return True
+    method = request_body.get("method")
+    if isinstance(method, str) and method in _LEGACY_HANDSHAKE_METHODS:
+        return True
+    return header_version is None and body_version is None
+
+
+def _emit_legacy_deprecation_warning() -> None:
+    """Emit the documented legacy-client ``DeprecationWarning`` (bridge path)."""
+    warnings.warn(_LEGACY_DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
+
+
+def _legacy_offramp_meta() -> dict[str, Any]:
+    """Structured deprecation note for legacy ``initialize`` responses."""
+    return {
+        "legacyProtocol": _LEGACY_PROTOCOL_VERSION,
+        "supportedProtocol": _MCP_VERSION,
+        "removeAfter": _LEGACY_OFFRAMP_UNTIL,
+        "message": _LEGACY_DEPRECATION_MESSAGE,
+    }
+
+
 def _body_name(request_body: dict[str, Any]) -> str | None:
     """Return ``params.name`` or ``params.uri`` for name-bearing RPCs."""
     params = request_body.get("params")
@@ -186,19 +265,19 @@ def _validate_routing_headers(
 ) -> Response | None:
     """Validate Streamable HTTP routing headers against the JSON-RPC body.
 
-    Enforcement is gated on a modern protocol advertisement: either the
-    ``MCP-Protocol-Version`` header or ``params._meta`` protocol version.
-    Requests with neither remain on the legacy path (sibling deprecation
-    offramp). When modern, missing/mismatched headers return HTTP 400 with
-    JSON-RPC ``HeaderMismatch`` (``-32020``).
+    Enforcement is gated on a **modern** (non-legacy) protocol advertisement:
+    ``MCP-Protocol-Version`` and/or ``params._meta`` carrying a version other
+    than ``2024-11-05``. Requests with no advertisement, or only the legacy
+    ``2024-11-05`` version, remain on the deprecation offramp (bridged until
+    ``2027-07-28``). When modern, missing/mismatched headers return HTTP 400
+    with JSON-RPC ``HeaderMismatch`` (``-32020``).
 
     Returns:
         An error ``Response`` on failure, or ``None`` when validation passes
         or is skipped.
     """
-    header_version = _header_value(request, _HEADER_PROTOCOL_VERSION)
-    body_version = _body_protocol_version(request_body)
-    if header_version is None and body_version is None:
+    header_version, body_version = _advertised_protocol_versions(request, request_body)
+    if not _has_modern_protocol_advertisement(header_version, body_version):
         return None
 
     if header_version is None:
@@ -381,6 +460,10 @@ async def handle_mcp_request(
             ),
         )
 
+    # Legacy offramp: bridge (warn), do not hard-error during the window.
+    if _is_legacy_mcp_request(request, rpc_request):
+        _emit_legacy_deprecation_warning()
+
     # SEP-2243 routing headers — validate before dispatch / notification noop.
     header_error = _validate_routing_headers(request, rpc_request, rpc_id=rpc_id)
     if header_error is not None:
@@ -469,13 +552,19 @@ def _handle_initialize(params: dict[str, Any]) -> dict[str, Any]:
     """Legacy ``initialize`` — accept-and-noop capability reply.
 
     Stateless servers do not require this handshake. Kept for
-    ``2024-11-05`` clients; response uses the current protocol version.
+    ``2024-11-05`` clients through the documented offramp
+    (``_LEGACY_OFFRAMP_UNTIL``); response advertises the current protocol
+    version and includes a structured deprecation note in ``_meta``.
     """
     _ = params
     return {
         "protocolVersion": _MCP_VERSION,
         "capabilities": _SERVER_CAPABILITIES,
         "serverInfo": _SERVER_INFO,
+        "_meta": {
+            _META_SERVER_INFO: dict(_SERVER_INFO),
+            _META_LEGACY_OFFRAMP: _legacy_offramp_meta(),
+        },
     }
 
 
