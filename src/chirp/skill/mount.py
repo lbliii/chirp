@@ -33,6 +33,7 @@ class _PendingSkillTool:
     description: str
     handler: Callable[..., Any]
     approval_required: bool
+    scopes: tuple[str, ...]
 
 
 class Skill:
@@ -52,7 +53,12 @@ class Skill:
         def add(a: int, b: int) -> int:
             return a + b
 
+        @skill.tool("hook", scopes=("webhook:write",))
+        def hook(payload: dict) -> dict:
+            return payload
+
         use_skill(app, skill)
+        app.register_scope("webhook:write")
     """
 
     __slots__ = (
@@ -160,11 +166,19 @@ class Skill:
         *,
         description: str = "",
         approval_required: bool = False,
+        scopes: tuple[str, ...] = (),
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Register a skill tool whose return value is wrapped in an ``Envelope``.
 
-        Mirrors ``app.tool``; scope gating is a sibling (#971) and is not applied
-        here. Passing an already-built ``Envelope`` leaves it unchanged.
+        When ``scopes`` is non-empty, the wrapper calls
+        :func:`~chirp.security.auth_core.enforce_auth` with
+        ``AuthSpec(scopes=...)`` before the body. A 403 denial from the shared
+        gate is mapped to :class:`~chirp.errors.ToolAuthError` (mutable; safe
+        through tool dispatch); MCP ``tools/call`` turns that into a JSON-RPC
+        error and ``authz.scope.denied`` is audited by the gate. Declare scopes
+        with ``app.register_scope(...)`` so the ``auth_spec`` contract can
+        validate them at startup. Passing an already-built ``Envelope`` leaves
+        it unchanged.
         """
         if self._mounted:
             msg = f"Cannot register tool {name!r} after use_skill() has mounted this skill"
@@ -179,6 +193,7 @@ class Skill:
         if any(t.name == normalized for t in self._pending):
             msg = f"Duplicate skill tool name: {normalized!r}"
             raise ValueError(msg)
+        scope_tuple = tuple(scopes)
 
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             wrapped = _envelope_wrapper(
@@ -189,12 +204,15 @@ class Skill:
                 private_key=self._private_key,
                 key_id=self._key_id,
             )
+            if scope_tuple:
+                wrapped = _scope_gate_wrapper(wrapped, scopes=scope_tuple)
             self._pending.append(
                 _PendingSkillTool(
                     name=normalized,
                     description=description,
                     handler=wrapped,
                     approval_required=approval_required,
+                    scopes=scope_tuple,
                 )
             )
             return wrapped
@@ -280,6 +298,46 @@ def _skill_tool_schemas(pending: list[_PendingSkillTool]) -> dict[str, dict[str,
         }
         for tool in pending
     }
+
+
+def _scope_gate_wrapper(
+    func: Callable[..., Any],
+    *,
+    scopes: tuple[str, ...],
+) -> Callable[..., Any]:
+    """Enforce ``AuthSpec(scopes=...)`` before invoking the skill tool body.
+
+    Decision D2 (MVP): wrap-in-decorator rather than ``ToolDef.auth``. Denial
+    raises ``HTTPError(403)`` from the shared gate; the wrapper maps that to
+    ``ToolAuthError`` and MCP maps it to JSON-RPC.
+    """
+    from chirp.pages.types import AuthSpec
+
+    spec = AuthSpec(scopes=scopes)
+
+    @functools.wraps(func)
+    async def gated(*args: Any, **kwargs: Any) -> Any:
+        from chirp._internal.invoke import invoke
+        from chirp.context import get_request
+        from chirp.errors import HTTPError, ToolAuthError
+        from chirp.middleware.auth import get_user
+        from chirp.security.auth_core import enforce_auth
+
+        try:
+            await enforce_auth(spec, get_request(), get_user())
+        except HTTPError as exc:
+            # Frozen HTTPError cannot carry __traceback__ through tool
+            # dispatch (trace_span / contextlib). Map 401/403 to a mutable
+            # ToolAuthError; MCP tools/call turns that into JSON-RPC.
+            if exc.status in (401, 403):
+                raise ToolAuthError(
+                    status=exc.status,
+                    detail=exc.detail or ("Forbidden" if exc.status == 403 else "Unauthorized"),
+                ) from None
+            raise
+        return await invoke(func, *args, **kwargs)
+
+    return gated
 
 
 def _envelope_wrapper(

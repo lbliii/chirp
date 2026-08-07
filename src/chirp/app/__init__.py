@@ -854,7 +854,8 @@ class App:
         """Declare a machine-token scope used by ``AuthSpec.scopes``.
 
         The **machine-auth** counterpart to :meth:`register_permission`: scopes
-        gate webhook / cron / provisioning endpoints on a token-resolved
+        gate webhook / cron / provisioning endpoints — and
+        ``@skill.tool(..., scopes=(...))`` handlers — on a token-resolved
         client's scopes (a :class:`~chirp.middleware.auth.ClientWithScopes`),
         independent of human permissions. Declaring scopes makes the
         ``auth_spec`` contract check registry-backed for the scope axis: an

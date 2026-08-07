@@ -613,12 +613,25 @@ async def _handle_tools_call(
             )
         }
 
+    from chirp.errors import HTTPError, ToolAuthError
+
     try:
         result = await registry.call_tool(tool_name, arguments)
     except KeyError:
         return {"error": JsonRpcError(code=-32602, message=f"Tool not found: {tool_name!r}")}
     except TypeError as exc:
         return {"error": JsonRpcError(code=-32602, message=f"Invalid arguments: {exc}")}
+    except ToolAuthError as exc:
+        # skill.tool scopes (and similar) map enforce_auth 401/403 here.
+        message = exc.detail or ("Forbidden" if exc.status == 403 else "Unauthorized")
+        return {"error": JsonRpcError(code=-32603, message=message)}
+    except HTTPError as exc:
+        # Defensive: a tool that raises HTTPError directly (frozen) may still
+        # surface here if dispatch did not rewrite it.
+        if exc.status in (401, 403):
+            message = exc.detail or ("Forbidden" if exc.status == 403 else "Unauthorized")
+            return {"error": JsonRpcError(code=-32603, message=message)}
+        return {"error": JsonRpcError(code=-32603, message=f"Tool execution error: {exc}")}
     except Exception as exc:
         return {"error": JsonRpcError(code=-32603, message=f"Tool execution error: {exc}")}
 
