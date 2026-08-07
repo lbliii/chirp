@@ -5,19 +5,33 @@ Receives a chirp ``Request``, returns a chirp ``Response`` — this means
 it participates in the normal middleware pipeline (auth, CORS, rate
 limiting all apply).
 
-Implements the minimal MCP surface for v1:
-    - ``initialize`` — capability negotiation (tools only)
-    - ``notifications/initialized`` — client acknowledgment (no-op)
+Implements the minimal MCP surface for the ``2026-07-28`` stateless core:
+    - ``server/discover`` — optional capability advertisement
     - ``tools/list`` — return registered tool schemas
     - ``tools/call`` — dispatch to tool handler, return result
+    - ``initialize`` / ``notifications/initialized`` — accept-and-noop
+      for legacy ``2024-11-05`` clients (no server-side session)
+
+Per-request ``params._meta`` carries protocol version, client identity,
+and capabilities. There is no handshake or session state.
 """
 
+from __future__ import annotations
+
 import json as json_module
+from contextvars import ContextVar, Token
+from dataclasses import dataclass
 from typing import Any, TypedDict
 
 from chirp.http.request import Request
 from chirp.http.response import Response
 from chirp.tools.registry import ToolRegistry
+
+# Reserved ``_meta`` keys (MCP 2026-07-28 RequestMetaObject)
+_META_PROTOCOL_VERSION = "io.modelcontextprotocol/protocolVersion"
+_META_CLIENT_INFO = "io.modelcontextprotocol/clientInfo"
+_META_CLIENT_CAPABILITIES = "io.modelcontextprotocol/clientCapabilities"
+_META_SERVER_INFO = "io.modelcontextprotocol/serverInfo"
 
 
 class JsonRpcError(TypedDict):
@@ -50,8 +64,21 @@ class McpContentBlock(TypedDict):
     text: str
 
 
+@dataclass(frozen=True, slots=True)
+class McpRequestMeta:
+    """Parsed per-request MCP ``_meta`` (protocol 2026-07-28).
+
+    Missing ``_meta`` (legacy clients) yields empty fields with ``raw={}``.
+    """
+
+    protocol_version: str | None
+    client_info: dict[str, Any] | None
+    client_capabilities: dict[str, Any] | None
+    raw: dict[str, Any]
+
+
 # MCP protocol version
-_MCP_VERSION = "2024-11-05"
+_MCP_VERSION = "2026-07-28"
 
 # Server capabilities (tools only in v1)
 _SERVER_INFO = {
@@ -63,6 +90,64 @@ _SERVER_CAPABILITIES = {
     "tools": {},
 }
 
+_mcp_meta_var: ContextVar[McpRequestMeta | None] = ContextVar(
+    "chirp_mcp_request_meta",
+    default=None,
+)
+
+
+def get_mcp_meta() -> McpRequestMeta | None:
+    """Return parsed ``_meta`` for the current MCP request, or ``None`` outside one."""
+    return _mcp_meta_var.get()
+
+
+def _parse_meta(request_body: dict[str, Any]) -> McpRequestMeta:
+    """Extract and normalize ``params._meta`` from a JSON-RPC request body.
+
+    Raises:
+        TypeError: When ``_meta`` is present but not a JSON object.
+    """
+    params = request_body.get("params")
+    if not isinstance(params, dict):
+        return McpRequestMeta(
+            protocol_version=None,
+            client_info=None,
+            client_capabilities=None,
+            raw={},
+        )
+
+    meta = params.get("_meta")
+    if meta is None:
+        return McpRequestMeta(
+            protocol_version=None,
+            client_info=None,
+            client_capabilities=None,
+            raw={},
+        )
+    if not isinstance(meta, dict):
+        raise TypeError("_meta must be an object")
+
+    protocol_version = meta.get(_META_PROTOCOL_VERSION)
+    if protocol_version is not None and not isinstance(protocol_version, str):
+        raise TypeError(f"{_META_PROTOCOL_VERSION!r} must be a string")
+
+    client_info = meta.get(_META_CLIENT_INFO)
+    if client_info is not None and not isinstance(client_info, dict):
+        raise TypeError(f"{_META_CLIENT_INFO!r} must be an object")
+
+    client_capabilities = meta.get(_META_CLIENT_CAPABILITIES)
+    if client_capabilities is not None and not isinstance(client_capabilities, dict):
+        raise TypeError(f"{_META_CLIENT_CAPABILITIES!r} must be an object")
+
+    return McpRequestMeta(
+        protocol_version=protocol_version,
+        client_info=dict(client_info) if client_info is not None else None,
+        client_capabilities=(
+            dict(client_capabilities) if client_capabilities is not None else None
+        ),
+        raw=dict(meta),
+    )
+
 
 async def handle_mcp_request(
     request: Request,
@@ -73,6 +158,9 @@ async def handle_mcp_request(
     Takes a chirp Request, returns a chirp Response. This function is
     called from within the middleware pipeline in ``handle_request()``,
     so all middleware (auth, CORS, rate limiting) applies.
+
+    Stateless: no handshake or session is required. Legacy ``initialize``
+    / ``notifications/initialized`` are accepted as no-ops for back-compat.
     """
     # MCP Streamable HTTP: only POST carries JSON-RPC
     if request.method != "POST":
@@ -126,7 +214,7 @@ async def handle_mcp_request(
     params = rpc_request.get("params", {})
 
     # JSON-RPC notifications have no "id" — they expect no response.
-    # MCP's notifications/initialized is the primary example.
+    # Legacy MCP's notifications/initialized is the primary example.
     is_notification = "id" not in rpc_request
 
     if not rpc_method:
@@ -139,12 +227,30 @@ async def handle_mcp_request(
             ),
         )
 
-    # Handle notifications (no response expected)
+    # Handle notifications (no response expected) — accept-and-noop
     if is_notification:
         return _handle_notification(rpc_method)
 
-    # Dispatch to MCP methods
-    result = await _dispatch(rpc_method, params, registry=registry)
+    try:
+        meta = _parse_meta(rpc_request)
+    except TypeError as exc:
+        return _json_response(
+            200,
+            JsonRpcErrorResponse(
+                jsonrpc="2.0",
+                error=JsonRpcError(code=-32602, message=str(exc)),
+                id=rpc_id,
+            ),
+        )
+
+    if not isinstance(params, dict):
+        params = {}
+
+    token: Token[McpRequestMeta | None] = _mcp_meta_var.set(meta)
+    try:
+        result = await _dispatch(rpc_method, params, registry=registry, meta=meta)
+    finally:
+        _mcp_meta_var.reset(token)
 
     if isinstance(result, dict) and "error" in result:
         return _json_response(
@@ -169,12 +275,11 @@ async def handle_mcp_request(
 def _handle_notification(method: str) -> Response:
     """Handle a JSON-RPC notification (no response expected).
 
-    MCP clients send ``notifications/initialized`` after the initialize
-    handshake completes. Per JSON-RPC spec, notifications have no ``id``
-    and the server MUST NOT reply. We return 204 No Content.
+    Legacy MCP clients send ``notifications/initialized`` after an
+    ``initialize`` handshake. Per JSON-RPC, notifications have no ``id``
+    and the server MUST NOT reply. We return 204 No Content for all
+    notifications (accept-and-noop; no session state).
     """
-    # Accept all notifications silently — notifications/initialized
-    # is the common case, but future MCP versions may add others.
     _ = method  # acknowledged but not dispatched
     return Response(body="", status=204)
 
@@ -184,11 +289,15 @@ async def _dispatch(
     params: dict[str, Any],
     *,
     registry: ToolRegistry,
+    meta: McpRequestMeta,
 ) -> Any:
     """Route a JSON-RPC method to the appropriate handler."""
     match method:
         case "initialize":
+            # Legacy accept-and-noop — no session; advertise current version.
             return _handle_initialize(params)
+        case "server/discover":
+            return _handle_server_discover(meta)
         case "tools/list":
             return _handle_tools_list(registry)
         case "tools/call":
@@ -198,11 +307,29 @@ async def _dispatch(
 
 
 def _handle_initialize(params: dict[str, Any]) -> dict[str, Any]:
-    """Handle MCP ``initialize`` — capability negotiation."""
+    """Legacy ``initialize`` — accept-and-noop capability reply.
+
+    Stateless servers do not require this handshake. Kept for
+    ``2024-11-05`` clients; response uses the current protocol version.
+    """
+    _ = params
     return {
         "protocolVersion": _MCP_VERSION,
         "capabilities": _SERVER_CAPABILITIES,
         "serverInfo": _SERVER_INFO,
+    }
+
+
+def _handle_server_discover(meta: McpRequestMeta) -> dict[str, Any]:
+    """Handle MCP ``server/discover`` — optional capability advertisement."""
+    _ = meta  # available for future version negotiation / logging
+    return {
+        "resultType": "complete",
+        "supportedVersions": [_MCP_VERSION],
+        "capabilities": _SERVER_CAPABILITIES,
+        "_meta": {
+            _META_SERVER_INFO: dict(_SERVER_INFO),
+        },
     }
 
 
