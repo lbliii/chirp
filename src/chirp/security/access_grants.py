@@ -9,7 +9,7 @@ Usage::
 
     from chirp.data import Database, Query, migrate
     from chirp.security.access_grants import (
-        ACCESS_GRANTS_DDL,
+        access_grants_ddl,
         access_policy,
         check_access,
         create_grant,
@@ -17,8 +17,11 @@ Usage::
         require_access,
     )
 
-    # One-time migration (copy ACCESS_GRANTS_DDL into migrations/NNN_access_grants.sql)
+    # One-time migration — dialect-aware DDL (sqlite | postgresql).
+    # Copy access_grants_ddl("sqlite") or access_grants_ddl("postgresql") into
+    # migrations/NNN_access_grants.sql, then:
     await migrate(db, "migrations/")
+    # Or apply directly: await db.execute_script(access_grants_ddl("postgresql"))
 
     app.register_permission("documents.grant.read")
     register_access_policy(app, "owns:document", "document", param="document_id", perm="read")
@@ -53,6 +56,7 @@ if TYPE_CHECKING:
 _log = logging.getLogger("chirp.security")
 
 _SQL_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_SUPPORTED_DIALECTS = frozenset({"sqlite", "postgresql"})
 
 
 def _sql_ident(name: str, *, label: str) -> str:
@@ -60,6 +64,15 @@ def _sql_ident(name: str, *, label: str) -> str:
         msg = f"{label} must be a SQL identifier, got {name!r}"
         raise ValueError(msg)
     return name
+
+
+def _normalize_dialect(dialect: str) -> str:
+    normalized = "postgresql" if dialect in ("postgres", "postgresql") else dialect
+    if normalized not in _SUPPORTED_DIALECTS:
+        supported = ", ".join(sorted(_SUPPORTED_DIALECTS))
+        msg = f"unsupported access-grants dialect {dialect!r}; expected one of: {supported}"
+        raise ValueError(msg)
+    return normalized
 
 
 GRANTS_TABLE = "access_grants"
@@ -71,9 +84,24 @@ PERM_WRITE = "write"
 GrantPermission = Literal["read", "write"]
 PrincipalType = Literal["user", "group"]
 
-ACCESS_GRANTS_DDL = f"""
+
+def access_grants_ddl(dialect: str = "sqlite") -> str:
+    """Return portable ``access_grants`` CREATE TABLE / INDEX SQL for *dialect*.
+
+    *dialect* is ``\"sqlite\"`` or ``\"postgresql\"`` (``\"postgres\"`` accepted).
+    SQLite uses ``INTEGER PRIMARY KEY`` (implicit autoincrement; no
+    ``AUTOINCREMENT`` keyword). PostgreSQL uses ``SERIAL PRIMARY KEY``.
+    Both forms are compatible with :func:`create_grant`, which reads the
+    inserted row via ``INSERT ... RETURNING`` rather than SQLite ``rowid``.
+
+    Copy the returned SQL into a numbered migration, or apply it with
+    :meth:`~chirp.data.Database.execute_script`.
+    """
+    normalized = _normalize_dialect(dialect)
+    id_column = "id SERIAL PRIMARY KEY" if normalized == "postgresql" else "id INTEGER PRIMARY KEY"
+    return f"""
 CREATE TABLE IF NOT EXISTS {GRANTS_TABLE} (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    {id_column},
     resource_type TEXT NOT NULL,
     resource_id TEXT NOT NULL,
     principal_type TEXT NOT NULL CHECK (principal_type IN ('user', 'group')),
@@ -88,6 +116,10 @@ CREATE INDEX IF NOT EXISTS idx_access_grants_grantee_user
 CREATE INDEX IF NOT EXISTS idx_access_grants_resource
     ON {GRANTS_TABLE} (resource_type, resource_id);
 """
+
+
+# Back-compat: SQLite DDL without AUTOINCREMENT (valid on existing INTEGER PK tables).
+ACCESS_GRANTS_DDL = access_grants_ddl("sqlite")
 
 
 @dataclass(frozen=True, slots=True)
@@ -268,23 +300,27 @@ async def create_grant(
     if errors:
         raise SharingEscalationError(errors)
     created_at = datetime.now(tz=UTC).isoformat()
-    await db.execute(
+    # INSERT ... RETURNING is portable across SQLite 3.35+ and PostgreSQL.
+    # Run inside a transaction so the write reuses one connection (SQLite
+    # write lock) and a unique-constraint failure rolls back cleanly.
+    insert_sql = (
         f"INSERT INTO {GRANTS_TABLE} "
         "(resource_type, resource_id, principal_type, principal_id, permission, "
         "granted_by_user_id, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        resource_type,
-        str(resource_id),
-        principal_type,
-        principal_id,
-        permission,
-        _user_id(granter),
-        created_at,
+        "VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *"
     )
-    row = await db.fetch_one(
-        AccessGrant,
-        f"SELECT * FROM {GRANTS_TABLE} WHERE rowid = last_insert_rowid()",
-    )
+    async with db.transaction():
+        row = await db.fetch_one(
+            AccessGrant,
+            insert_sql,
+            resource_type,
+            str(resource_id),
+            principal_type,
+            principal_id,
+            permission,
+            _user_id(granter),
+            created_at,
+        )
     if row is None:
         msg = "grant insert succeeded but row could not be read back"
         raise RuntimeError(msg)
@@ -368,6 +404,7 @@ __all__ = [
     "AccessGrant",
     "SharingEscalationError",
     "access_exists_clause",
+    "access_grants_ddl",
     "access_policy",
     "check_access",
     "create_grant",

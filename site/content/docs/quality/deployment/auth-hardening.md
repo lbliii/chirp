@@ -138,6 +138,19 @@ The authorization decorators and lockout helpers live in `chirp.security`, not
 from chirp.security import LockoutConfig, LoginLockout, login_required, requires
 ```
 
+### Per-record access grants
+
+Resource-level grants live in an app-owned `access_grants` table. Use
+`access_grants_ddl("sqlite")` or `access_grants_ddl("postgresql")` for the
+migration SQL — do not copy SQLite-only `AUTOINCREMENT` / `last_insert_rowid()`
+forms. `create_grant` inserts with portable `INSERT ... RETURNING`.
+
+```python
+from chirp.security import access_grants_ddl, create_grant
+
+await db.execute_script(access_grants_ddl("postgresql"))  # or "sqlite"
+```
+
 ### Password hashing and login verification
 
 `chirp.security` ships the credential primitives. They live one import away:
