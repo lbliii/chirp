@@ -35,6 +35,7 @@ from chirp.server.streaming_context import (
     capture_streaming_render_context,
 )
 from chirp.shell_actions import ShellActionsRenderer
+from chirp.skill.envelope import Envelope
 from chirp.templating.composition import PageComposition
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.integration import render_fragment, render_template
@@ -767,6 +768,15 @@ def negotiate(
                 status=200,
             )
             return Response(body=value, content_type="application/octet-stream")
+        case Envelope():
+            # Signed skill result — wire dict as JSON (dict/list precedent).
+            _trace_return(
+                request,
+                return_type="Envelope",
+                category="primitive",
+                status=200,
+            )
+            return JSONResponse.from_value(value.to_wire())
         case dict() | list():
             _trace_return(
                 request,
@@ -801,6 +811,7 @@ def negotiate(
             msg = (
                 f"Cannot convert {type(value).__name__} to a response. "
                 f"Return str, dict, bytes, Template, InlineTemplate, Fragment, "
-                f"TemplateStream, Action, Stream, EventStream, Response, or Redirect."
+                f"TemplateStream, Action, Stream, EventStream, Envelope, "
+                f"Response, or Redirect."
             )
             raise TypeError(msg)
