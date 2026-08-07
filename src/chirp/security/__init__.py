@@ -31,9 +31,12 @@ opportunistic hash upgrades::
         return reject()
 
     # Re-derive stale hashes on a successful login (never on a wrong password).
-    ok, new_hash = verify_and_upgrade(password, user.password_hash)
+    # Pass upgrade_algorithm=True during a controlled scrypt→argon2 migration.
+    ok, new_hash = verify_and_upgrade(
+        password, user.password_hash, upgrade_algorithm=True
+    )
     if new_hash is not None:
-        user.password_hash = new_hash
+        user.password_hash = new_hash  # app must persist
 
 Group -> permission rollup for the flat ``user.permissions`` gate::
 

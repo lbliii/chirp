@@ -190,7 +190,7 @@ original origin.
 | `settings_spec` | ERROR / WARNING | Fix a declared `app.register_setting()` spec that shadows a boot-time `AppConfig` field or marks a sensitive value persistable (`secret=False`). Env-aware (silent dev / WARNING staging / ERROR prod). |
 | `cookie_secure` | ERROR / WARNING | Make the session cookie `Secure`. Keep `SessionConfig(secure="auto")` (resolves to `Secure` in production/staging) or set `secure=True`. A `samesite="none"` cookie that is not `Secure` is an env-independent ERROR. See the dropdown below. |
 | `hsts` | WARNING | Set `AppConfig(strict_transport_security="max-age=63072000; includeSubDomains")` on a production app with an auth/mutating surface — once you have confirmed it is only ever reached over HTTPS. Never auto-emitted. See the dropdown below. |
-| `password_extra` | WARNING | Install `chirp[auth]` (argon2id) on a production app with a login/mutating surface — without it password hashing falls back to stdlib scrypt. Advisory only (silent in development); existing scrypt hashes upgrade on next login. See the dropdown below. |
+| `password_extra` | WARNING | Install `chirp[auth]` (argon2id) on a production app with a login/mutating surface — without it password hashing falls back to stdlib scrypt. Advisory only (silent in development); existing scrypt hashes re-derive via `verify_and_upgrade(..., upgrade_algorithm=True)` when you opt in. See the dropdown below. |
 | `passkeys` | ERROR | Install `chirp[passkeys]` when `AppConfig(passkeys=True)` — without `webauthn` every ceremony fails at runtime (env-independent ERROR). Cookie and Redis session stores both preserve the single-use challenge; Redis is optional for scale, not required for passkeys. See the dropdown below. |
 | `csp_nonce` | ERROR / WARNING | Enable a per-request nonce mechanism (`AppConfig(csp_nonce_enabled=True)`) so framework inline scripts carry a nonce under an inline-forbidding CSP. See the dropdown below. |
 | `chirpui_csp` | ERROR / WARNING | **chirp-ui apps only.** Remove a conflicting static CSP so `use_chirp_ui`'s auto-wired nonce CSP can keep Alpine alive. See the dropdown below. |
@@ -384,18 +384,19 @@ auto-detects the algorithm from the PHC prefix), but argon2id is the recommended
 algorithm for new production deployments.
 
 This is a posture **advisory**, never an ERROR: there is no correctness gap to
-fail loud on, and existing scrypt hashes upgrade to argon2 on the next successful
-login via `verify_and_upgrade()` once the extra is installed. Severity is
-env-aware — silent in development (and the scrypt-only base CI environment),
-WARNING in staging/production — so dev apps and shipped examples stay clean, and
-it escalates under `chirp check --deploy`. argon2 availability is read via the
-same `_has_argon2()` predicate the runtime uses to pick the hashing algorithm, so
-the check and the runtime never disagree.
+fail loud on. Existing scrypt hashes re-derive to argon2 on the next successful
+login when you call `verify_and_upgrade(..., upgrade_algorithm=True)` (opt-in;
+storm-safe default is off) and persist the returned hash once the extra is
+installed. Severity is env-aware — silent in development (and the scrypt-only
+base CI environment), WARNING in staging/production — so dev apps and shipped
+examples stay clean, and it escalates under `chirp check --deploy`. argon2
+availability is read via the same `_has_argon2()` predicate the runtime uses to
+pick the hashing algorithm, so the check and the runtime never disagree.
 
 **Fix:** `pip install chirp[auth]` (pulls in `argon2-cffi`). New hashes then use
 argon2id; existing scrypt hashes re-derive to argon2 the next time each user logs
-in if you wire `verify_and_upgrade()` (see
-[[docs/quality/deployment/auth-hardening|Auth Hardening]]).
+in when you wire `verify_and_upgrade(..., upgrade_algorithm=True)` and persist
+the replacement (see [[docs/quality/deployment/auth-hardening|Auth Hardening]]).
 
 ### `passkeys`: WebAuthn ceremony posture
 
