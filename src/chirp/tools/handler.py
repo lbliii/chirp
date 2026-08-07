@@ -14,11 +14,17 @@ Implements the minimal MCP surface for the ``2026-07-28`` stateless core:
 
 Per-request ``params._meta`` carries protocol version, client identity,
 and capabilities. There is no handshake or session state.
+
+Streamable HTTP routing headers (SEP-2243) are validated when a modern
+protocol version is advertised via ``MCP-Protocol-Version`` or
+``params._meta`` — see ``_validate_routing_headers``.
 """
 
 from __future__ import annotations
 
+import base64
 import json as json_module
+import re
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from typing import Any, TypedDict
@@ -32,6 +38,14 @@ _META_PROTOCOL_VERSION = "io.modelcontextprotocol/protocolVersion"
 _META_CLIENT_INFO = "io.modelcontextprotocol/clientInfo"
 _META_CLIENT_CAPABILITIES = "io.modelcontextprotocol/clientCapabilities"
 _META_SERVER_INFO = "io.modelcontextprotocol/serverInfo"
+
+# SEP-2243 / Streamable HTTP 2026-07-28
+_HEADER_PROTOCOL_VERSION = "MCP-Protocol-Version"
+_HEADER_METHOD = "Mcp-Method"
+_HEADER_NAME = "Mcp-Name"
+_HEADER_MISMATCH_CODE = -32020
+_METHODS_REQUIRING_NAME = frozenset({"tools/call", "resources/read", "prompts/get"})
+_BASE64_SENTINEL = re.compile(r"^=\?base64\?(?P<data>.+)\?=$")
 
 
 class JsonRpcError(TypedDict):
@@ -99,6 +113,146 @@ _mcp_meta_var: ContextVar[McpRequestMeta | None] = ContextVar(
 def get_mcp_meta() -> McpRequestMeta | None:
     """Return parsed ``_meta`` for the current MCP request, or ``None`` outside one."""
     return _mcp_meta_var.get()
+
+
+def _header_value(request: Request, name: str) -> str | None:
+    """Return a trimmed HTTP header value, or ``None`` if absent/blank."""
+    raw = request.headers.get(name)
+    if raw is None:
+        return None
+    value = raw.strip()
+    return value if value else None
+
+
+def _decode_mcp_header_value(value: str) -> str | None:
+    """Decode a plain or Base64-sentinel MCP header value.
+
+    Returns ``None`` when a Base64 sentinel is present but malformed
+    (invalid padding/characters) — callers treat that as HeaderMismatch.
+    """
+    match = _BASE64_SENTINEL.fullmatch(value)
+    if match is None:
+        return value
+    try:
+        return base64.b64decode(match.group("data"), validate=True).decode("utf-8")
+    except ValueError, UnicodeDecodeError:
+        return None
+
+
+def _body_protocol_version(request_body: dict[str, Any]) -> str | None:
+    """Return ``params._meta`` protocol version when present and a string."""
+    params = request_body.get("params")
+    if not isinstance(params, dict):
+        return None
+    meta = params.get("_meta")
+    if not isinstance(meta, dict):
+        return None
+    version = meta.get(_META_PROTOCOL_VERSION)
+    return version if isinstance(version, str) else None
+
+
+def _body_name(request_body: dict[str, Any]) -> str | None:
+    """Return ``params.name`` or ``params.uri`` for name-bearing RPCs."""
+    params = request_body.get("params")
+    if not isinstance(params, dict):
+        return None
+    name = params.get("name")
+    if isinstance(name, str):
+        return name
+    uri = params.get("uri")
+    return uri if isinstance(uri, str) else None
+
+
+def _header_mismatch_response(
+    rpc_id: str | int | float | None,
+    message: str,
+) -> Response:
+    """Build the SEP-2243 ``HeaderMismatch`` (-32020) JSON-RPC error."""
+    return _json_response(
+        400,
+        JsonRpcErrorResponse(
+            jsonrpc="2.0",
+            error=JsonRpcError(code=_HEADER_MISMATCH_CODE, message=message),
+            id=rpc_id,
+        ),
+    )
+
+
+def _validate_routing_headers(
+    request: Request,
+    request_body: dict[str, Any],
+    *,
+    rpc_id: str | int | float | None,
+) -> Response | None:
+    """Validate Streamable HTTP routing headers against the JSON-RPC body.
+
+    Enforcement is gated on a modern protocol advertisement: either the
+    ``MCP-Protocol-Version`` header or ``params._meta`` protocol version.
+    Requests with neither remain on the legacy path (sibling deprecation
+    offramp). When modern, missing/mismatched headers return HTTP 400 with
+    JSON-RPC ``HeaderMismatch`` (``-32020``).
+
+    Returns:
+        An error ``Response`` on failure, or ``None`` when validation passes
+        or is skipped.
+    """
+    header_version = _header_value(request, _HEADER_PROTOCOL_VERSION)
+    body_version = _body_protocol_version(request_body)
+    if header_version is None and body_version is None:
+        return None
+
+    if header_version is None:
+        return _header_mismatch_response(
+            rpc_id,
+            f"Missing required header: {_HEADER_PROTOCOL_VERSION}",
+        )
+
+    header_method = _header_value(request, _HEADER_METHOD)
+    if header_method is None:
+        return _header_mismatch_response(
+            rpc_id,
+            f"Missing required header: {_HEADER_METHOD}",
+        )
+
+    body_method = request_body.get("method")
+    if not isinstance(body_method, str) or header_method != body_method:
+        return _header_mismatch_response(
+            rpc_id,
+            (
+                f"Header mismatch: {_HEADER_METHOD} header value "
+                f"{header_method!r} does not match body value {body_method!r}"
+            ),
+        )
+
+    if body_version is None or header_version != body_version:
+        return _header_mismatch_response(
+            rpc_id,
+            (
+                f"Header mismatch: {_HEADER_PROTOCOL_VERSION} header value "
+                f"{header_version!r} does not match body value {body_version!r}"
+            ),
+        )
+
+    if body_method in _METHODS_REQUIRING_NAME:
+        header_name_raw = _header_value(request, _HEADER_NAME)
+        if header_name_raw is None:
+            return _header_mismatch_response(
+                rpc_id,
+                f"Missing required header: {_HEADER_NAME}",
+            )
+        header_name = _decode_mcp_header_value(header_name_raw)
+        body_name = _body_name(request_body)
+        if header_name is None or header_name != body_name:
+            display = header_name_raw if header_name is None else header_name
+            return _header_mismatch_response(
+                rpc_id,
+                (
+                    f"Header mismatch: {_HEADER_NAME} header value "
+                    f"{display!r} does not match body value {body_name!r}"
+                ),
+            )
+
+    return None
 
 
 def _parse_meta(request_body: dict[str, Any]) -> McpRequestMeta:
@@ -226,6 +380,11 @@ async def handle_mcp_request(
                 id=rpc_id,
             ),
         )
+
+    # SEP-2243 routing headers — validate before dispatch / notification noop.
+    header_error = _validate_routing_headers(request, rpc_request, rpc_id=rpc_id)
+    if header_error is not None:
+        return header_error
 
     # Handle notifications (no response expected) — accept-and-noop
     if is_notification:
