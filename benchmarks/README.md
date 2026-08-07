@@ -300,3 +300,18 @@ Run `python -m benchmarks.run chirp-sync -c 10` to validate JSON/CPU targets.
 - [x] DB workload (SQLite)
 - [x] Starlette, Litestar
 - [x] GIL vs free-threaded report metadata (3.14 vs 3.14t commands above)
+
+## Dependency receipt (#907)
+
+The `benchmark` extra used to resolve a yanked APSW through this chain:
+
+`benchmark` → `python-fasthtml` → `fastlite` → `apswutils` → `apsw==3.53.3.0` (yanked)
+
+Chirp does **not** declare APSW as a runtime or benchmark dependency. The
+fix raises the FastHTML floor to `python-fasthtml>=0.14.11`, where
+`fastlite` is only a FastHTML `[dev]` extra. Fresh
+`uv sync --extra benchmark` therefore no longer installs APSW (final APSW
+version for this profile: **none / not resolved**).
+
+Proof: `tests/test_benchmarks_core.py::test_benchmark_extra_does_not_resolve_yanked_apsw`
+and a local `uv sync --extra benchmark` + FastHTML import / app smoke.

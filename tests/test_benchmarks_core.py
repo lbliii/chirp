@@ -4,19 +4,21 @@ import importlib.util
 import json
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
 
-_CORE_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "core.py"
-_RUN_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "run.py"
-_WORKLOADS_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "apps" / "workloads.py"
+_ROOT = Path(__file__).resolve().parents[1]
+_CORE_PATH = _ROOT / "benchmarks" / "core.py"
+_RUN_PATH = _ROOT / "benchmarks" / "run.py"
+_WORKLOADS_PATH = _ROOT / "benchmarks" / "apps" / "workloads.py"
 _BASELINE_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "benchmarks"
-    / "results"
-    / "networked-2026-07-08-cpython-3.14t-macos-arm64.json"
+    _ROOT / "benchmarks" / "results" / "networked-2026-07-08-cpython-3.14t-macos-arm64.json"
 )
+# FastHTML 0.14.11 moved fastlite (→ apswutils → APSW) to its [dev] extra.
+_FASTHTML_FLOOR_WITHOUT_APSW = "python-fasthtml>=0.14.11"
+_YANKED_APSW = "3.53.3.0"
 _SPEC = importlib.util.spec_from_file_location("benchmarks.core", _CORE_PATH)
 assert _SPEC is not None
 assert _SPEC.loader is not None
@@ -41,11 +43,30 @@ def test_core_benchmark_imports_in_a_clean_process() -> None:
     """The release benchmark must not depend on pytest's import order."""
     subprocess.run(
         [sys.executable, "-c", "from chirp.server.negotiation import negotiate"],
-        cwd=_CORE_PATH.parents[1],
+        cwd=_ROOT,
         check=True,
         capture_output=True,
         text=True,
     )
+
+
+@pytest.mark.issue(907)
+def test_benchmark_extra_does_not_resolve_yanked_apsw() -> None:
+    """Receipt: benchmark → fasthtml floor drops the yanked APSW chain (#907)."""
+    project = tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    runtime = project["project"]["dependencies"]
+    benchmark = project["project"]["optional-dependencies"]["benchmark"]
+    fasthtml = next(dep for dep in benchmark if dep.startswith("python-fasthtml"))
+
+    assert fasthtml == _FASTHTML_FLOOR_WITHOUT_APSW
+    assert not any("apsw" in dep.lower() for dep in runtime)
+    assert not any("apsw" in dep.lower() for dep in benchmark)
+    assert _YANKED_APSW not in fasthtml
+
+    readme = (_ROOT / "benchmarks" / "README.md").read_text(encoding="utf-8")
+    assert "Dependency receipt (#907)" in readme
+    assert "apsw==3.53.3.0" in readme
+    assert "python-fasthtml>=0.14.11" in readme
 
 
 @pytest.mark.asyncio
