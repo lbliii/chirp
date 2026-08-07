@@ -33,8 +33,10 @@ guarantees Secure cookies under production posture).
 | Production | `PASSKEY_RP_ID=example.com`, `PASSKEY_ORIGIN=https://app.example.com` |
 
 `app.check()` fires the `passkeys` category when `passkeys=True`: an ERROR if
-`webauthn` is missing, and a production/staging WARNING if you use the cookie
-session store with passkey-heavy traffic (challenge bloat — prefer Redis).
+`webauthn` is missing. Cookie sessions are first-class — the begin → finish
+challenge lives in the session on both `CookieSessionStore` and optional
+`RedisSessionStore` (`pip install chirp[redis]` only when you need shared
+sessions across workers).
 
 ## Test
 

@@ -352,8 +352,10 @@ not the everyday request loop.
   - Parsed htmx request metadata and URL scoping helpers on `Request`.
 * - `ReactiveBus`, `reactive_stream`, `DependencyIndex`, `ChangeEvent`, `BlockRef`
   - The reactive / signals system. See [[docs/build-apps/streaming-updates/reactive-system|Reactive system]].
-* - `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface`
+* - `ShellAction`, `ShellActions`, `ShellActionZone`, `ShellMenuItem`, `ShellSubmitSurface`, `ShellActionsRenderer`
   - App-shell action and menu types. See [[docs/build-apps/ui-extensions/app-shell|App shell]].
+* - `HypermediaHandoff`, `FocusHandoff`, `TitleHandoff`, `AnnouncementHandoff`, `apply_handoff`
+  - UI-neutral focus/title/history/announcement handoff helpers. See [[docs/build-apps/ui-extensions/shells|Shells]].
 * - `ToolDef`, `ToolRegistry`, `ToolEventBus`, `ToolCallEvent`
   - MCP tool registration and event types.
 * - `cache_view`, `get_cache`, `DeferredCache`

@@ -258,7 +258,7 @@ There are three zones:
 - **controls** — secondary actions (e.g. "Metrics", filters).
 - **overflow** — dropdown menu (e.g. "More" with Archive, Export, Docs).
 
-When you extend `chirpui/app_shell_layout.html`, `shell_actions` is passed
+Chirp's default OOB renderer for shell actions is UI-neutral (`chirp/shell_actions.html`). Calling `use_chirp_ui()` adapts that transport to chirp-ui's visual controls. When you extend `chirpui/app_shell_layout.html`, `shell_actions` is passed
 through the layout chain from the merged `_context.py` results — no extra wiring.
 When you use the `app_shell()` macro (regions-based layouts), pass it explicitly:
 

@@ -34,6 +34,7 @@ from chirp.server.streaming_context import (
     attach_streaming_render_context,
     capture_streaming_render_context,
 )
+from chirp.shell_actions import ShellActionsRenderer
 from chirp.templating.composition import PageComposition
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.integration import render_fragment, render_template
@@ -237,6 +238,7 @@ def _render_composition(
     kida_env: Environment,
     validate_blocks: bool,
     oob_registry: OOBRegistry | None,
+    shell_actions_renderer: ShellActionsRenderer | None = None,
 ) -> Response:
     """Shared 5-step pipeline: shell updates → plan → execute → serialize → response.
 
@@ -245,7 +247,9 @@ def _render_composition(
     may replay the wrong fragment width or serve a fragment to a full-page
     request.
     """
-    shell_updates = compute_shell_region_updates(composition, request, fragment_target_registry)
+    shell_updates = compute_shell_region_updates(
+        composition, request, fragment_target_registry, shell_actions_renderer
+    )
     plan = build_render_plan(
         composition,
         request=request,
@@ -310,6 +314,7 @@ def negotiate(
     fragment_target_registry: FragmentTargetRegistry | None = None,
     suspense_error_template: str | None = None,
     suspense_error_block: str = "fallback",
+    shell_actions_renderer: ShellActionsRenderer | None = None,
 ) -> Response | StreamingResponse | SSEResponse:
     """Convert a route handler's return value to a Response.
 
@@ -482,6 +487,7 @@ def negotiate(
                 kida_env,
                 validate_blocks,
                 oob_registry,
+                shell_actions_renderer,
             )
         case PageComposition():
             kida_env = _require_kida_env(kida_env, "PageComposition")
@@ -492,6 +498,7 @@ def negotiate(
                 kida_env,
                 validate_blocks,
                 oob_registry,
+                shell_actions_renderer,
             )
         case Action():
             _trace_return(
@@ -672,7 +679,9 @@ def negotiate(
                 error_block=suspense_error_block,
             )
             if should_append_streamed_shell_actions_oob(value.context, req):
-                chunks = append_shell_actions_oob_stream(chunks, value.context, kida_env)
+                chunks = append_shell_actions_oob_stream(
+                    chunks, value.context, kida_env, shell_actions_renderer
+                )
             if should_append_layout_oob(req, value.layout_chain):
                 chunks = append_layout_oob_stream(
                     chunks, kida_env, value.layout_chain, value.context, oob_registry

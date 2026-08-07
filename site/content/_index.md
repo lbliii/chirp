@@ -1,6 +1,6 @@
 ---
 title: Chirp
-description: A hypermedia-native Python framework with typed returns and contract checks for server-rendered product UIs
+description: A hypermedia-native Python framework for server-rendered product UIs
 template: home.html
 weight: 100
 type: page
@@ -29,9 +29,11 @@ show_recent_posts: false
 **Build dynamic Python UIs without building a SPA.**
 
 Chirp is the hypermedia-native Python framework for server-rendered product UIs.
-Typed route returns produce full pages, htmx fragments, streaming HTML, and live
-SSE updates from the same named template blocks. `chirp check` catches broken
+Typed route returns turn the same named template blocks into full pages, htmx
+fragments, streaming HTML, and live SSE updates. `chirp check` catches broken
 routes, blocks, and targets before users do.
+
+![An active weaverbird weaving one template into page, fragment, streaming, and live-update surfaces.](/assets/images/chirp-hypermedia-weaver-hero.webp)
 
 ```python
 from chirp import App, Page, Request
@@ -59,7 +61,7 @@ No SPA. No duplicated partials. No JavaScript build pipeline.
 :::{card} One Render Surface
 :icon: layers
 Use the same named template blocks for full pages, htmx fragments, OOB updates,
-deferred content, and SSE payloads.
+deferred content, and SSE payloads—without maintaining parallel templates.
 :::{/card}
 
 :::{card} Typed Intent
@@ -71,7 +73,7 @@ negotiation and htmx awareness without manual response branching.
 :::{card} Verified UI Wiring
 :icon: shield
 `chirp check` validates routes, template blocks, htmx targets, OOB regions, and
-SSE wiring before users discover the mistake.
+SSE wiring before a broken interaction reaches production.
 :::{/card}
 
 :::{card} Streaming and Live Updates
@@ -111,20 +113,18 @@ Chirp]] and [[docs/about/non-goals|Non-Goals]] for the honest boundaries.
 
 ## Return Values, Not Response Construction
 
-Route functions return *values*. The framework handles content negotiation based on the type:
+Route functions return values that state what the browser needs:
 
 ```python
-return "Hello"                                   # -> 200, text/html
-return {"users": [...]}                          # -> 200, application/json
-return Template("page.html", title="Home")       # -> 200, rendered via kida
-return Fragment("page.html", "results", items=x) # -> 200, rendered block
-return Stream("dashboard.html", **async_ctx)     # -> 200, streamed HTML
-return EventStream(generator())                  # -> SSE stream
-return Response(body=b"...", status=201)          # -> explicit control
-return Redirect("/login")                        # -> 302
+return Page("search.html", "results", items=x)          # Page or htmx fragment
+return Fragment("cart.html", "count", count=n)          # One named block
+return Suspense("dashboard.html", stats=get_stats())     # Shell, then slow blocks
+return EventStream(events())                             # Post-load SSE updates
 ```
 
-No `make_response()`. No `jsonify()`. The type *is* the intent.
+A `dict` still returns JSON. Use `Response` when exact status, headers, or body
+control is the right boundary. See the [[docs/about/core-concepts/return-values|full
+return-value reference]] for redirects, mutations, validation, and other cases.
 
 ---
 

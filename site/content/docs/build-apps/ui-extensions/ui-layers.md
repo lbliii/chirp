@@ -116,6 +116,8 @@ Shell **regions** are elements with fixed `id` attributes that htmx updates with
 | Constant | Default element id | Role |
 |----------|--------------------|------|
 | `DOCUMENT_TITLE_ELEMENT_ID` | `chirpui-document-title` | The `<title>` element |
+| `ANNOUNCEMENTS_ELEMENT_ID` | `chirp-announcements` | Live-region announcements |
+| `FOCUS_FALLBACK_DEFAULT` | `#main` | Focus fallback after swaps |
 | `SHELL_ACTIONS_TARGET` | `chirp-shell-actions` | Route-scoped topbar actions |
 
 `SHELL_ELEMENT_IDS` is a frozenset of those documented ids. Apps may add their own OOB targets (sidebars, extra breadcrumb trails); register them with `app.register_oob_region(...)` and document the ids locally.

@@ -1,0 +1,10 @@
+{#- Chirp ↔ chirp-ui shell actions adapter
+
+   Activated by use_chirp_ui() via app.set_shell_actions_renderer(...).
+   Keeps the Chirp OOB transport contract while rendering chirp-ui controls.
+-#}
+{% from "chirpui/shell_actions.html" import shell_actions_bar %}
+
+{% fragment content %}
+{{ shell_actions_bar(shell_actions) }}
+{% end %}

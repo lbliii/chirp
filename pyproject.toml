@@ -134,6 +134,7 @@ chirp = [
     "py.typed",
     "templating/macros/**/*.html",
     "server/devtools/js/*.js",
+    "static/*.js",
     "data/migrations/**/*.sql",
 ]
 

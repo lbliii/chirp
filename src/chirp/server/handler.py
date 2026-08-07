@@ -60,6 +60,7 @@ from chirp.server.query_protocol import (
 )
 from chirp.server.route_explorer import ROUTE_EXPLORER_PATH, render_route_explorer
 from chirp.server.sender import send_file_response, send_response, send_streaming_response
+from chirp.shell_actions import ShellActionsRenderer
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.integration import _active_kida_env
 from chirp.templating.oob_registry import OOBRegistry
@@ -224,6 +225,7 @@ def create_request_handler(
     kida_env: Environment | None,
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    shell_actions_renderer: ShellActionsRenderer | None = None,
     route_layout_chains: Mapping[str, Any] | None = None,
     swap_scope_map: Mapping[str, str] | None = None,
     discovered_routes: list[Any] | None = None,
@@ -419,6 +421,7 @@ def create_request_handler(
             force_inline_sync=force_inline_sync_var.get(),
             oob_registry=oob_registry,
             fragment_target_registry=fragment_target_registry,
+            shell_actions_renderer=shell_actions_renderer,
             route_layout_chains=route_layout_chains,
             swap_scope_map=swap_scope_map,
             suspense_error_template=suspense_error_template,
@@ -471,6 +474,7 @@ async def handle_request(
     compiled_handler: Callable[[Request], Any] | None = None,
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    shell_actions_renderer: ShellActionsRenderer | None = None,
     url_for: Callable[..., str] | None = None,
     debug_wiring: RuntimeDebugWiring | None = None,
     htmx_manifest: HtmxProvisioningManifest | None = None,
@@ -661,6 +665,7 @@ async def _invoke_handler(
     force_inline_sync: bool = False,
     oob_registry: OOBRegistry | None = None,
     fragment_target_registry: FragmentTargetRegistry | None = None,
+    shell_actions_renderer: ShellActionsRenderer | None = None,
     route_layout_chains: Mapping[str, Any] | None = None,
     swap_scope_map: Mapping[str, str] | None = None,
     suspense_error_template: str | None = None,
@@ -728,6 +733,7 @@ async def _invoke_handler(
         fragment_target_registry=fragment_target_registry,
         suspense_error_template=suspense_error_template,
         suspense_error_block=suspense_error_block,
+        shell_actions_renderer=shell_actions_renderer,
     )
     validate_query_response(match.route, request, response)
     if hypermedia_program is not None:

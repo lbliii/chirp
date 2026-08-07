@@ -301,6 +301,11 @@ def use_chirp_ui(
         optional=True,
     )
 
+    # Adapt chirp-ui visuals to Chirp's UI-neutral shell-actions transport (#859).
+    from chirp.shell_actions import SHELL_ACTIONS_BLOCK, SHELL_ACTIONS_CHIRPUI_TEMPLATE
+
+    app.set_shell_actions_renderer(SHELL_ACTIONS_CHIRPUI_TEMPLATE, SHELL_ACTIONS_BLOCK)
+
     app.register_page_shell_contract(CHIRPUI_PAGE_SHELL_CONTRACT)
     app.register_layout_preset(
         CHIRPUI_APP_SHELL_PRESET.name,
