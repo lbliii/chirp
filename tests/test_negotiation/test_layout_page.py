@@ -133,6 +133,10 @@ class TestLayoutPageSlotContext:
         self,
         tmp_path: Path,
     ) -> None:
+        pytest.importorskip("chirp_ui")
+        from chirp import App
+        from chirp.ext.chirp_ui import use_chirp_ui
+
         (tmp_path / "page.html").write_text(
             '{% extends "chirpui/app_shell_layout.html" %}'
             "{% block brand %}Shell App{% end %}"
@@ -147,11 +151,12 @@ class TestLayoutPageSlotContext:
             "{% block content %}<div>Hello shell</div>{% end %}",
             encoding="utf-8",
         )
-        env = create_environment(
-            AppConfig(template_dir=tmp_path),
-            filters={},
-            globals_={"shell_actions": None, "csrf_token": lambda: "test-csrf"},
-        )
+        app = App(AppConfig(template_dir=tmp_path, skip_contract_checks=True))
+        use_chirp_ui(app)
+        app.template_global("csrf_token")(lambda: "test-csrf")
+        app.freeze()
+        env = app._runtime_state.kida_env
+        assert env is not None
 
         result = negotiate(Template("page.html"), kida_env=env)
 
@@ -164,6 +169,10 @@ class TestLayoutPageSlotContext:
         self,
         tmp_path: Path,
     ) -> None:
+        pytest.importorskip("chirp_ui")
+        from chirp import App
+        from chirp.ext.chirp_ui import use_chirp_ui
+
         (tmp_path / "page.html").write_text(
             '{% extends "chirpui/app_shell_layout.html" %}'
             "{% block sidebar_collapsible %}true{% end %}"
@@ -171,11 +180,12 @@ class TestLayoutPageSlotContext:
             "{% block content %}<div>Hello shell</div>{% end %}",
             encoding="utf-8",
         )
-        env = create_environment(
-            AppConfig(template_dir=tmp_path),
-            filters={},
-            globals_={"shell_actions": None, "csrf_token": lambda: "test-csrf"},
-        )
+        app = App(AppConfig(template_dir=tmp_path, skip_contract_checks=True))
+        use_chirp_ui(app)
+        app.template_global("csrf_token")(lambda: "test-csrf")
+        app.freeze()
+        env = app._runtime_state.kida_env
+        assert env is not None
 
         result = negotiate(Template("page.html"), kida_env=env)
 

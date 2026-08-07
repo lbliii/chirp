@@ -242,7 +242,7 @@ def log_error(exc: BaseException, request: Request | None = None) -> None:
 
     if traceback_style == "full":
         # Full Python traceback (original behavior)
-        logger.exception(prefix)
+        logger.exception(prefix)  # noqa: LOG004, RUF100 -- caller's exception context is active
     elif traceback_style == "minimal":
         logger.error(
             "%s — %s",

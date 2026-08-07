@@ -183,15 +183,35 @@ class UploadFile:
         return f"UploadFile({self.filename!r}, {self.content_type!r}, {self.size} bytes)"
 
 
+class FormFileFieldError(TypeError):
+    """Raised when a string form accessor is used for an uploaded file field.
+
+    ``FormData`` keeps string fields and uploads in separate maps. Reading a
+    file-only name through ``form[key]`` / ``form.get(key)`` used to look like
+    a missing field (``KeyError`` / ``None``), which silently dropped uploads.
+    This error points callers at ``form.files[key]`` instead.
+
+    Inherits from ``TypeError`` (wrong accessor kind), not ``KeyError`` (absent
+    key), so ``except KeyError`` handlers do not treat a present upload as
+    missing.
+    """
+
+    def __init__(self, key: str) -> None:
+        self.key = key
+        super().__init__(f"{key!r} is an uploaded file; use form.files[{key!r}]")
+
+
 class FormData(Mapping[str, str]):
     """Immutable parsed form data.
 
     Implements ``Mapping[str, str]`` and the ``MultiValueMapping`` protocol.
     Holds both string field values and uploaded files.
 
-    ``__getitem__`` returns the first value for a key (string fields only).
-    ``get_list`` returns all values for a key.
-    ``files`` provides access to uploaded files by field name.
+    ``__getitem__`` / ``get`` return string field values only. Uploaded files
+    live under ``files`` — using a string accessor for a file-only name raises
+    :class:`FormFileFieldError` rather than reporting the field as absent.
+    ``get_list`` returns all string values for a key. Membership (``in``,
+    iteration, ``len``) covers string fields only.
 
     Usage::
 
@@ -217,8 +237,24 @@ class FormData(Mapping[str, str]):
         """Uploaded files by field name."""
         return self._files
 
+    def _raise_if_file_only(self, key: str) -> None:
+        """Fail loud when *key* exists only as an uploaded file."""
+        if key in self._files:
+            raise FormFileFieldError(key)
+
     def __getitem__(self, key: str) -> str:
-        return self._data[key][0]
+        """Return the first string value for *key*.
+
+        Raises:
+            FormFileFieldError: If *key* names an uploaded file (use
+                ``form.files[key]``).
+            KeyError: If *key* is absent from both string fields and files.
+        """
+        try:
+            return self._data[key][0]
+        except KeyError:
+            self._raise_if_file_only(key)
+            raise
 
     def __contains__(self, key: object) -> bool:
         return key in self._data
@@ -240,10 +276,20 @@ class FormData(Mapping[str, str]):
     def get[T](self, key: str, default: T) -> str | T: ...
 
     def get(self, key: str, default: object = None) -> object:
-        """Return the first value for *key*, or *default* if missing."""
+        """Return the first string value for *key*, or *default* if missing.
+
+        Uploaded files are not string values. If *key* exists only under
+        ``files``, this raises :class:`FormFileFieldError` instead of returning
+        *default* — so a present upload is never mistaken for an absent field.
+
+        Raises:
+            FormFileFieldError: If *key* names an uploaded file (use
+                ``form.files.get(key)`` or ``form.files[key]``).
+        """
         values = self._data.get(key)
         if values:
             return values[0]
+        self._raise_if_file_only(key)
         return default
 
     def get_list(self, key: str) -> list[str]:

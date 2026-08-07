@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from chirp import App, AppConfig
+from chirp.ext.chirp_ui import use_chirp_ui
 from chirp.testing import TestClient
 
 
@@ -129,7 +130,8 @@ def handler() -> Page:
         encoding="utf-8",
     )
 
-    app = App(AppConfig(template_dir=str(pages_dir), debug=True))
+    app = App(AppConfig(template_dir=str(pages_dir), debug=True, skip_contract_checks=True))
+    use_chirp_ui(app)
     app.mount_pages(str(pages_dir))
     return app
 

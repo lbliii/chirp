@@ -51,6 +51,15 @@ class TestChirpUIAlpineRuntimeContract:
                 skip_contract_checks=True,
             )
         )
+        # Explicit-loading contract (#860): register the chirp-ui template loader
+        # and filters WITHOUT use_chirp_ui(app) (which would force alpine=True and
+        # inject the runtime). This is the documented "equivalent explicit
+        # App.add_loader + filter integration" path — the app renders chirp-ui
+        # interactive macros but never wires chirpui-alpine.js, which is exactly
+        # the mismatch this rule must catch.
+        from kida import PackageLoader
+
+        app.add_loader(PackageLoader("chirp_ui", "templates"))
         chirp_ui.register_filters(app)
         app.set_contract_check_data("chirpui_components", frozenset(["card.html"]))
 

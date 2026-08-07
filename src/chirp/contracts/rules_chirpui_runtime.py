@@ -13,9 +13,10 @@ def check_chirpui_runtime_registration(
 ) -> list[ContractIssue]:
     """Warn when app templates use ChirpUI without registering the runtime.
 
-    Chirp's templating fallback can make ChirpUI macros render even when an app
-    forgot ``use_chirp_ui(app)``. That is useful for filters, but it does not
-    serve ``chirpui.css`` / ``chirpui-alpine.js`` or register ChirpUI checks.
+    Chirp no longer ambiently loads chirp-ui templates or filters from package
+    presence (#860). Imports of ``chirpui/...`` without ``use_chirp_ui(app)``
+    (or an equivalent explicit ``App.add_loader`` + filter registration) fail at
+    render and miss CSS/Alpine/contract wiring.
     """
     if extras.get("chirpui_components") is not None:
         return []
@@ -36,9 +37,11 @@ def check_chirpui_runtime_registration(
             category="chirpui_runtime",
             message=(
                 "Template imports ChirpUI components, but ChirpUI runtime registration "
-                "was not detected. Call use_chirp_ui(app) to serve chirpui.css, "
-                "chirpui-alpine.js, filters, and ChirpUI contract checks, or make sure "
-                "you intentionally provide equivalent static/runtime integration."
+                "was not detected. Call use_chirp_ui(app) to register the chirp-ui "
+                "template loader, serve chirpui.css / chirpui-alpine.js, filters, and "
+                "ChirpUI contract checks — package presence alone does not activate "
+                "chirp-ui. Or provide an equivalent explicit App.add_loader + filter "
+                "integration."
             ),
             template=templates[0],
             details=f"Templates: {shown}{more}",

@@ -1,0 +1,292 @@
+{
+  "profile_version": "agent-buildability-quality-v1",
+  "report_id": "fixture-nojs-floor-current",
+  "subject": {
+    "app_id": "examples.standalone.nojs_floor",
+    "revision": "workspace-2026-08-03",
+    "task_receipt_id": null
+  },
+  "overall_status": "fail",
+  "evidence_set_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "artifacts": [
+    {
+      "id": "configured-inspection",
+      "kind": "configured app.check JSON",
+      "authority": "inspection",
+      "locator": "command:chirp-check-configured-2026-08-03",
+      "capture_status": "captured",
+      "notes": "Exit zero with six warnings; this fixture records the observed categories, not the raw transient output."
+    },
+    {
+      "id": "deploy-inspection",
+      "kind": "deploy-posture app.check JSON",
+      "authority": "inspection",
+      "locator": "command:chirp-check-deploy-2026-08-03",
+      "capture_status": "captured",
+      "notes": "Exit one with allowed_hosts, secret_key, and security_stack errors plus warnings."
+    },
+    {
+      "id": "nojs-testclient",
+      "kind": "maintained example tests",
+      "authority": "testclient",
+      "locator": "examples/standalone/nojs_floor/test_app.py",
+      "capture_status": "captured",
+      "notes": "Nine tests passed; all requests are plain HTTP without HX-Request."
+    },
+    {
+      "id": "disabled-js-browser",
+      "kind": "JavaScript-disabled browser receipt",
+      "authority": "browser",
+      "locator": "issue:725",
+      "capture_status": "missing",
+      "notes": "The maintained app has no disabled-JavaScript Playwright test."
+    },
+    {
+      "id": "dynamic-a11y-browser",
+      "kind": "dynamic accessibility browser receipt",
+      "authority": "browser",
+      "locator": "tests/contracts/test_accessibility_interactions_browser.py",
+      "capture_status": "skipped",
+      "notes": "The evidence run skipped because playwright.sync_api is unavailable; it is not evidence for this app."
+    },
+    {
+      "id": "transition-receipt",
+      "kind": "compiled transition coverage",
+      "authority": "transition",
+      "locator": "missing:nojs-floor-transition-receipt",
+      "capture_status": "missing",
+      "notes": "No required transition set or observation artifact exists for this app."
+    },
+    {
+      "id": "integrity-receipt",
+      "kind": "RFC 026 integrity and suppression report",
+      "authority": "evaluation_receipt",
+      "locator": "issue:890",
+      "capture_status": "missing",
+      "notes": "The evaluation runner and suppression inventory are not implemented."
+    },
+    {
+      "id": "human-review-receipt",
+      "kind": "bounded human review",
+      "authority": "human_review",
+      "locator": "missing:nojs-floor-human-review",
+      "capture_status": "missing",
+      "notes": "No profile-versioned reviewer checklist exists."
+    }
+  ],
+  "dimensions": [
+    {
+      "id": "structural_contracts",
+      "required": true,
+      "status": "fail",
+      "claim": "Configured structural inspection has no unresolved error or warning.",
+      "authority_artifact_ids": ["configured-inspection"],
+      "observed_cases": ["five routes and 251 templates inspected"],
+      "unobserved_cases": [],
+      "findings": [
+        {"source_id": "configured-inspection", "severity": "warning", "category": "a11y_label", "summary": "Two input labels are not associated by a literal for/id or ARIA relationship.", "disposition": "open"},
+        {"source_id": "configured-inspection", "severity": "warning", "category": "a11y_landmark", "summary": "The layout has no detected main landmark.", "disposition": "open"},
+        {"source_id": "configured-inspection", "severity": "warning", "category": "macro_css", "summary": "The inspection reports core macro classes without a backing stylesheet.", "disposition": "open"},
+        {"source_id": "configured-inspection", "severity": "warning", "category": "security_stack", "summary": "Mutating routes have no SecurityHeadersMiddleware.", "disposition": "open"},
+        {"source_id": "configured-inspection", "severity": "warning", "category": "swap_safety", "summary": "A mutating htmx request may inherit a broad target.", "disposition": "open"}
+      ],
+      "suppression_count": 0,
+      "failure_meaning": "The maintained app retains known structural or safety warnings.",
+      "unobserved_meaning": "The configured inspection did not run or omitted required coverage.",
+      "repair_surface": "Application templates/config or the owning contract if a finding is proven false.",
+      "not_applicable_reason": null
+    },
+    {
+      "id": "production_posture",
+      "required": true,
+      "status": "fail",
+      "claim": "Deploy-posture inspection has no unresolved production finding.",
+      "authority_artifact_ids": ["deploy-inspection"],
+      "observed_cases": ["production posture applied to the same maintained app"],
+      "unobserved_cases": [],
+      "findings": [
+        {"source_id": "deploy-inspection", "severity": "error", "category": "allowed_hosts", "summary": "Wildcard allowed hosts remain under production posture.", "disposition": "open"},
+        {"source_id": "deploy-inspection", "severity": "error", "category": "secret_key", "summary": "The application secret key is empty under production posture.", "disposition": "open"},
+        {"source_id": "deploy-inspection", "severity": "error", "category": "security_stack", "summary": "Session and CSRF middleware are absent for mutating routes.", "disposition": "open"}
+      ],
+      "suppression_count": 0,
+      "failure_meaning": "The example cannot be represented as safe for production deployment.",
+      "unobserved_meaning": "Production posture was not evaluated on the exact app revision.",
+      "repair_surface": "Application production configuration and middleware.",
+      "not_applicable_reason": null
+    },
+    {
+      "id": "security_journeys",
+      "required": true,
+      "status": "unobserved",
+      "claim": "Applicable session, CSRF, authentication, authorization, redirect, and audit boundaries pass negative and positive journey tests.",
+      "authority_artifact_ids": [],
+      "observed_cases": [],
+      "unobserved_cases": ["app-specific CSRF/session/security-header journeys", "security steward applicability selection"],
+      "findings": [],
+      "suppression_count": 0,
+      "failure_meaning": "A declared security boundary behaves incorrectly.",
+      "unobserved_meaning": "No app-specific runtime security receipt exists.",
+      "repair_surface": "Application security tests or the owning Chirp security primitive.",
+      "not_applicable_reason": null
+    },
+    {
+      "id": "full_page_behavior",
+      "required": true,
+      "status": "pass",
+      "claim": "Declared ordinary HTTP CRUD and redirect journeys behave as tested.",
+      "authority_artifact_ids": ["nojs-testclient"],
+      "observed_cases": ["GET list", "create 303 and followed redirect", "edit 303 and followed redirect", "delete 303 and followed redirect"],
+      "unobserved_cases": [],
+      "findings": [],
+      "suppression_count": 0,
+      "failure_meaning": "A maintained plain-request CRUD journey returns incorrect status, content, or state.",
+      "unobserved_meaning": "The explicit TestClient journey did not run.",
+      "repair_surface": "Example behavior/tests or framework return handling when evidence assigns framework ownership.",
+      "not_applicable_reason": null
+    },
+    {
+      "id": "htmx_behavior",
+      "required": true,
+      "status": "unobserved",
+      "claim": "Enhanced CRUD responses and browser swaps target the intended named surfaces.",
+      "authority_artifact_ids": [],
+      "observed_cases": [],
+      "unobserved_cases": ["HX-Request response intent", "actual DOM swaps", "OOB note count update"],
+      "findings": [],
+      "suppression_count": 0,
+      "failure_meaning": "An enhanced response or browser swap is incorrect.",
+      "unobserved_meaning": "The maintained tests intentionally send no HX-Request and no browser receipt exists.",
+      "repair_surface": "Example htmx tests/browser proof or owning Chirp hypermedia behavior.",
+      "not_applicable_reason": null
+    },
+    {
+      "id": "invalid_form_behavior",
+      "required": true,
+      "status": "pass",
+      "claim": "Declared invalid create/edit inputs return 422 feedback and do not persist rejected state.",
+      "authority_artifact_ids": ["nojs-testclient"],
+      "observed_cases": ["invalid create 422 with values/errors", "invalid create does not persist", "invalid edit 422 with errors"],
+      "unobserved_cases": [],
+      "findings": [],
+      "suppression_count": 0,
+      "failure_meaning": "Invalid input loses feedback, uses the wrong response, or mutates state.",
+      "unobserved_meaning": "Invalid-input cases did not execute.",
+      "repair_surface": "Example validation behavior or Chirp ValidationError behavior when framework-owned.",
+      "not_applicable_reason": null
+    },
+    {
+      "id": "transition_coverage",
+      "required": true,
+      "status": "unobserved",
+      "claim": "Every required compiled transition and request mode is observed.",
+      "authority_artifact_ids": ["transition-receipt"],
+      "observed_cases": [],
+      "unobserved_cases": ["required transition set", "plain and htmx transition observations"],
+      "findings": [],
+      "suppression_count": 0,
+      "failure_meaning": "A required transition observation disagrees with expected behavior.",
+      "unobserved_meaning": "No transition coverage receipt exists; static routes do not prove execution.",
+      "repair_surface": "Example transition tests or compiler/test correlation.",
+      "not_applicable_reason": null
+    },
+    {
+      "id": "no_javascript_browser",
+      "required": true,
+      "status": "unobserved",
+      "claim": "CRUD and invalid-form journeys complete in a browser with JavaScript disabled.",
+      "authority_artifact_ids": ["nojs-testclient", "disabled-js-browser"],
+      "observed_cases": ["supporting plain-request HTTP behavior"],
+      "unobserved_cases": ["JavaScript-disabled browser create/edit/delete/validation journeys"],
+      "findings": [],
+      "suppression_count": 0,
+      "failure_meaning": "A declared user task depends on JavaScript or its fallback is unusable.",
+      "unobserved_meaning": "Plain TestClient evidence exists, but the required browser mode did not run.",
+      "repair_surface": "Issue #725 and app browser tests.",
+      "not_applicable_reason": null
+    },
+    {
+      "id": "static_accessibility",
+      "required": true,
+      "status": "fail",
+      "claim": "Supported literal accessibility checks report no unresolved warning or error.",
+      "authority_artifact_ids": ["configured-inspection"],
+      "observed_cases": ["a11y_interactive", "a11y_label", "a11y_alt", "a11y_heading", "a11y_landmark"],
+      "unobserved_cases": [],
+      "findings": [
+        {"source_id": "configured-inspection", "severity": "warning", "category": "a11y_label", "summary": "Two label associations are not statically established.", "disposition": "open"},
+        {"source_id": "configured-inspection", "severity": "warning", "category": "a11y_landmark", "summary": "No main landmark is detected.", "disposition": "open"}
+      ],
+      "suppression_count": 0,
+      "failure_meaning": "A bounded literal accessibility finding remains.",
+      "unobserved_meaning": "Static accessibility categories did not run.",
+      "repair_surface": "Example markup or the owning rule after false-positive proof.",
+      "not_applicable_reason": null
+    },
+    {
+      "id": "dynamic_accessibility",
+      "required": true,
+      "status": "unobserved",
+      "claim": "Focus, announcement, and applicable dialog interaction behavior has compiled and browser proof.",
+      "authority_artifact_ids": ["dynamic-a11y-browser"],
+      "observed_cases": [],
+      "unobserved_cases": ["app-specific focus continuity", "live-region preservation", "compiled dynamic accessibility edges from issue #687"],
+      "findings": [],
+      "suppression_count": 0,
+      "failure_meaning": "A declared dynamic accessibility path fails its graph contract or browser assertion.",
+      "unobserved_meaning": "The browser dependency was unavailable, the fixture is not app-specific, and #687 remains open.",
+      "repair_surface": "Issue #687 and application Playwright tests.",
+      "not_applicable_reason": null
+    },
+    {
+      "id": "proof_integrity",
+      "required": true,
+      "status": "unobserved",
+      "claim": "All required evidence is content-addressed, redacted, complete, and unsuppressed.",
+      "authority_artifact_ids": ["integrity-receipt"],
+      "observed_cases": [],
+      "unobserved_cases": ["artifact integrity", "suppression inventory", "intervention and redaction accounting"],
+      "findings": [],
+      "suppression_count": 0,
+      "failure_meaning": "Evidence is missing, altered, suppressed, bypassed, or unsafe to publish.",
+      "unobserved_meaning": "RFC 026 evaluation infrastructure has not produced a receipt.",
+      "repair_surface": "Issues #890 and #888.",
+      "not_applicable_reason": null
+    },
+    {
+      "id": "human_review",
+      "required": true,
+      "status": "human_review",
+      "claim": "A named reviewer completed the bounded non-machine checklist without unresolved launch concern.",
+      "authority_artifact_ids": ["human-review-receipt"],
+      "observed_cases": [],
+      "unobserved_cases": ["product-scope coherence", "copy/error quality", "destructive-action clarity", "exploratory accessibility sample", "obvious parallel architecture"],
+      "findings": [],
+      "suppression_count": 0,
+      "failure_meaning": "The reviewer records an unresolved concern.",
+      "unobserved_meaning": "The bounded human review is pending.",
+      "repair_surface": "Application/product owner review.",
+      "not_applicable_reason": null
+    }
+  ],
+  "excluded_claims": [
+    {"name": "aggregate_score", "reason": "A score could conceal a required failed or unknown dimension."},
+    {"name": "wcag_conformance", "reason": "Static and browser checks do not establish conformance."},
+    {"name": "performance", "reason": "No workload, environment, budget, or variance policy is approved."},
+    {"name": "aesthetics", "reason": "Visual taste is not a framework-provable fact."},
+    {"name": "ethics", "reason": "Ethical product judgment is outside the contract."},
+    {"name": "content_truth", "reason": "The framework cannot establish truth or provenance of app content."},
+    {"name": "arbitrary_business_logic", "reason": "Only declared task assertions can be evaluated."},
+    {"name": "security_certification", "reason": "Bounded checks do not establish absence of every vulnerability."}
+  ],
+  "integrity": {
+    "missing_artifacts": 4,
+    "suppression_count": 0,
+    "unresolved_redactions": 0
+  },
+  "signoffs": {
+    "contracts": {"status": "pending", "reviewer": null, "evidence_artifact_id": null},
+    "security": {"status": "pending", "reviewer": null, "evidence_artifact_id": null},
+    "accessibility": {"status": "pending", "reviewer": null, "evidence_artifact_id": null}
+  }
+}

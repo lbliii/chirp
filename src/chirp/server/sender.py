@@ -382,7 +382,7 @@ def _if_range_matches(if_range: str, etag: str, last_modified: str) -> bool:
     return if_range == last_modified
 
 
-def _parse_single_range(range_header: str, size: int) -> tuple[int, int] | None | bool:
+def _parse_single_range(range_header: str, size: int) -> tuple[int, int] | bool | None:
     """Parse a single ``bytes=`` Range spec.
 
     Returns:

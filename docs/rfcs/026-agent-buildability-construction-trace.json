@@ -1,0 +1,201 @@
+{
+  "schema_version": "agent-buildability-eval-v1",
+  "run_id": "fixture-construction-001",
+  "run_kind": "construction",
+  "task": {
+    "id": "fixture-crud-build",
+    "version": "1.0.0",
+    "packet_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "objective_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "environment": {
+    "repository_revision": "1111111111111111111111111111111111111111",
+    "platform": "fixture-platform",
+    "python_version": "3.14.0",
+    "chirp_revision": "2222222222222222222222222222222222222222",
+    "dependency_lock_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "locale": "C.UTF-8",
+    "timezone": "UTC"
+  },
+  "lane": {
+    "id": "fixture-live-lane-a",
+    "executor_kind": "live_model",
+    "provider": "fixture-provider",
+    "model": "fixture-model",
+    "model_revision": "fixture-revision",
+    "parameters_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "attempt": 1
+  },
+  "context": {
+    "public_only": true,
+    "bundle_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "entries": [
+      {
+        "kind": "task",
+        "locator": "fixture://task/objective.md",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      {
+        "kind": "repository_instructions",
+        "locator": "fixture://repository/AGENTS.md",
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    ],
+    "prior_conversation": "public_task_only",
+    "private_instructions": false
+  },
+  "permissions": {
+    "tools": ["apply_patch", "shell"],
+    "write_roots": ["workspace"],
+    "network": "denied",
+    "network_allowlist": []
+  },
+  "artifacts": [
+    {
+      "id": "artifact-inspection-before",
+      "kind": "inspection",
+      "uri": "fixture://construction/inspection-before.json",
+      "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "media_type": "application/json",
+      "redacted": true,
+      "producer_event_id": "event-check-before"
+    },
+    {
+      "id": "artifact-inspection-after",
+      "kind": "inspection",
+      "uri": "fixture://construction/inspection-after.json",
+      "sha256": "123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0",
+      "media_type": "application/json",
+      "redacted": true,
+      "producer_event_id": "event-check-after"
+    }
+  ],
+  "events": [
+    {
+      "id": "event-check-before",
+      "sequence": 1,
+      "actor": "harness",
+      "kind": "command",
+      "summary": "Recorded an intentional unresolved block-target finding.",
+      "command": "chirp check --json",
+      "exit_code": 1,
+      "artifact_ids": ["artifact-inspection-before"],
+      "intervention_id": null
+    },
+    {
+      "id": "event-environment-reset",
+      "sequence": 2,
+      "actor": "human",
+      "kind": "environment",
+      "summary": "Applied the task-packet-declared fixture service reset.",
+      "command": null,
+      "exit_code": null,
+      "artifact_ids": [],
+      "intervention_id": "intervention-fixture-reset"
+    },
+    {
+      "id": "event-agent-repair",
+      "sequence": 3,
+      "actor": "agent",
+      "kind": "edit",
+      "summary": "Aligned the target with the existing named block.",
+      "command": null,
+      "exit_code": null,
+      "artifact_ids": [],
+      "intervention_id": null
+    },
+    {
+      "id": "event-check-after",
+      "sequence": 4,
+      "actor": "harness",
+      "kind": "command",
+      "summary": "Recorded the clean post-repair inspection fixture.",
+      "command": "chirp check --json",
+      "exit_code": 0,
+      "artifact_ids": ["artifact-inspection-after"],
+      "intervention_id": null
+    }
+  ],
+  "interventions": [
+    {
+      "id": "intervention-fixture-reset",
+      "kind": "environment",
+      "declared": true,
+      "summary": "Reset deterministic fixture data as allowed by the packet.",
+      "event_id": "event-environment-reset",
+      "material": false
+    }
+  ],
+  "repairs": [
+    {
+      "id": "repair-block-target",
+      "failure_ids": ["failure-block-target"],
+      "finding_ids": ["fixture.block_target_missing"],
+      "iteration": 1,
+      "event_ids": ["event-agent-repair", "event-check-after"],
+      "outcome": "repaired",
+      "bypass_kind": null
+    }
+  ],
+  "suppressions": [
+    {
+      "id": "suppression-scan-none",
+      "mechanism": "fixture-scan",
+      "location": "workspace",
+      "justification": "The contract fixture records that no suppression was found.",
+      "required_finding": false,
+      "disposition": "approved"
+    }
+  ],
+  "checks": [
+    {
+      "id": "check-inspection-after",
+      "kind": "inspection",
+      "status": "pass",
+      "required": true,
+      "artifact_ids": ["artifact-inspection-after"],
+      "summary": "The fixture post-repair inspection is clean."
+    },
+    {
+      "id": "check-offline-replay",
+      "kind": "artifact_integrity",
+      "status": "not_run",
+      "required": true,
+      "artifact_ids": [],
+      "summary": "Issue #890 must implement offline artifact replay."
+    }
+  ],
+  "failures": [
+    {
+      "id": "failure-block-target",
+      "class": "executor",
+      "owner": "executor",
+      "summary": "The initial fixture used a target that did not resolve to a named block.",
+      "artifact_ids": ["artifact-inspection-before"]
+    }
+  ],
+  "redaction": {
+    "policy_version": "fixture-v1",
+    "secret_scan": "pass",
+    "privacy_scan": "pass",
+    "removed_items": 0,
+    "unresolved": false
+  },
+  "reproducibility": {
+    "offline_replay": "not_run",
+    "replay_of": null,
+    "deterministic_checks_sha256": "3456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef012",
+    "repeated_run_ids": [],
+    "variance_notes": ["Contract fixture only; no model performance was measured."]
+  },
+  "handoff": null,
+  "result": {
+    "status": "incomplete",
+    "required_checks_passed": false,
+    "undeclared_interventions": 0,
+    "invalid_suppressions": 0,
+    "missing_artifacts": 1,
+    "framework_failure_ids": [],
+    "reasons": ["Offline replay and real content-addressed artifacts belong to issue #890."]
+  }
+}

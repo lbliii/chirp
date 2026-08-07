@@ -1,0 +1,992 @@
+{
+  "issue": 923,
+  "source": "GitHub Actions API via gh run view --json jobs",
+  "workflow": ".github/workflows/ci.yml",
+  "branch": "main",
+  "sample_runs": [
+    {
+      "run_id": 30909653420,
+      "url": "https://github.com/lbliii/chirp/actions/runs/30909653420",
+      "head_sha": "81f0b51aa3133ddcd4584a69d05e6a3a07626786",
+      "title": "Define agent-buildability foundations (#895)",
+      "conclusion": "success",
+      "workflow_wall_s": 394.0,
+      "jobs": [
+        {
+          "name": "test",
+          "duration_s": 378.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 4.0
+            },
+            {
+              "name": "Tests",
+              "duration_s": 364.0
+            }
+          ]
+        },
+        {
+          "name": "browser-smoke",
+          "duration_s": 163.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install Chromium",
+              "duration_s": 34.0
+            },
+            {
+              "name": "Browser smoke",
+              "duration_s": 108.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 14",
+          "duration_s": 54.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 8.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 17",
+          "duration_s": 48.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 16",
+          "duration_s": 46.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 8.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 18",
+          "duration_s": 46.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "chirp-ui-compat (0.10.0)",
+          "duration_s": 43.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Cross-version boundary and contract tests",
+              "duration_s": 6.0
+            },
+            {
+              "name": "Cross-version shell example smoke",
+              "duration_s": 21.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 13",
+          "duration_s": 42.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "data-pg-gil-gate",
+          "duration_s": 40.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "GIL gate \u2014 pelt / Postgres backend import",
+              "duration_s": 6.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 15",
+          "duration_s": 40.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "chirp-ui-compat (latest)",
+          "duration_s": 34.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Cross-version boundary and contract tests",
+              "duration_s": 5.0
+            },
+            {
+              "name": "Cross-version shell example smoke",
+              "duration_s": 17.0
+            }
+          ]
+        },
+        {
+          "name": "query-interop",
+          "duration_s": 24.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "QUERY wire, retry, redirect, limit, log, and proxy proof",
+              "duration_s": 4.0
+            }
+          ]
+        },
+        {
+          "name": "ty",
+          "duration_s": 16.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 4.0
+            },
+            {
+              "name": "Ty type checker",
+              "duration_s": 1.0
+            }
+          ]
+        },
+        {
+          "name": "ruff",
+          "duration_s": 13.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 4.0
+            },
+            {
+              "name": "Ruff (lint)",
+              "duration_s": 1.0
+            }
+          ]
+        }
+      ],
+      "critical_path_job": "test",
+      "critical_path_s": 378.0
+    },
+    {
+      "run_id": 29610299299,
+      "url": "https://github.com/lbliii/chirp/actions/runs/29610299299",
+      "head_sha": "789d53e4c49f3b5d66ff5fa80ac064d82f41c168",
+      "title": "feat: scaffold app-owned template architecture (#870)",
+      "conclusion": "success",
+      "workflow_wall_s": 291.0,
+      "jobs": [
+        {
+          "name": "test",
+          "duration_s": 287.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 3.0
+            },
+            {
+              "name": "Tests",
+              "duration_s": 276.0
+            }
+          ]
+        },
+        {
+          "name": "browser-smoke",
+          "duration_s": 131.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install Chromium",
+              "duration_s": 30.0
+            },
+            {
+              "name": "Browser smoke",
+              "duration_s": 84.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 17",
+          "duration_s": 50.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 6.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 16",
+          "duration_s": 48.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 13",
+          "duration_s": 47.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "chirp-ui-compat (0.10.0)",
+          "duration_s": 47.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Cross-version boundary and contract tests",
+              "duration_s": 8.0
+            },
+            {
+              "name": "Cross-version shell example smoke",
+              "duration_s": 29.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 18",
+          "duration_s": 41.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 14",
+          "duration_s": 41.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "chirp-ui-compat (latest)",
+          "duration_s": 40.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Cross-version boundary and contract tests",
+              "duration_s": 6.0
+            },
+            {
+              "name": "Cross-version shell example smoke",
+              "duration_s": 21.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 15",
+          "duration_s": 39.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "data-pg-gil-gate",
+          "duration_s": 37.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "GIL gate \u2014 pelt / Postgres backend import",
+              "duration_s": 6.0
+            }
+          ]
+        },
+        {
+          "name": "query-interop",
+          "duration_s": 25.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "QUERY wire, retry, redirect, limit, log, and proxy proof",
+              "duration_s": 3.0
+            }
+          ]
+        },
+        {
+          "name": "ty",
+          "duration_s": 14.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 3.0
+            },
+            {
+              "name": "Ty type checker",
+              "duration_s": 1.0
+            }
+          ]
+        },
+        {
+          "name": "ruff",
+          "duration_s": 11.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 3.0
+            },
+            {
+              "name": "Ruff (lint)",
+              "duration_s": 0.0
+            }
+          ]
+        }
+      ],
+      "critical_path_job": "test",
+      "critical_path_s": 287.0
+    },
+    {
+      "run_id": 29607228372,
+      "url": "https://github.com/lbliii/chirp/actions/runs/29607228372",
+      "head_sha": "d375140b77f73cdcd589f430c5cf0521ae2650b1",
+      "title": "test: prove Kida adapter advice context (#869)",
+      "conclusion": "success",
+      "workflow_wall_s": 376.0,
+      "jobs": [
+        {
+          "name": "test",
+          "duration_s": 373.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 3.0
+            },
+            {
+              "name": "Tests",
+              "duration_s": 358.0
+            }
+          ]
+        },
+        {
+          "name": "browser-smoke",
+          "duration_s": 141.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install Chromium",
+              "duration_s": 28.0
+            },
+            {
+              "name": "Browser smoke",
+              "duration_s": 92.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 17",
+          "duration_s": 51.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "chirp-ui-compat (0.10.0)",
+          "duration_s": 48.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Cross-version boundary and contract tests",
+              "duration_s": 7.0
+            },
+            {
+              "name": "Cross-version shell example smoke",
+              "duration_s": 27.0
+            }
+          ]
+        },
+        {
+          "name": "chirp-ui-compat (latest)",
+          "duration_s": 47.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Cross-version boundary and contract tests",
+              "duration_s": 7.0
+            },
+            {
+              "name": "Cross-version shell example smoke",
+              "duration_s": 29.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 18",
+          "duration_s": 47.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 13",
+          "duration_s": 46.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "data-pg-gil-gate",
+          "duration_s": 45.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "GIL gate \u2014 pelt / Postgres backend import",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 15",
+          "duration_s": 43.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 14",
+          "duration_s": 42.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 16",
+          "duration_s": 41.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "query-interop",
+          "duration_s": 20.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "QUERY wire, retry, redirect, limit, log, and proxy proof",
+              "duration_s": 4.0
+            }
+          ]
+        },
+        {
+          "name": "ruff",
+          "duration_s": 16.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 4.0
+            },
+            {
+              "name": "Ruff (lint)",
+              "duration_s": 0.0
+            }
+          ]
+        },
+        {
+          "name": "ty",
+          "duration_s": 12.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 3.0
+            },
+            {
+              "name": "Ty type checker",
+              "duration_s": 1.0
+            }
+          ]
+        }
+      ],
+      "critical_path_job": "test",
+      "critical_path_s": 373.0
+    },
+    {
+      "run_id": 29602621091,
+      "url": "https://github.com/lbliii/chirp/actions/runs/29602621091",
+      "head_sha": "3e56ce273cf6ec3cb73c6ce8decef2f78e6dc1f5",
+      "title": "test: add Kida multi-root downstream pilot (#868)",
+      "conclusion": "success",
+      "workflow_wall_s": 377.0,
+      "jobs": [
+        {
+          "name": "test",
+          "duration_s": 372.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 3.0
+            },
+            {
+              "name": "Tests",
+              "duration_s": 359.0
+            }
+          ]
+        },
+        {
+          "name": "browser-smoke",
+          "duration_s": 141.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install Chromium",
+              "duration_s": 21.0
+            },
+            {
+              "name": "Browser smoke",
+              "duration_s": 99.0
+            }
+          ]
+        },
+        {
+          "name": "chirp-ui-compat (0.10.0)",
+          "duration_s": 48.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Cross-version boundary and contract tests",
+              "duration_s": 7.0
+            },
+            {
+              "name": "Cross-version shell example smoke",
+              "duration_s": 26.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 18",
+          "duration_s": 48.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 6.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 16",
+          "duration_s": 47.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 14",
+          "duration_s": 45.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "data-pg-gil-gate",
+          "duration_s": 43.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "GIL gate \u2014 pelt / Postgres backend import",
+              "duration_s": 6.0
+            }
+          ]
+        },
+        {
+          "name": "chirp-ui-compat (latest)",
+          "duration_s": 43.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Cross-version boundary and contract tests",
+              "duration_s": 7.0
+            },
+            {
+              "name": "Cross-version shell example smoke",
+              "duration_s": 26.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 15",
+          "duration_s": 42.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 17",
+          "duration_s": 41.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 8.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 13",
+          "duration_s": 39.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "query-interop",
+          "duration_s": 24.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "QUERY wire, retry, redirect, limit, log, and proxy proof",
+              "duration_s": 4.0
+            }
+          ]
+        },
+        {
+          "name": "ruff",
+          "duration_s": 18.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 3.0
+            },
+            {
+              "name": "Ruff (lint)",
+              "duration_s": 0.0
+            }
+          ]
+        },
+        {
+          "name": "ty",
+          "duration_s": 16.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 4.0
+            },
+            {
+              "name": "Ty type checker",
+              "duration_s": 1.0
+            }
+          ]
+        }
+      ],
+      "critical_path_job": "test",
+      "critical_path_s": 372.0
+    },
+    {
+      "run_id": 29596483356,
+      "url": "https://github.com/lbliii/chirp/actions/runs/29596483356",
+      "head_sha": "e0d74211669ce28c1b96910e0f6636618ab498c5",
+      "title": "Merge pull request #866 from lbliii/codex/issue-862-ui-ownership-rfc",
+      "conclusion": "success",
+      "workflow_wall_s": 365.0,
+      "jobs": [
+        {
+          "name": "test",
+          "duration_s": 361.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 3.0
+            },
+            {
+              "name": "Tests",
+              "duration_s": 346.0
+            }
+          ]
+        },
+        {
+          "name": "browser-smoke",
+          "duration_s": 124.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install Chromium",
+              "duration_s": 22.0
+            },
+            {
+              "name": "Browser smoke",
+              "duration_s": 87.0
+            }
+          ]
+        },
+        {
+          "name": "chirp-ui-compat (0.10.0)",
+          "duration_s": 48.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Cross-version boundary and contract tests",
+              "duration_s": 8.0
+            },
+            {
+              "name": "Cross-version shell example smoke",
+              "duration_s": 29.0
+            }
+          ]
+        },
+        {
+          "name": "chirp-ui-compat (latest)",
+          "duration_s": 48.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Cross-version boundary and contract tests",
+              "duration_s": 8.0
+            },
+            {
+              "name": "Cross-version shell example smoke",
+              "duration_s": 26.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 18",
+          "duration_s": 47.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 8.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 14",
+          "duration_s": 44.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 17",
+          "duration_s": 44.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 13",
+          "duration_s": 43.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 8.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 16",
+          "duration_s": 40.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 7.0
+            }
+          ]
+        },
+        {
+          "name": "PostgreSQL 15",
+          "duration_s": 38.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "PostgreSQL round-trip tests",
+              "duration_s": 8.0
+            }
+          ]
+        },
+        {
+          "name": "data-pg-gil-gate",
+          "duration_s": 37.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "GIL gate \u2014 pelt / Postgres backend import",
+              "duration_s": 6.0
+            }
+          ]
+        },
+        {
+          "name": "query-interop",
+          "duration_s": 25.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "QUERY wire, retry, redirect, limit, log, and proxy proof",
+              "duration_s": 4.0
+            }
+          ]
+        },
+        {
+          "name": "ty",
+          "duration_s": 13.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 4.0
+            },
+            {
+              "name": "Ty type checker",
+              "duration_s": 0.0
+            }
+          ]
+        },
+        {
+          "name": "ruff",
+          "duration_s": 13.0,
+          "conclusion": "success",
+          "key_steps": [
+            {
+              "name": "Install dependencies",
+              "duration_s": 3.0
+            },
+            {
+              "name": "Ruff (lint)",
+              "duration_s": 0.0
+            }
+          ]
+        }
+      ],
+      "critical_path_job": "test",
+      "critical_path_s": 361.0
+    }
+  ],
+  "variance": {
+    "workflow_wall_s": {
+      "n": 5,
+      "min": 291.0,
+      "median": 376.0,
+      "max": 394.0,
+      "samples": [
+        394.0,
+        291.0,
+        376.0,
+        377.0,
+        365.0
+      ]
+    },
+    "test_job_s": {
+      "n": 5,
+      "min": 287.0,
+      "median": 372.0,
+      "max": 378.0,
+      "stdev": 38.1,
+      "samples": [
+        378.0,
+        287.0,
+        373.0,
+        372.0,
+        361.0
+      ]
+    }
+  },
+  "notes": [
+    "Critical path is the free-threaded main `test` job (PYTHON_GIL=0, -n 4 --dist loadgroup --cov).",
+    "browser-smoke and postgres matrix jobs are service/install dominated and must not be averaged into the main pytest budget.",
+    "pytest -q omits the classic \u201cN passed in Xs\u201d footer from Actions logs when coverage follows; use job/step timestamps."
+  ]
+}

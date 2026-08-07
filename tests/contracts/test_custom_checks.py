@@ -139,7 +139,9 @@ class TestExecution:
         error_issues = [i for i in result.issues if i.category == "plugin_check_error"]
         assert len(error_issues) == 1
         assert "bad_check" in error_issues[0].message
-        assert "plugin crashed" in error_issues[0].message
+        assert "ValueError" in error_issues[0].message
+        assert "plugin crashed" not in error_issues[0].message
+        assert "Repair surface: custom check 'bad_check'" in (error_issues[0].details or "")
 
         # good_check still ran
         good_issues = [i for i in result.issues if i.category == "good_plugin"]

@@ -57,7 +57,7 @@ def base_url() -> Iterator[str]:
                 output = proc.stdout.read().decode(errors="replace") if proc.stdout else ""
                 raise RuntimeError(f"server exited early code={proc.returncode}: {output}")
             try:
-                with urllib.request.urlopen(url, timeout=2) as response:  # noqa: S310
+                with urllib.request.urlopen(url, timeout=2) as response:  # noqa: S310, RUF100 -- fixed loopback URL
                     if response.status == 200:
                         break
             except urllib.error.URLError, ConnectionError, OSError:

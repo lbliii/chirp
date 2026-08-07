@@ -60,7 +60,7 @@ def _serve_app(app_name: str) -> Iterator[str]:
             if proc.poll() is not None:
                 raise RuntimeError(f"server exited early code={proc.returncode}")
             try:
-                with urllib.request.urlopen(url, timeout=2) as response:  # noqa: S310
+                with urllib.request.urlopen(url, timeout=2) as response:  # noqa: S310, RUF100 -- fixed loopback URL
                     if response.status == 200:
                         break
             except (

@@ -110,9 +110,6 @@
     "silent-handler|src/chirp/server/negotiation.py|_set_layout_debug_from_plan|pass/continue handler requires '# silent: <reason>'",
     "silent-handler|src/chirp/server/streaming_context.py|capture_streaming_render_context|pass/continue handler requires '# silent: <reason>'",
     "silent-handler|src/chirp/server/streaming_context.py|capture_streaming_render_context|pass/continue handler requires '# silent: <reason>'",
-    "silent-handler|src/chirp/templating/integration.py|_ensure_chirp_ui_filters|pass/continue handler requires '# silent: <reason>'",
-    "silent-handler|src/chirp/templating/integration.py|_ensure_chirp_ui_filters|pass/continue handler requires '# silent: <reason>'",
-    "silent-handler|src/chirp/templating/integration.py|create_environment|pass/continue handler requires '# silent: <reason>'",
     "silent-handler|src/chirp/templating/streaming.py|render_stream_async._producer|pass/continue handler requires '# silent: <reason>'"
   ]
 }

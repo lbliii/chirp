@@ -33,6 +33,14 @@ from chirp.middleware.protocol import AnyResponse, Next
 
 _log = logging.getLogger("chirp.sessions")
 
+# Request-scoped bookkeeping only — recomputed on load, never written to Redis.
+# Distinct from framework-private *security transaction* keys (e.g.
+# ``__passkey_challenge``) and timeout stamps (``__created_at`` /
+# ``__last_seen_at``), which MUST survive across requests. Do not revive a
+# blanket ``k.startswith("__")`` filter here: that dropped passkey ceremony
+# state and idle/absolute timeout stamps (#871).
+_REDIS_EPHEMERAL_KEYS: frozenset[str] = frozenset({"__session_id"})
+
 if TYPE_CHECKING:
     pass
 
@@ -431,8 +439,9 @@ class RedisSessionStore:
         else:
             session_id = old_id
 
-        # Store only user data (exclude internal keys)
-        to_store = {k: v for k, v in session.items() if not k.startswith("__")}
+        # Persist user data + cross-request security/timeout keys; drop only
+        # request-scoped bookkeeping (see ``_REDIS_EPHEMERAL_KEYS``).
+        to_store = {k: v for k, v in session.items() if k not in _REDIS_EPHEMERAL_KEYS}
         client = redis.from_url(self._redis_url)
         try:
             key = self._prefix + session_id

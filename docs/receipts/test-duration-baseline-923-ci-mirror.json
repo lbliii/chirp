@@ -1,0 +1,72 @@
+{
+  "issue": 923,
+  "parent": 900,
+  "saga": 896,
+  "profile": "ci-mirror",
+  "purpose": "Representative local/CI test-duration baseline before execution strategy changes. Measurement only.",
+  "environment": {
+    "recorded_at": "2026-08-05T14:21:32.052290+00:00",
+    "git_revision": "81f0b51aa3133ddcd4584a69d05e6a3a07626786",
+    "cwd": "/Users/llane/Documents/github/python/b-stack/chirp/ovrtx/issue-923-test-baselines",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "processor": "arm",
+    "python_version": "3.14.2 free-threading build (main, Dec 17 2025, 21:08:58) [Clang 21.1.4 ]",
+    "python_implementation": "CPython",
+    "executable": "/Users/llane/Documents/github/python/b-stack/chirp/ovrtx/issue-923-test-baselines/.venv/bin/python3",
+    "gil_enabled": false,
+    "cpu_count": 11,
+    "env_flags": {}
+  },
+  "commands": [
+    {
+      "name": "ci_mirror_test_job",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+        "--tb=short",
+        "--timeout=60",
+        "-m",
+        "not slow",
+        "--ignore=examples/chirpui/lucky_cat/test_browser_smoke.py",
+        "-n",
+        "4",
+        "--dist",
+        "loadgroup",
+        "--cov",
+        "--cov-report=term"
+      ],
+      "wall_s": 257.754,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "",
+      "parsed": {
+        "skipped_reported": 124
+      }
+    }
+  ],
+  "variance": {
+    "preflight": {},
+    "invariants": {}
+  },
+  "notes": [
+    "Do not treat service-dominated CI jobs as interchangeable with the main free-threaded pytest job when setting budgets (#919).",
+    "Acceptance #923: n/a \u2014 measurement receipt; no behavioral test.",
+    "ci-mirror matches the main CI test job argv; local wall time will differ from ubuntu-latest runners.",
+    "ci-mirror local sample re-run outside sandbox; wall time is host-specific (M3 Pro) and not interchangeable with ubuntu-latest Actions timings."
+  ],
+  "ci_methodology": {
+    "workflow": ".github/workflows/ci.yml",
+    "source": "GitHub Actions job startedAt/completedAt via gh run view",
+    "main_test_command": "pytest -q --tb=short --timeout=60 -m not slow --ignore=examples/chirpui/lucky_cat/test_browser_smoke.py -n 4 --dist loadgroup --cov --cov-report=term",
+    "critical_path_job": "test",
+    "service_dominated_jobs": [
+      "test-postgres (matrix)",
+      "data-pg-gil-gate",
+      "browser-smoke (Playwright install + Chromium)",
+      "query-interop (nginx + optional protocol clients)"
+    ]
+  }
+}

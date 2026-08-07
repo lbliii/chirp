@@ -3,8 +3,9 @@
 Each scaffold test runs in two phases:
 
 1. **Scaffold in-process**: ``chirp.cli.main(["new", ...])`` writes template
-   files into a tmp dir. For plain-v2 (no chirp-ui) we monkeypatch
-   ``chirp.cli._new._has_chirpui`` to ``False`` before scaffolding.
+   files into a tmp dir. Default modes are package-presence-independent;
+   ``mode="v2_chirpui"`` passes ``--with-chirpui`` for the explicit
+   compatibility scaffold.
 2. **Evaluate out-of-process**: a fresh Python subprocess imports the
    generated ``app.py``, freezes it, and emits JSON on stdout. Running in
    a subprocess isolates us from state that ``App()`` registers at module

@@ -139,7 +139,7 @@ class Response:
         URL string.  When any extra option is given, sets the header to
         a JSON object per the htmx ``HX-Location`` spec.
         """
-        opts: dict[str, str | None | dict[str, Any]] = {
+        opts: dict[str, str | dict[str, Any] | None] = {
             "target": target,
             "swap": swap,
             "source": source,
