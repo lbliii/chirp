@@ -1,7 +1,8 @@
-"""Tests for per-record access grants (#371, #376)."""
+"""Tests for per-record access grants (#371, #376, #872)."""
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 
 import pytest
@@ -9,11 +10,13 @@ import pytest
 from chirp import App
 from chirp.data import Database, Query
 from chirp.data.database import _db_var
+from chirp.data.errors import QueryError
 from chirp.errors import HTTPError
 from chirp.pages.types import AuthSpec
 from chirp.security.access_grants import (
     ACCESS_GRANTS_DDL,
     SharingEscalationError,
+    access_grants_ddl,
     access_policy,
     check_access,
     create_grant,
@@ -24,6 +27,14 @@ from chirp.security.access_grants import (
 from chirp.security.audit import SecurityEvent, set_security_event_sink
 from chirp.security.auth_core import enforce_auth
 from chirp.templating.returns import ValidationError
+
+# Live PostgreSQL coverage mirrors tests/test_schema_introspect.py — gated on
+# CHIRP_TEST_PG_DSN so local SQLite-only runs and the free-threaded main job stay green.
+PG_DSN = os.environ.get("CHIRP_TEST_PG_DSN")
+requires_pg = pytest.mark.skipif(
+    not PG_DSN,
+    reason="CHIRP_TEST_PG_DSN not set — PostgreSQL access-grant coverage skipped",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,17 +52,19 @@ class GrantUser:
     group_ids: frozenset[str] = frozenset()
 
 
+async def _seed_documents(db: Database) -> None:
+    await db.execute("CREATE TABLE documents (id INTEGER PRIMARY KEY, title TEXT, owner_id TEXT)")
+    await db.execute("INSERT INTO documents (id, title, owner_id) VALUES (1, 'a', 'alice')")
+    await db.execute("INSERT INTO documents (id, title, owner_id) VALUES (2, 'b', 'bob')")
+    await db.execute("INSERT INTO documents (id, title, owner_id) VALUES (3, 'c', 'carol')")
+
+
 @pytest.fixture
 async def grants_db(tmp_path):
     db = Database(f"sqlite:///{tmp_path / 'grants.db'}")
     await db.connect()
-    await db.execute_script(ACCESS_GRANTS_DDL)
-    await db.execute(
-        "CREATE TABLE documents (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, owner_id TEXT)"
-    )
-    await db.execute("INSERT INTO documents (title, owner_id) VALUES ('a', 'alice')")
-    await db.execute("INSERT INTO documents (title, owner_id) VALUES ('b', 'bob')")
-    await db.execute("INSERT INTO documents (title, owner_id) VALUES ('c', 'carol')")
+    await db.execute_script(access_grants_ddl("sqlite"))
+    await _seed_documents(db)
     yield db
     await db.disconnect()
 
@@ -66,6 +79,26 @@ def security_events():
     set_security_event_sink(_sink)
     yield events
     set_security_event_sink(None)
+
+
+@pytest.mark.issue(872)
+class TestAccessGrantsDdlPortability:
+    def test_sqlite_ddl_omits_autoincrement_and_matches_constant(self) -> None:
+        ddl = access_grants_ddl("sqlite")
+        assert ddl == ACCESS_GRANTS_DDL
+        assert "AUTOINCREMENT" not in ddl
+        assert "id INTEGER PRIMARY KEY" in ddl
+        assert "SERIAL" not in ddl
+
+    def test_postgresql_ddl_uses_serial(self) -> None:
+        ddl = access_grants_ddl("postgresql")
+        assert "id SERIAL PRIMARY KEY" in ddl
+        assert "AUTOINCREMENT" not in ddl
+        assert access_grants_ddl("postgres") == ddl
+
+    def test_unknown_dialect_fails_loud(self) -> None:
+        with pytest.raises(ValueError, match="unsupported access-grants dialect"):
+            access_grants_ddl("mysql")
 
 
 @pytest.mark.issue(371)
@@ -281,10 +314,37 @@ class TestSharingEscalation:
             principal_id="bob",
             permission="write",
         )
+        assert isinstance(grant.id, int)
         assert grant.resource_id == "1"
         assert grant.permission == "write"
         bob = GrantUser(id="bob")
         assert await check_access(grants_db, bob, "document", "1", "write")
+
+    @pytest.mark.issue(872)
+    async def test_create_grant_duplicate_fails_loud(self, grants_db: Database) -> None:
+        granter = GrantUser(id="alice", permissions=frozenset({"document.grant.read"}))
+        await create_grant(
+            grants_db,
+            granter=granter,
+            resource_type="document",
+            resource_id="1",
+            principal_type="user",
+            principal_id="bob",
+            permission="read",
+        )
+        with pytest.raises(QueryError):
+            await create_grant(
+                grants_db,
+                granter=granter,
+                resource_type="document",
+                resource_id="1",
+                principal_type="user",
+                principal_id="bob",
+                permission="read",
+            )
+        # Duplicate failure must not leave a second row or wipe the first grant.
+        bob = GrantUser(id="bob")
+        assert await check_access(grants_db, bob, "document", "1", "read")
 
     async def test_validation_error_pattern_for_form_handler(self, grants_db: Database) -> None:
         granter = GrantUser(id="alice", permissions=frozenset())
@@ -306,3 +366,96 @@ class TestSharingEscalation:
         )
         assert err.context["errors"]["permission"]
         assert err.context["form"]["principal_id"] == "bob"
+
+
+async def _drop_pg_grant_tables(db: Database) -> None:
+    await db.execute("DROP TABLE IF EXISTS access_grants CASCADE")
+    await db.execute("DROP TABLE IF EXISTS documents CASCADE")
+
+
+@requires_pg
+@pytest.mark.issue(872)
+class TestAccessGrantsPostgres:
+    """Live PostgreSQL parity for DDL apply, create_grant, and check_access."""
+
+    async def test_create_grant_and_checks_on_postgresql(self) -> None:
+        assert PG_DSN is not None
+        db = Database(PG_DSN)
+        await db.connect()
+        try:
+            assert db._driver == "postgresql"
+            await _drop_pg_grant_tables(db)
+            await db.execute_script(access_grants_ddl("postgresql"))
+            await _seed_documents(db)
+
+            granter = GrantUser(
+                id="alice",
+                permissions=frozenset({"document.grant.read", "document.grant.write"}),
+            )
+            read_grant = await create_grant(
+                db,
+                granter=granter,
+                resource_type="document",
+                resource_id="1",
+                principal_type="user",
+                principal_id="bob",
+                permission="read",
+            )
+            assert isinstance(read_grant.id, int)
+            assert read_grant.principal_id == "bob"
+
+            write_grant = await create_grant(
+                db,
+                granter=granter,
+                resource_type="document",
+                resource_id="2",
+                principal_type="user",
+                principal_id="*",
+                permission="write",
+            )
+            assert write_grant.permission == "write"
+
+            await create_grant(
+                db,
+                granter=granter,
+                resource_type="document",
+                resource_id="3",
+                principal_type="group",
+                principal_id="editors",
+                permission="read",
+            )
+
+            bob = GrantUser(id="bob")
+            stranger = GrantUser(id="stranger")
+            editor = GrantUser(id="carol", group_ids=frozenset({"editors"}))
+
+            assert await check_access(db, bob, "document", "1", "read")
+            assert not await check_access(db, bob, "document", "1", "write")
+            assert await check_access(db, stranger, "document", "2", "write")
+            assert await check_access(db, editor, "document", "3", "read")
+            assert not await check_access(db, stranger, "document", "3", "read")
+
+            rows = await (
+                Query(Doc, "documents")
+                .accessible_to(bob, "read", resource_type="document")
+                .order_by("id")
+                .fetch(db)
+            )
+            assert [r.id for r in rows] == [1]
+
+            with pytest.raises(QueryError):
+                await create_grant(
+                    db,
+                    granter=granter,
+                    resource_type="document",
+                    resource_id="1",
+                    principal_type="user",
+                    principal_id="bob",
+                    permission="read",
+                )
+            assert await check_access(db, bob, "document", "1", "read")
+        finally:
+            try:
+                await _drop_pg_grant_tables(db)
+            finally:
+                await db.disconnect()
