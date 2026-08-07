@@ -80,10 +80,11 @@ def check_password_extra(
                 f"App has a login/mutating surface but argon2-cffi is not "
                 f"installed (env='{env}'), so password hashing falls back to "
                 "stdlib scrypt. argon2id is the recommended production algorithm "
-                "— install it with: pip install chirp[auth]. Existing scrypt "
-                "hashes re-derive to argon2 on the next successful login when "
-                "you call verify_and_upgrade(..., upgrade_algorithm=True) and "
-                "persist the returned hash."
+                "— install it with: pip install chirp[auth]. Once installed, "
+                "existing scrypt hashes re-derive to argon2 on the next "
+                "successful login when you call "
+                "verify_and_upgrade(..., upgrade_algorithm=True) and persist "
+                "the returned hash."
             ),
         )
     ]
