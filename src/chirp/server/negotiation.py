@@ -35,7 +35,6 @@ from chirp.server.streaming_context import (
     capture_streaming_render_context,
 )
 from chirp.shell_actions import ShellActionsRenderer
-from chirp.skill.envelope import Envelope
 from chirp.templating.composition import PageComposition
 from chirp.templating.fragment_target_registry import FragmentTargetRegistry
 from chirp.templating.integration import render_fragment, render_template
@@ -71,6 +70,16 @@ _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from chirp.http.request import Request
+
+
+def _is_skill_envelope(value: object) -> bool:
+    """Structural Envelope check without importing ``chirp.skill`` on the hot path.
+
+    Eager ``from chirp.skill.envelope import Envelope`` regresses
+    ``suspense_first_chunk`` (provisional skill package must stay lazy).
+    """
+    cls = type(value)
+    return cls.__name__ == "Envelope" and cls.__module__ == "chirp.skill.envelope"
 
 
 def _minimal_kida_env() -> Environment:
@@ -768,8 +777,9 @@ def negotiate(
                 status=200,
             )
             return Response(body=value, content_type="application/octet-stream")
-        case Envelope():
+        case _ if _is_skill_envelope(value):
             # Signed skill result — wire dict as JSON (dict/list precedent).
+            # Structural dispatch keeps chirp.skill off the Suspense/SSE import path.
             _trace_return(
                 request,
                 return_type="Envelope",
