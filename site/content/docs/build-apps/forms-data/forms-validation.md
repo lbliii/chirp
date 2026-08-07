@@ -157,7 +157,9 @@ class PaymentForm:
 
 Multipart forms expose uploaded files via `form.files`. Read the bytes, or stream
 to disk with `save()` (which sanitizes the destination basename against path
-traversal).
+traversal). String accessors (`form["avatar"]`, `form.get("avatar")`) raise
+`FormFileFieldError` for file-only names — they never report a present upload as
+missing.
 
 ```python
 @app.route("/upload", methods=["POST"])
