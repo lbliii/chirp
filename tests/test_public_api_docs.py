@@ -98,7 +98,7 @@ def test_milo_adapter_is_documented_as_a_provisional_submodule_api() -> None:
     assert "not re-exported from `chirp`" in section
 
 
-@pytest.mark.issue(969, 970)
+@pytest.mark.issue(969, 970, 974)
 def test_skill_envelope_is_documented_as_a_provisional_submodule_api() -> None:
     section = _section_body(_PUBLIC_API_DOC.read_text(), "Provisional Submodule APIs")
 
@@ -110,6 +110,7 @@ def test_skill_envelope_is_documented_as_a_provisional_submodule_api() -> None:
         "use_skill",
         "Manifest",
         "assemble_manifest",
+        "compute_content_digest",
     ):
         assert section.count(f"`{name}`") == 1
     assert "`chirp.skill`" in section
