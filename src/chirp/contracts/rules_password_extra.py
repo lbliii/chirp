@@ -14,9 +14,10 @@ Category:
   in production/staging, **silent in development** (the default) so dev apps and
   shipped examples — and the scrypt-only base CI env — stay clean. This is a
   posture *advisory*, never an ERROR: scrypt verifies and stores fine, so there
-  is no correctness gap to fail loud on, and existing scrypt hashes upgrade to
-  argon2 on the next successful login via ``verify_and_upgrade`` once the extra
-  is installed.
+  is no correctness gap to fail loud on. Existing scrypt hashes re-derive to
+  argon2 on the next successful login when the app calls
+  ``verify_and_upgrade(..., upgrade_algorithm=True)`` (opt-in; storm-safe
+  default is off) and persists the returned hash once the extra is installed.
 
 Why **built-in** and not a plugin check: this rule must read ``config.env`` and
 the route surface (``router`` + discovered filesystem pages), which the plugin
@@ -79,9 +80,11 @@ def check_password_extra(
                 f"App has a login/mutating surface but argon2-cffi is not "
                 f"installed (env='{env}'), so password hashing falls back to "
                 "stdlib scrypt. argon2id is the recommended production algorithm "
-                "— install it with: pip install chirp[auth]. Existing scrypt "
-                "hashes upgrade to argon2 on the next successful login via "
-                "verify_and_upgrade()."
+                "— install it with: pip install chirp[auth]. Once installed, "
+                "existing scrypt hashes re-derive to argon2 on the next "
+                "successful login when you call "
+                "verify_and_upgrade(..., upgrade_algorithm=True) and persist "
+                "the returned hash."
             ),
         )
     ]

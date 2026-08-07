@@ -312,19 +312,32 @@ def needs_rehash(phc_hash: str, *, upgrade_algorithm: bool = False) -> bool:
     return True
 
 
-def verify_and_upgrade(password: str, phc_hash: str) -> tuple[bool, str | None]:
+def verify_and_upgrade(
+    password: str, phc_hash: str, *, upgrade_algorithm: bool = False
+) -> tuple[bool, str | None]:
     """Verify a password and opportunistically return an upgraded hash.
 
     Returns ``(ok, new_hash_or_None)``. ``new_hash`` is a freshly computed hash
     **only** when the password verified *and* :func:`needs_rehash` reports the
-    stored hash is stale (parameter staleness only — algorithm upgrades are not
-    triggered here, matching :func:`needs_rehash`'s default). A hash is never
-    re-derived for a wrong password, so a failed guess can never cause a
+    stored hash is stale. ``upgrade_algorithm`` is forwarded to
+    :func:`needs_rehash` and defaults to ``False`` (parameter staleness only —
+    scrypt→argon2 algorithm upgrades require an explicit opt-in). A hash is
+    never re-derived for a wrong password, so a failed guess can never cause a
     database write.
 
-    Typical use on login::
+    Typical use on login (parameter upgrades only)::
 
         ok, new_hash = verify_and_upgrade(password, user.password_hash)
+        if not ok:
+            return reject()
+        if new_hash is not None:
+            user.password_hash = new_hash  # persist the upgrade
+
+    Controlled scrypt→argon2 migration window::
+
+        ok, new_hash = verify_and_upgrade(
+            password, user.password_hash, upgrade_algorithm=True
+        )
         if not ok:
             return reject()
         if new_hash is not None:
@@ -333,6 +346,10 @@ def verify_and_upgrade(password: str, phc_hash: str) -> tuple[bool, str | None]:
     Args:
         password: The plaintext password to check.
         phc_hash: The stored PHC-format hash.
+        upgrade_algorithm: When ``True``, also rehash a current-cost scrypt
+            hash to argon2 when argon2 is available. Default ``False`` (storm-
+            safe: installing ``chirp[auth]`` alone does not rewrite every
+            scrypt row on first login).
 
     Returns:
         ``(True, new_hash)`` when the password is correct and the stored hash
@@ -341,7 +358,7 @@ def verify_and_upgrade(password: str, phc_hash: str) -> tuple[bool, str | None]:
     """
     if not verify_password(password, phc_hash):
         return (False, None)
-    if needs_rehash(phc_hash):
+    if needs_rehash(phc_hash, upgrade_algorithm=upgrade_algorithm):
         return (True, hash_password(password))
     return (True, None)
 

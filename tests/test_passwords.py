@@ -428,6 +428,44 @@ class TestVerifyAndUpgrade:
         # A wrong password must NEVER trigger a rehash (no DB write on bad guess).
         spy_hash.assert_not_called()
 
+    @pytest.mark.issue(751)
+    def test_default_does_not_upgrade_current_scrypt_when_argon2_available(
+        self,
+    ) -> None:
+        """Storm-safe default: current-cost scrypt is not replaced solely
+        because argon2 became available (#751).
+        """
+        current_hash = _scrypt_hash_with(n=_SCRYPT_N, r=_SCRYPT_R)
+        with (
+            patch("chirp.security.passwords._has_argon2", return_value=True),
+            patch("chirp.security.passwords.hash_password") as spy_hash,
+        ):
+            ok, new_hash = verify_and_upgrade("test", current_hash)
+        assert ok is True
+        assert new_hash is None
+        spy_hash.assert_not_called()
+
+    @pytest.mark.issue(751)
+    def test_opt_in_no_op_when_argon2_absent(self) -> None:
+        """upgrade_algorithm=True without argon2 stays on param staleness (#751)."""
+        current_hash = _scrypt_hash_with(n=_SCRYPT_N, r=_SCRYPT_R)
+        with patch("chirp.security.passwords._has_argon2", return_value=False):
+            ok, new_hash = verify_and_upgrade("test", current_hash, upgrade_algorithm=True)
+        assert ok is True
+        assert new_hash is None
+
+    @pytest.mark.issue(751)
+    def test_wrong_password_never_upgrades_even_with_opt_in(self) -> None:
+        current_hash = _scrypt_hash_with(n=_SCRYPT_N, r=_SCRYPT_R)
+        with (
+            patch("chirp.security.passwords._has_argon2", return_value=True),
+            patch("chirp.security.passwords.hash_password") as spy_hash,
+        ):
+            ok, new_hash = verify_and_upgrade("wrong-guess", current_hash, upgrade_algorithm=True)
+        assert ok is False
+        assert new_hash is None
+        spy_hash.assert_not_called()
+
 
 @pytest.mark.skipif(not _has_argon2(), reason="argon2-cffi not installed")
 class TestVerifyAndUpgradeArgon2:
@@ -436,6 +474,17 @@ class TestVerifyAndUpgradeArgon2:
         ok, new_hash = verify_and_upgrade("argon2-current", current)
         assert ok is True
         assert new_hash is None
+
+    @pytest.mark.issue(751)
+    def test_opt_in_upgrades_current_scrypt_to_argon2(self) -> None:
+        """upgrade_algorithm=True rehashes current-cost scrypt → argon2id (#751)."""
+        current_hash = _scrypt_hash_with(n=_SCRYPT_N, r=_SCRYPT_R)
+        ok, new_hash = verify_and_upgrade("test", current_hash, upgrade_algorithm=True)
+        assert ok is True
+        assert new_hash is not None
+        assert new_hash.startswith("$argon2id$")
+        # Persistence step apps must perform — replacement verifies after store.
+        assert verify_password("test", new_hash) is True
 
 
 # ---------------------------------------------------------------------------

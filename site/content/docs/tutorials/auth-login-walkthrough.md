@@ -386,9 +386,10 @@ login flow (the auth posture above is clean); see
 The golden path is correct by default. Here is where each piece extends:
 
 - **Rehash on login** — `verify_and_upgrade(password, hash)` verifies *and*
-  returns a freshly computed hash when the stored one is below current cost
-  params, so passwords transparently upgrade as users sign in (never on a wrong
-  guess). See [[docs/quality/deployment/auth-hardening|Auth Hardening]].
+  returns a freshly computed hash when the stored one is stale (parameter
+  upgrades by default; pass `upgrade_algorithm=True` for scrypt→argon2 during a
+  migration window). Persist the returned hash; never rehashes a wrong guess.
+  See [[docs/quality/deployment/auth-hardening|Auth Hardening]].
 - **Declarative gating** — instead of the `@login_required` decorator, set
   `RouteMeta.auth` (or an `AuthSpec`) on a mounted filesystem page; the same
   `auth_middleware` / `auth_spec` checks enforce it. See

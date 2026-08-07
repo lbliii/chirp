@@ -200,16 +200,21 @@ decoy's cost differs from a stored scrypt verify. Re-deriving stale hashes (next
 converges the corpus toward one algorithm over time.
 
 **Rehash-on-login (opportunistic upgrade).** `verify_and_upgrade` verifies the
-password and, when correct **and** the stored hash is below the current cost
-parameters, returns a freshly computed replacement. It never re-derives a hash
-for a wrong guess, so a failed login can never trigger a database write:
+password and, when correct **and** the stored hash is stale, returns a freshly
+computed replacement. It never re-derives a hash for a wrong guess, so a failed
+login can never trigger a database write. Parameter staleness upgrades by
+default; scrypt→argon2 algorithm upgrades require
+`upgrade_algorithm=True` (same gate as `needs_rehash`). Persist the returned
+hash in your repository when it is not `None`:
 
 ```python
-ok, new_hash = verify_and_upgrade(password, user.password_hash)
+ok, new_hash = verify_and_upgrade(
+    password, user.password_hash, upgrade_algorithm=True  # migration window
+)
 if not ok:
     return reject()
 if new_hash is not None:
-    user.password_hash = new_hash  # persist the upgrade
+    user.password_hash = new_hash  # app must persist the upgrade
 ```
 
 `needs_rehash(phc_hash, *, upgrade_algorithm=False)` reports parameter staleness
