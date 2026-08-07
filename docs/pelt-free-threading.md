@@ -2,6 +2,12 @@
 
 Status: implemented and continuously checked for issues #259 and #260.
 
+Stack context: the Bengal
+[free-threading stack ledger](design/free-threading-stack-ledger.md)
+(`docs/design/free-threading-stack-ledger.md`)
+places Pelt's pool checkout and codec snapshots in the shared-vs-isolated map
+alongside Chirp, Kida, and Pounce (#944).
+
 Pelt's free-threading contract is ownership-based. A checked-out connection owns
 its mutable protocol, prepared-statement cache, dynamic-type discovery ledger,
 and database-specific codec registry. Registry writes take a short

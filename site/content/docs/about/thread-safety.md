@@ -29,6 +29,11 @@ The strategy is three tiers:
 An evaluator skimming the first screen should already have the model: read-only data is
 free, request data is isolated, and the rest is locked.
 
+The Bengal stack (Chirp, Kida, Pounce, and in-tree Pelt) shares one
+[free-threading stack ledger](https://github.com/lbliii/chirp/blob/main/docs/design/free-threading-stack-ledger.md)
+that classifies **shared warm** vs **isolated** ownership and names honest
+boundaries across the stack.
+
 :::{note}
 This describes Chirp's *own* abstractions, which are free-threading safe. Shared mutable
 state **you** add — a module-level dict, a counter, an in-process cache — is your
