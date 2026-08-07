@@ -9,7 +9,10 @@ import warnings
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pounce.display import DisplayConfig
 
 # Shared default for the request-body / multipart-upload byte ceilings (16 MB).
 # Named so __post_init__ can tell "user left max_upload_size at its default"
@@ -339,6 +342,12 @@ class AppConfig:
     backlog: int = 2048
     keep_alive_timeout: float = 5.0
     request_timeout: float = 30.0
+    # Pounce startup display identity (name/tagline/version/lines/signage).
+    # Forwarded unchanged as ServerConfig.display; Pounce owns precedence
+    # (CLI → env → this value → pyproject → app hook), signage modes, and
+    # JSON startup fields. None preserves Pounce's unset behavior. Import
+    # ``DisplayConfig`` from ``pounce.display`` — Chirp does not redefine it.
+    display: DisplayConfig | None = None
 
     # TLS (optional)
     ssl_certfile: str | None = None

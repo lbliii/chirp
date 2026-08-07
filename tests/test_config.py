@@ -63,6 +63,7 @@ class TestAppConfig:
         assert cfg.max_upload_size == 16 * 1024 * 1024
         assert cfg.view_transitions is False
         assert cfg.static_context is None
+        assert cfg.display is None
 
     @pytest.mark.issue(699)
     def test_redis_url_is_redacted_from_repr(self) -> None:

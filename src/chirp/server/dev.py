@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, cast
 from pounce import ASGIApp
 
 if TYPE_CHECKING:
+    from pounce.display import DisplayConfig
     from pounce.server import LifecycleCollector
 
 
@@ -22,6 +23,7 @@ def run_dev_server(
     reload_dirs: tuple[str, ...] = (),
     app_path: str | None = None,
     lifecycle_collector: LifecycleCollector | None = None,
+    display: DisplayConfig | None = None,
 ) -> None:
     """Start a pounce dev server with the given chirp App.
 
@@ -42,6 +44,9 @@ def run_dev_server(
             that code changes on disk take effect immediately.
         lifecycle_collector: Optional Pounce LifecycleCollector for
             observability.  Forwarded to the Pounce Server.
+        display: Optional Pounce ``DisplayConfig`` forwarded unchanged as
+            ``ServerConfig.display``.  ``None`` leaves Pounce unset
+            behavior intact (env / pyproject / app-hook resolution).
     """
     from pounce.config import ServerConfig
     from pounce.server import Server
@@ -53,6 +58,7 @@ def run_dev_server(
         reload=reload,
         reload_include=reload_include,
         reload_dirs=reload_dirs,
+        display=display,
     )
     server = Server(
         config,
