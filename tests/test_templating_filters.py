@@ -166,30 +166,28 @@ class TestBuiltinFiltersRegistry:
         assert BUILTIN_FILTERS["qs"] is qs
 
 
-# ── create_environment chirp-ui fallback ────────────────────────────────────
+# ── create_environment chirp-ui (no ambient discovery) ───────────────────────
 
 
-class TestCreateEnvironmentChirpUIFallback:
-    """Env-level chirp-ui filter fallback (RFC 001)."""
+class TestCreateEnvironmentNoAmbientChirpUI:
+    """Package presence alone must not change the environment (#860)."""
 
-    def test_env_has_chirp_ui_filters_when_chirp_ui_installed(self, tmp_path: Path) -> None:
-        """create_environment ensures chirp-ui filters exist when chirp_ui is loadable."""
+    def test_chirp_ui_globals_not_ambient_when_installed(self, tmp_path: Path) -> None:
+        """create_environment does not inject chirp-ui globals without use_chirp_ui."""
         from chirp.config import AppConfig
+        from chirp.templating.filters import BUILTIN_FILTERS
         from chirp.templating.integration import create_environment
 
+        pytest.importorskip("chirp_ui")
         config = AppConfig(template_dir=str(tmp_path))
         env = create_environment(config, filters={}, globals_={})
-        # When chirp_ui is installed, env should have html_attrs even without register_filters
+        # Built-ins remain; chirp-ui-only globals stay absent until explicit integration.
         assert "html_attrs" in env.filters
-        assert "bem" in env.filters
-        assert "field_errors" in env.filters
-        assert "validate_variant" in env.filters
-        assert "validate_appearance_block" in env.filters
-        assert "validate_tone_block" in env.filters
-        assert "chirpui_asset_path" in env.globals
+        assert env.filters["html_attrs"] is BUILTIN_FILTERS["html_attrs"]
+        assert "chirpui_asset_path" not in env.globals
 
-    def test_user_filter_overrides_chirp_ui_fallback(self, tmp_path: Path) -> None:
-        """User-registered filters take precedence over chirp-ui fallback."""
+    def test_user_filter_shadow_warning_still_fires(self, tmp_path: Path) -> None:
+        """User-registered filters that shadow builtins still warn."""
         from chirp.config import AppConfig
         from chirp.templating.integration import create_environment
 

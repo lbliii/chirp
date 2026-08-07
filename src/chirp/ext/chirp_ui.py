@@ -8,7 +8,7 @@ Usage::
     from chirp.ext.chirp_ui import use_chirp_ui
 
     app = App(AppConfig(template_dir="templates"))
-    use_chirp_ui(app)  # Registers static files, filters (bem, field_errors, html_attrs), and middleware
+    use_chirp_ui(app)  # Registers template loader, static files, filters, and middleware
     app.run()
 """
 
@@ -163,8 +163,10 @@ def use_chirp_ui(
 ) -> None:
     """Register chirp-ui static files (CSS, themes) and filters with the app.
 
-    Call after App creation. Serves chirpui.css, chirpui-alpine.js, themes/,
-    chirpui-transitions.css from the chirp-ui package. Automatically registers
+    Call after App creation. Explicitly registers a ``PackageLoader`` for
+    chirp-ui templates (chirp-ui is never ambiently discovered from package
+    presence alone), serves chirpui.css, chirpui-alpine.js, themes/,
+    chirpui-transitions.css from the chirp-ui package, and registers
     chirp-ui filters (bem, field_errors, html_attrs, validate_variant) so
     components render correctly. It also upgrades chirp-ui's
     ``route_link_attrs`` global to use Chirp's route-aware ``swap_attrs``
@@ -190,8 +192,13 @@ def use_chirp_ui(
     Raises ImportError if chirp-ui is not installed.
     """
     import chirp_ui
+    from kida import PackageLoader
 
     from chirp.middleware.static import StaticFiles
+
+    # Explicit template root — chirp-ui is never ambiently discovered from
+    # package presence alone (#860). Must run before freeze builds the env.
+    app.add_loader(PackageLoader("chirp_ui", "templates"))
 
     # Auto-enable Alpine (chirp-ui components require it) AND auto-wire a
     # per-request nonce CSP so chirp-ui's inline Alpine survives secure-by-default.
