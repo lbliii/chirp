@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from chirp.skill.envelope import Envelope, sign_envelope
 from chirp.skill.manifest import Manifest, assemble_manifest
+from chirp.tools.schema import function_to_schema
 
 if TYPE_CHECKING:
     from chirp.app import App
@@ -56,12 +57,14 @@ class Skill:
 
     __slots__ = (
         "_key_id",
+        "_manifest",
         "_mounted",
         "_name",
         "_pending",
         "_private_key",
         "_provider_keys",
         "_public_key",
+        "_template_sources",
         "_version",
     )
 
@@ -92,7 +95,9 @@ class Skill:
         self._public_key = public_key if public_key is not None else _derive_public_key(private_key)
         self._provider_keys = tuple(provider_keys)
         self._pending: list[_PendingSkillTool] = []
+        self._template_sources: dict[str, str] = {}
         self._mounted = False
+        self._manifest: Manifest | None = None
 
     @property
     def name(self) -> str:
@@ -118,6 +123,37 @@ class Skill:
     def tools(self) -> tuple[str, ...]:
         return tuple(t.name for t in self._pending)
 
+    @property
+    def manifest(self) -> Manifest:
+        """Return the freeze-finalized immutable :class:`Manifest`.
+
+        Raises ``RuntimeError`` until ``app.freeze()`` (or ``run``/``check``)
+        has published the skill domain snapshot — milo ``bindings`` precedent.
+        """
+        if self._manifest is None:
+            msg = (
+                f"Skill {self._name!r} manifest is not available until the Chirp app is frozen. "
+                "Call app.freeze(), app.check(), app.run(), or serve the first request."
+            )
+            raise RuntimeError(msg)
+        return self._manifest
+
+    def add_template_source(self, name: str, source: str) -> None:
+        """Associate a template source string with this skill for the content digest.
+
+        Setup-only: raises after the freeze-time manifest is finalized.
+        """
+        if self._manifest is not None:
+            msg = f"Cannot add template source {name!r} after skill {self._name!r} is frozen"
+            raise RuntimeError(msg)
+        if not isinstance(name, str) or not name.strip():
+            msg = "Template name must be a non-empty string"
+            raise ValueError(msg)
+        if not isinstance(source, str):
+            msg = "Template source must be a string"
+            raise TypeError(msg)
+        self._template_sources[name.strip()] = source
+
     def tool(
         self,
         name: str,
@@ -132,6 +168,9 @@ class Skill:
         """
         if self._mounted:
             msg = f"Cannot register tool {name!r} after use_skill() has mounted this skill"
+            raise RuntimeError(msg)
+        if self._manifest is not None:
+            msg = f"Cannot register tool {name!r} after skill {self._name!r} is frozen"
             raise RuntimeError(msg)
         if not isinstance(name, str) or not name.strip():
             msg = "Skill tool name must be a non-empty string"
@@ -163,7 +202,13 @@ class Skill:
         return decorator
 
     def assemble_manifest(self) -> Manifest:
-        """Assemble a serializable :class:`Manifest` from this skill's current tools."""
+        """Assemble a :class:`Manifest` from this skill's current tools.
+
+        After freeze, returns the finalized immutable manifest (same object as
+        :attr:`manifest`). Before freeze, returns a provisional identity digest.
+        """
+        if self._manifest is not None:
+            return self._manifest
         return assemble_manifest(
             name=self._name,
             version=self._version,
@@ -172,12 +217,35 @@ class Skill:
             provider_keys=self._provider_keys,
         )
 
+    def register(self, _app: App) -> None:
+        """Freeze-time domain hook — finalize the immutable content-digested manifest.
+
+        Invoked by ``AppCompiler.freeze`` via ``app.register_domain`` (milo
+        ``MiloMCPAppAdapter.register`` precedent). Idempotent once published.
+        Skill state is self-contained; the app argument satisfies the Domain
+        protocol and is unused today.
+        """
+        if self._manifest is not None:
+            return
+        self._manifest = assemble_manifest(
+            name=self._name,
+            version=self._version,
+            tools=self.tools,
+            public_key=self._public_key,
+            provider_keys=self._provider_keys,
+            tool_schemas=_skill_tool_schemas(self._pending),
+            template_sources=dict(self._template_sources),
+        )
+
 
 def use_skill(app: App, skill: Skill) -> Skill:
     """Mount ``skill``'s tools onto ``app``'s MCP tool registry via ``app.tool``.
 
-    Eagerly verifies the Ed25519 peer dependency so missing ``cryptography``
-    fails at setup rather than on the first tool call. Returns ``skill``.
+    Registers ``skill`` as an app domain so ``app.freeze()`` finalizes an
+    immutable :class:`Manifest` with a content digest (milo
+    ``register_domain`` precedent). Eagerly verifies the Ed25519 peer
+    dependency so missing ``cryptography`` fails at setup rather than on the
+    first tool call. Returns ``skill``.
     """
     if not isinstance(skill, Skill):
         msg = "use_skill() requires a chirp.skill.Skill instance"
@@ -199,7 +267,19 @@ def use_skill(app: App, skill: Skill) -> Skill:
         )(pending.handler)
 
     skill._mounted = True
+    app.register_domain(skill)
     return skill
+
+
+def _skill_tool_schemas(pending: list[_PendingSkillTool]) -> dict[str, dict[str, Any]]:
+    """Build the canonical tool-schema map digested into the freeze-time manifest."""
+    return {
+        tool.name: {
+            "description": tool.description,
+            "inputSchema": function_to_schema(tool.handler),
+        }
+        for tool in pending
+    }
 
 
 def _envelope_wrapper(
