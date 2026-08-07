@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% from 'chirpui/layout.html' import container %}
+
+{% block content %}
+{% call container(max_width='76rem', cls='chirp-theme-home chirp-homepage') %}
+<article class="page prose chirp-theme-page__article" data-chirp-theme-surface="home">
+  <div class="page-content chirp-theme-page__content">
+    {{ content | safe }}
+  </div>
+</article>
+{% end %}
+{% end %}
