@@ -99,7 +99,9 @@ benchmark = [
     "starlette>=0.40.0",
     "litestar>=2.13.0",
     "httpx>=0.27.0",
-    "python-fasthtml>=0.14.3",
+    # >=0.14.11: FastHTML moved fastlite (→ apswutils → APSW) to its [dev]
+    # extra, so the benchmark profile no longer resolves yanked apsw==3.53.3.0.
+    "python-fasthtml>=0.14.11",
 ]
 
 # Full stack: framework + data + AI
