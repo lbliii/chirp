@@ -71,6 +71,7 @@ def _run_production(app: App, args: argparse.Namespace, host: str, port: int) ->
         host=host,
         port=port,
         workers=args.workers if args.workers is not None else app.config.workers,
+        display=app.config.display,
         # CLI flags override config
         metrics_enabled=args.metrics or app.config.metrics_enabled,
         metrics_path=app.config.metrics_path,
@@ -116,4 +117,5 @@ def _run_dev(app: App, args: argparse.Namespace, host: str, port: int) -> None:
         reload_include=(),
         reload_dirs=app.config.reload_dirs,
         app_path=args.app,
+        display=app.config.display,
     )

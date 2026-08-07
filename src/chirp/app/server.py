@@ -67,6 +67,7 @@ class ServerLauncher:
                 reload_include=(),
                 reload_dirs=reload_dirs,
                 lifecycle_collector=lifecycle_collector,
+                display=self._config.display,
             )
             return
 
@@ -77,6 +78,7 @@ class ServerLauncher:
             host=host,
             port=port,
             workers=self._config.workers,
+            display=self._config.display,
             metrics_enabled=self._config.metrics_enabled,
             metrics_path=self._config.metrics_path,
             rate_limit_enabled=self._config.rate_limit_enabled,

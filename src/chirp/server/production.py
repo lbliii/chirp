@@ -13,6 +13,7 @@ from pounce import ASGIApp
 from pounce.sync_protocol import SyncApp
 
 if TYPE_CHECKING:
+    from pounce.display import DisplayConfig
     from pounce.server import LifecycleCollector
 
     from chirp.app import App
@@ -25,6 +26,7 @@ def run_production_server(
     workers: int = 0,  # 0 = auto-detect from CPU count
     worker_mode: str = "auto",  # "auto" | "sync" | "async" | "subinterpreter"
     *,
+    display: DisplayConfig | None = None,
     # Phase 6.1: Prometheus Metrics
     metrics_enabled: bool = True,
     metrics_path: str = "/metrics",
@@ -121,6 +123,9 @@ def run_production_server(
         ssl_keyfile: Path to TLS private key file.
         lifecycle_collector: Optional Pounce lifecycle collector for
             startup/shutdown/worker hook event capture.
+        display: Optional Pounce ``DisplayConfig`` forwarded unchanged as
+            ``ServerConfig.display``.  ``None`` leaves Pounce unset
+            behavior intact (env / pyproject / app-hook resolution).
 
     Example:
         >>> from myapp import app
@@ -227,6 +232,8 @@ def run_production_server(
         # TLS
         ssl_certfile=ssl_certfile,
         ssl_keyfile=ssl_keyfile,
+        # Startup display identity (Pounce DisplayConfig; optional)
+        display=display,
         # Use pounce's built-in health check if chirp app doesn't define /health
         health_check_path=None,  # Let chirp app handle health checks
     )
