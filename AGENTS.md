@@ -70,6 +70,7 @@ Do not open `.stewards/PROTOCOL.md` or `.stewards/manifest.toml` unless the task
 | server | `src/chirp/server/AGENTS.md` | 2 | 50% |
 | settings | `src/chirp/settings/AGENTS.md` | 1 | 100% |
 | site | `site/AGENTS.md` | 1 | 100% |
+| skill | `src/chirp/skill/AGENTS.md` | 1 | 100% |
 | templating | `src/chirp/templating/AGENTS.md` | 2 | 50% |
 | testing | `src/chirp/testing/AGENTS.md` | 1 | 100% |
 | tests | `tests/AGENTS.md` | 1 | 100% |

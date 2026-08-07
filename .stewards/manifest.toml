@@ -151,6 +151,10 @@ location = "tests/test_testing_helpers.py"
 invoke = "uv run pytest tests/test_tools -q"
 location = "tests/test_tools/test_schema.py"
 
+[check.skill-suite]
+invoke = "uv run pytest tests/test_skill -q"
+location = "tests/test_skill/test_envelope.py"
+
 [check.validation-suite]
 invoke = "uv run pytest tests/test_validation.py tests/test_forms.py tests/contracts/test_forms.py -q"
 location = "tests/test_validation.py"
@@ -474,6 +478,24 @@ owns.code = ["src/chirp/tools/"]
 owns.tests = ["tests/test_tools/"]
 owns.docs = ["README.md"]
 edges = [{ to = "app", type = "freezes-with", what = "tool registry" }, { to = "server", type = "handled-by", what = "MCP transport" }]
+
+[[steward]]
+id = "skill"
+path = "src/chirp/skill/AGENTS.md"
+point_of_view = "Keep signed skill envelopes verifiable, provisional, and negotiated as typed return values without a parallel JSON API layer."
+guardrails = [
+  "Envelope remains a frozen slotted return type with structural negotiate dispatch.",
+  "Ed25519 signatures cover all metadata; tampering fails closed.",
+  "chirp.skill stays a provisional submodule API (not re-exported from top-level chirp).",
+]
+owns.code = ["src/chirp/skill/"]
+owns.tests = ["tests/test_skill/"]
+owns.docs = ["docs/public-api.md"]
+edges = [
+  { to = "server", type = "negotiated-by", what = "Envelope return wire JSON" },
+  { to = "public", type = "documented-as", what = "provisional submodule API" },
+  { to = "tools", type = "feeds", what = "later skill.tool MCP surface" },
+]
 
 [[steward]]
 id = "tests"
@@ -891,6 +913,14 @@ statement = "Tool schemas, registry freeze, events, handler, client, and approva
 severity = "P1"
 verification = "machine"
 enforced_by = "tools-suite"
+
+[[invariant]]
+id = "skill-envelope"
+steward = "skill"
+statement = "Signed Envelope round-trips through negotiate and rejects tampered payloads."
+severity = "P0"
+verification = "machine"
+enforced_by = "skill-suite"
 
 [[invariant]]
 id = "tests-full-suite"
