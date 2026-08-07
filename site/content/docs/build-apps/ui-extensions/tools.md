@@ -76,11 +76,32 @@ The schema is built at freeze time from each parameter's annotation:
 ## The MCP endpoint
 
 When at least one tool is registered, Chirp mounts a JSON-RPC endpoint at `/mcp`.
-It speaks MCP protocol version `2026-07-28` (stateless core) with the `tools`
-capability. There is no handshake or session: each request is independent and
-carries protocol version, client identity, and capabilities in
-`params._meta`. Optional `server/discover` advertises supported versions;
-legacy `initialize` / `notifications/initialized` are accepted as no-ops.
+It speaks MCP protocol version `2026-07-28` (stateless Streamable HTTP core)
+with the `tools` capability.
+
+**Stateless transport.** There is no handshake or server-side session. Each
+`POST` is independent: protocol version, client identity, and capabilities ride
+in per-request `params._meta` (reserved keys under
+`io.modelcontextprotocol/…`). Optional `server/discover` advertises supported
+versions. Legacy `initialize` / `notifications/initialized` remain
+accept-and-noop for older clients — they do not create session state.
+
+**Streamable HTTP routing headers (SEP-2243).** Modern clients that advertise
+protocol `2026-07-28` must also send routing headers that agree with the
+JSON-RPC body:
+
+| Header | Required when | Must match |
+|--------|---------------|------------|
+| `MCP-Protocol-Version` | Modern path (see below) | `params._meta` protocol version |
+| `Mcp-Method` | Modern path | JSON-RPC `method` |
+| `Mcp-Name` | `tools/call` (also `resources/read`, `prompts/get`) | `params.name` (or `params.uri`) |
+
+Enforcement is gated: if **neither** the `MCP-Protocol-Version` header **nor**
+`params._meta` protocol version is present, Chirp stays on the legacy path and
+does not require these headers. Once either advertises a modern version, missing
+or mismatched headers return **HTTP 400** with JSON-RPC error
+`HeaderMismatch` (`-32020`). `Mcp-Name` may use a Base64 sentinel form
+`=?base64?<data>?=` when the name is not header-safe.
 
 ::::{steps}
 :::{step} Discover (optional)
@@ -89,6 +110,8 @@ Ask the server for supported versions and capabilities.
 ```bash
 curl -X POST http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
+  -H 'MCP-Protocol-Version: 2026-07-28' \
+  -H 'Mcp-Method: server/discover' \
   -d '{"jsonrpc":"2.0","method":"server/discover","id":1,"params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"curl","version":"1.0"},"io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 :::{/step}
@@ -98,15 +121,20 @@ Fetch the registered tools and their input schemas. No prior call required.
 ```bash
 curl -X POST http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
+  -H 'MCP-Protocol-Version: 2026-07-28' \
+  -H 'Mcp-Method: tools/list' \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":2,"params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 :::{/step}
 :::{step} Call a tool
-Dispatch a tool by name with arguments.
+Dispatch a tool by name with arguments. Include `Mcp-Name` for `tools/call`.
 
 ```bash
 curl -X POST http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
+  -H 'MCP-Protocol-Version: 2026-07-28' \
+  -H 'Mcp-Method: tools/call' \
+  -H 'Mcp-Name: add_note' \
   -d '{"jsonrpc":"2.0","method":"tools/call","id":3,"params":{"name":"add_note","arguments":{"text":"Hello"},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
 ```
 :::{/step}
