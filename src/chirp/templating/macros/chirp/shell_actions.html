@@ -1,9 +1,11 @@
-{#- Chirp shell actions fragment
+{#- Chirp shell actions fragment (UI-neutral)
 
-   Renders the resolved route-scoped shell actions for OOB delivery into the
-   persistent shell target.
+   Renders resolved route-scoped shell actions for OOB delivery into the
+   persistent shell target. Uses semantic HTML and data-* hooks only — no
+   component class names or theme. Applications style via CSS or override the
+   renderer with app.set_shell_actions_renderer(...).
 -#}
-{% from "chirpui/shell_actions.html" import shell_actions_bar %}
+{% from "chirp/macros/shell_actions.html" import shell_actions_bar %}
 
 {% fragment content %}
 {{ shell_actions_bar(shell_actions) }}

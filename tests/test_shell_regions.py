@@ -2,7 +2,9 @@
 
 from chirp.shell_actions import SHELL_ACTIONS_TARGET as FROM_ACTIONS
 from chirp.shell_regions import (
+    ANNOUNCEMENTS_ELEMENT_ID,
     DOCUMENT_TITLE_ELEMENT_ID,
+    FOCUS_FALLBACK_DEFAULT,
     SHELL_ACTIONS_TARGET,
     SHELL_ELEMENT_IDS,
 )
@@ -17,6 +19,8 @@ def test_document_title_id() -> None:
 
 
 def test_shell_element_ids_frozen() -> None:
-    assert len(SHELL_ELEMENT_IDS) == 2
+    assert len(SHELL_ELEMENT_IDS) == 3
     assert DOCUMENT_TITLE_ELEMENT_ID in SHELL_ELEMENT_IDS
     assert SHELL_ACTIONS_TARGET in SHELL_ELEMENT_IDS
+    assert ANNOUNCEMENTS_ELEMENT_ID in SHELL_ELEMENT_IDS
+    assert FOCUS_FALLBACK_DEFAULT == "#main"
