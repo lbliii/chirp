@@ -227,6 +227,31 @@ For the framework-wide model see
 [[docs/about/thread-safety|the free-threading thread-safety model]].
 :::{/dropdown}
 
+## Skill tools with machine scopes
+
+Provisional ``chirp.skill`` mounts signed tool handlers onto the same MCP
+registry. Gate a skill tool on machine-token scopes with
+``@skill.tool(..., scopes=(...))`` — Chirp calls ``enforce_auth(AuthSpec(scopes=...))``
+before the body. Declare each scope with ``app.register_scope`` so the
+``auth_spec`` contract can validate names at startup:
+
+```python
+from chirp.skill import Skill, use_skill
+
+skill = Skill("hooks", version="1.0.0", private_key=private, key_id="hooks-1")
+
+@skill.tool("dispatch", scopes=("webhook:write",))
+def dispatch(payload: dict) -> dict:
+    return payload
+
+use_skill(app, skill)
+app.register_scope("webhook:write")
+```
+
+A caller missing the scope gets a 403 from ``enforce_auth``; the skill wrapper
+maps that to ``ToolAuthError`` and MCP ``tools/call`` returns a JSON-RPC error
+(``-32603``, message ``Forbidden``) while emitting ``authz.scope.denied``.
+
 ## Milo MCP Apps registration preview
 
 `chirp.ext.milo` is a provisional, setup-only bridge for applications that
