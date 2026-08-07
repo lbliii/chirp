@@ -1,0 +1,209 @@
+{
+  "issue": 923,
+  "parent": 900,
+  "saga": 896,
+  "profile": "fast",
+  "purpose": "Representative local/CI test-duration baseline before execution strategy changes. Measurement only.",
+  "environment": {
+    "recorded_at": "2026-08-05T14:13:22.242650+00:00",
+    "git_revision": "81f0b51aa3133ddcd4584a69d05e6a3a07626786",
+    "cwd": "/Users/llane/Documents/github/python/b-stack/chirp/ovrtx/issue-923-test-baselines",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "processor": "arm",
+    "python_version": "3.14.2 free-threading build (main, Dec 17 2025, 21:08:58) [Clang 21.1.4 ]",
+    "python_implementation": "CPython",
+    "executable": "/Users/llane/Documents/github/python/b-stack/chirp/ovrtx/issue-923-test-baselines/.venv/bin/python3",
+    "gil_enabled": false,
+    "cpu_count": 11,
+    "env_flags": {}
+  },
+  "commands": [
+    {
+      "name": "preflight#1",
+      "argv": [
+        "uv",
+        "run",
+        "poe",
+        "preflight"
+      ],
+      "wall_s": 3.612,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "Poe => ruff check .\nPoe => ruff format . --check\nPoe => ty check src/chirp/\nPoe => pytest tests/test_lazy_imports.py tests/test_public_api_docs.py -q\n",
+      "parsed": {}
+    },
+    {
+      "name": "preflight#2",
+      "argv": [
+        "uv",
+        "run",
+        "poe",
+        "preflight"
+      ],
+      "wall_s": 3.19,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "Poe => ruff check .\nPoe => ruff format . --check\nPoe => ty check src/chirp/\nPoe => pytest tests/test_lazy_imports.py tests/test_public_api_docs.py -q\n",
+      "parsed": {}
+    },
+    {
+      "name": "preflight#3",
+      "argv": [
+        "uv",
+        "run",
+        "poe",
+        "preflight"
+      ],
+      "wall_s": 2.701,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "Poe => ruff check .\nPoe => ruff format . --check\nPoe => ty check src/chirp/\nPoe => pytest tests/test_lazy_imports.py tests/test_public_api_docs.py -q\n",
+      "parsed": {}
+    },
+    {
+      "name": "invariants#1",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "tests/test_lazy_imports.py",
+        "tests/test_public_api_docs.py",
+        "-q",
+        "--timeout=60",
+        "-ra"
+      ],
+      "wall_s": 2.114,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "",
+      "parsed": {}
+    },
+    {
+      "name": "invariants#2",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "tests/test_lazy_imports.py",
+        "tests/test_public_api_docs.py",
+        "-q",
+        "--timeout=60",
+        "-ra"
+      ],
+      "wall_s": 1.99,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "",
+      "parsed": {}
+    },
+    {
+      "name": "invariants#3",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "tests/test_lazy_imports.py",
+        "tests/test_public_api_docs.py",
+        "-q",
+        "--timeout=60",
+        "-ra"
+      ],
+      "wall_s": 2.065,
+      "returncode": 0,
+      "stdout_tail": "",
+      "stderr_tail": "",
+      "parsed": {}
+    },
+    {
+      "name": "contracts_durations",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "tests/contracts",
+        "-q",
+        "--timeout=60",
+        "--durations=25",
+        "--maxfail=5"
+      ],
+      "wall_s": 61.388,
+      "returncode": 1,
+      "stdout_tail": "FAILED tests/contracts/test_surface_diff_tool.py::test_chirp_surface_diff_tool_returns_json_payload",
+      "stderr_tail": "",
+      "parsed": {
+        "skipped_reported": 3
+      },
+      "slowest_durations": [
+        "============================= slowest 25 durations =============================",
+        "1.32s call     tests/contracts/test_chirpui_alpine_runtime_rule.py::TestChirpUIAlpineRuntimeContract::test_wired_app_passes_probe",
+        "1.20s call     tests/contracts/test_cache_middleware_e2e.py::TestTTLExpiry::test_handler_reruns_after_ttl_expires",
+        "0.86s call     tests/contracts/test_contract_diff.py::test_forum_shell_baseline_roundtrip",
+        "0.83s call     tests/contracts/test_query_contracts.py::test_query_is_not_executed_by_checks_freeze_speculation_or_autodoc",
+        "0.78s call     tests/contracts/test_query_contracts.py::test_literal_query_client_names_missing_route",
+        "0.74s call     tests/contracts/test_surface_diff_tool.py::test_chirp_surface_diff_tool_returns_json_payload",
+        "0.70s call     tests/contracts/test_shell_outlet_boosted_navigation.py::test_chirpui_app_shell_extends_infers_main_outlet_for_boosted_navigation",
+        "0.70s call     tests/contracts/test_chirpui_alpine_runtime_rule.py::TestChirpUIAlpineRuntimeContract::test_no_interactive_pages_skips_probe",
+        "0.63s call     tests/contracts/test_signal_backplane.py::test_safe_worker_and_redis_and_no_signal_shapes_are_clean",
+        "0.56s call     tests/contracts/test_password_extra.py::test_deploy_posture_escalates_password_extra",
+        "0.54s call     tests/contracts/test_custom_checks_integration.py::TestChirpUIContractCheck::test_use_chirp_ui_reports_manifest_stats",
+        "0.54s call     tests/contracts/test_query_contracts.py::test_literal_query_clients_match_route_and_media_type[htmx.ajax(\"QUERY\", \"/search\", {\\n            headers: {\"Content-Type\": \"application/json\"},\\n            target: \"#results\"\\n        });]",
+        "0.48s call     tests/contracts/test_page_shell.py::TestPageShellContractValidation::test_checker_accepts_page_shell_templates_with_required_blocks",
+        "0.47s call     tests/contracts/test_custom_checks_integration.py::TestMountedPagesWithCustomCheck::test_custom_check_with_extras_and_mounted_pages",
+        "0.47s call     tests/contracts/test_deploy_preflight.py::test_deploy_posture_escalates_debug_without_mutating_app",
+        "0.44s call     tests/contracts/test_query_contracts.py::test_literal_query_clients_match_route_and_media_type[fetch(\"/search\", {\\n            method: \"QUERY\",\\n            headers: {\"Content-Type\": \"application/json\"},\\n            body: \"{}\"\\n        });]",
+        "0.42s call     tests/contracts/test_cookie_secure.py::test_deploy_posture_escalates_hsts",
+        "0.40s call     tests/contracts/test_query_contracts.py::test_literal_query_client_names_get_query_mismatch",
+        "0.39s call     tests/contracts/test_page_shell.py::TestPageShellContractValidation::test_checker_reports_missing_required_page_shell_blocks",
+        "0.38s call     tests/contracts/test_custom_checks_integration.py::TestChirpUIContractCheck::test_valid_import_no_issues",
+        "0.36s call     tests/contracts/test_passkeys_rule.py::test_cookie_bloat_escalates_under_deploy",
+        "0.35s call     tests/contracts/test_rule_wiring.py::test_islands_strict_fires_for_missing_mount_id",
+        "0.33s call     tests/contracts/test_cookie_secure.py::test_deploy_posture_clean_for_auto_default_frozen_in_dev",
+        "0.33s call     tests/contracts/test_query_contracts.py::test_non_executable_query_examples_are_not_clients[<script src=\"client.js\">fetch(\"/missing\", {method: \"QUERY\"})</script>]",
+        "0.33s call     tests/contracts/test_hypermedia.py::TestCheckHypermediaSurface::test_no_accessibility_warnings_when_all_interactive"
+      ]
+    }
+  ],
+  "variance": {
+    "preflight": {
+      "n": 3,
+      "min_s": 2.701,
+      "median_s": 3.19,
+      "max_s": 3.612,
+      "stdev_s": 0.45591044442229367,
+      "samples_s": [
+        3.612,
+        3.19,
+        2.701
+      ]
+    },
+    "invariants": {
+      "n": 3,
+      "min_s": 1.99,
+      "median_s": 2.065,
+      "max_s": 2.114,
+      "stdev_s": 0.062452648729524086,
+      "samples_s": [
+        2.114,
+        1.99,
+        2.065
+      ]
+    }
+  },
+  "notes": [
+    "Do not treat service-dominated CI jobs as interchangeable with the main free-threaded pytest job when setting budgets (#919).",
+    "Acceptance #923: n/a \u2014 measurement receipt; no behavioral test."
+  ],
+  "ci_methodology": {
+    "workflow": ".github/workflows/ci.yml",
+    "source": "GitHub Actions job startedAt/completedAt via gh run view",
+    "main_test_command": "pytest -q --tb=short --timeout=60 -m not slow --ignore=examples/chirpui/lucky_cat/test_browser_smoke.py -n 4 --dist loadgroup --cov --cov-report=term",
+    "critical_path_job": "test",
+    "service_dominated_jobs": [
+      "test-postgres (matrix)",
+      "data-pg-gil-gate",
+      "browser-smoke (Playwright install + Chromium)",
+      "query-interop (nginx + optional protocol clients)"
+    ]
+  }
+}
