@@ -119,6 +119,10 @@ class TestMcpApprovalRequired:
         class _Req:
             method = "POST"
 
+            @property
+            def headers(self) -> dict[str, str]:
+                return {}
+
             async def body(self) -> bytes:
                 payload = {
                     "jsonrpc": "2.0",

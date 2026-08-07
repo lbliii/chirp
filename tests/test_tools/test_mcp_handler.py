@@ -1,5 +1,6 @@
 """Tests for chirp.tools.handler — MCP JSON-RPC protocol handler."""
 
+import base64
 import json
 
 import pytest
@@ -33,11 +34,28 @@ def _stateless_meta(
     }
 
 
+def _routing_headers(
+    *,
+    method: str,
+    name: str | None = None,
+    protocol_version: str = "2026-07-28",
+) -> dict[str, str]:
+    """Build SEP-2243 Streamable HTTP routing headers."""
+    headers = {
+        "MCP-Protocol-Version": protocol_version,
+        "Mcp-Method": method,
+    }
+    if name is not None:
+        headers["Mcp-Name"] = name
+    return headers
+
+
 def _make_request(
     *,
     method: str = "POST",
     path: str = "/mcp",
     body: dict | bytes | None = None,
+    headers: dict[str, str] | None = None,
 ) -> Request:
     """Build a chirp Request for MCP handler tests."""
     if isinstance(body, dict):
@@ -56,12 +74,19 @@ def _make_request(
             return {"type": "http.request", "body": raw_body, "more_body": False}
         return {"type": "http.disconnect"}
 
+    asgi_headers: list[tuple[bytes, bytes]] = [
+        (b"content-type", b"application/json"),
+    ]
+    if headers:
+        for key, value in headers.items():
+            asgi_headers.append((key.lower().encode("latin-1"), value.encode("latin-1")))
+
     return Request.from_asgi(
         {
             "type": "http",
             "method": method,
             "path": path,
-            "headers": [(b"content-type", b"application/json")],
+            "headers": asgi_headers,
             "query_string": b"",
         },
         receive,
@@ -132,7 +157,8 @@ class TestMCPHandler:
                     "arguments": {"name": "World"},
                     "_meta": _stateless_meta(client_name="agent"),
                 },
-            }
+            },
+            headers=_routing_headers(method="tools/call", name="greet"),
         )
         response = await handle_mcp_request(request, registry)
         status, body = _parse_response(response)
@@ -190,7 +216,8 @@ class TestMCPHandler:
                     "arguments": {"name": "Stateless"},
                     "_meta": _stateless_meta(),
                 },
-            }
+            },
+            headers=_routing_headers(method="tools/call", name="greet"),
         )
         call_resp = await handle_mcp_request(call_req, registry)
         call_status, call_body = _parse_response(call_resp)
@@ -226,6 +253,7 @@ class TestMCPHandler:
                 "id": "discover-1",
                 "params": {"_meta": _stateless_meta()},
             },
+            headers=_routing_headers(method="server/discover"),
         )
         response = await handle_mcp_request(request, registry)
         status, body = _parse_response(response)
@@ -252,6 +280,122 @@ class TestMCPHandler:
         assert status == 200
         assert body["error"]["code"] == -32602
         assert "_meta" in body["error"]["message"]
+
+    @pytest.mark.issue(966)
+    @pytest.mark.asyncio
+    async def test_routing_headers_agree_with_body(self) -> None:
+        """Matching SEP-2243 routing headers pass through to tools/call."""
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "id": 42,
+                "params": {
+                    "name": "greet",
+                    "arguments": {"name": "Headers"},
+                    "_meta": _stateless_meta(),
+                },
+            },
+            headers=_routing_headers(method="tools/call", name="greet"),
+        )
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
+        assert status == 200
+        assert body["result"]["content"][0]["text"] == "Hello, Headers!"
+
+    @pytest.mark.issue(966)
+    @pytest.mark.asyncio
+    async def test_missing_required_routing_header_errors(self) -> None:
+        """Modern requests missing a required routing header get HeaderMismatch."""
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "id": 43,
+                "params": {"_meta": _stateless_meta()},
+            },
+            # Protocol version present → modern path; Mcp-Method omitted.
+            headers={"MCP-Protocol-Version": "2026-07-28"},
+        )
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
+        assert status == 400
+        assert body["id"] == 43
+        assert body["error"]["code"] == -32020
+        assert "Mcp-Method" in body["error"]["message"]
+
+    @pytest.mark.issue(966)
+    @pytest.mark.asyncio
+    async def test_routing_header_method_mismatch_errors(self) -> None:
+        """Mcp-Method that disagrees with the JSON-RPC body is HeaderMismatch."""
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/list",
+                "id": 44,
+                "params": {"_meta": _stateless_meta()},
+            },
+            headers=_routing_headers(method="tools/call"),
+        )
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
+        assert status == 400
+        assert body["id"] == 44
+        assert body["error"]["code"] == -32020
+        assert "Mcp-Method" in body["error"]["message"]
+        assert "tools/call" in body["error"]["message"]
+        assert "tools/list" in body["error"]["message"]
+
+    @pytest.mark.issue(966)
+    @pytest.mark.asyncio
+    async def test_routing_header_name_mismatch_errors(self) -> None:
+        """Mcp-Name that disagrees with params.name is HeaderMismatch."""
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "id": 45,
+                "params": {
+                    "name": "greet",
+                    "arguments": {"name": "X"},
+                    "_meta": _stateless_meta(),
+                },
+            },
+            headers=_routing_headers(method="tools/call", name="search"),
+        )
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
+        assert status == 400
+        assert body["error"]["code"] == -32020
+        assert "Mcp-Name" in body["error"]["message"]
+
+    @pytest.mark.issue(966)
+    @pytest.mark.asyncio
+    async def test_routing_header_name_base64_decoded(self) -> None:
+        """Base64-sentinel Mcp-Name values are decoded before comparison."""
+        registry = self._make_registry()
+        encoded = f"=?base64?{base64.b64encode(b'greet').decode('ascii')}?="
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "id": 46,
+                "params": {
+                    "name": "greet",
+                    "arguments": {"name": "B64"},
+                    "_meta": _stateless_meta(),
+                },
+            },
+            headers=_routing_headers(method="tools/call", name=encoded),
+        )
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
+        assert status == 200
+        assert body["result"]["content"][0]["text"] == "Hello, B64!"
 
     @pytest.mark.asyncio
     async def test_tools_list(self) -> None:
