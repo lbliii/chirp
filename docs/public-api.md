@@ -160,7 +160,7 @@ Their qualified import paths are supported provisionally:
 | Module | Names | Boundary |
 |------|-------|----------|
 | `chirp.ext.milo` | `MiloContext`, `MiloContextProvider`, `MiloMCPAppAdapter`, `MiloMCPAppBinding`, `use_milo` | Setup-only verification of exact Milo command allowlists, MCP App tool/resource links, and immutable Chirp template/block bindings. Resource rendering remains pending in #578. |
-| `chirp.skill` | `Envelope`, `sign_envelope`, `verify_envelope` | Signed skill-tool result envelope with Ed25519 sign/verify; `negotiate()` emits the wire JSON. Mounting (`use_skill` / `skill.tool`) and packaging are tracked separately. |
+| `chirp.skill` | `Envelope`, `sign_envelope`, `verify_envelope`, `Skill`, `use_skill`, `Manifest`, `assemble_manifest` | Signed skill-tool results with Ed25519 sign/verify; `negotiate()` emits the wire JSON. Tool handlers are wrapped on mount onto the app MCP registry; the identity record covers name, semver, tools, public key, provider-key names, and content digest. Scope gating and freeze-time digest finalization are tracked separately. |
 
 Milo 0.4.1 is already a bounded direct Chirp dependency; this adapter does not
 add an optional extra. Importing `chirp` or `chirp.ext` does not load the
