@@ -1,0 +1,48 @@
+{# Skill console registry browse.
+   Blocks: skill_list #}
+{% include "chirp_skill/_console_styles.html" %}
+
+{% block skill_list %}
+<div id="skill_list" class="chirp-skill-console">
+  <h1>Skill console</h1>
+  <p class="lede">
+    Browse skills mounted on this host. Open a skill for its manifest,
+    contract status, and smoke reliability score.
+  </p>
+
+  {% if skills %}
+  <table>
+    <thead>
+      <tr>
+        <th>Skill</th>
+        <th>Version</th>
+        <th>Tools</th>
+        <th>Reliability</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for skill in skills %}
+      <tr>
+        <td>
+          <a href="{{ skill.href }}"
+             hx-get="{{ skill.href }}"
+             hx-target="#skill_list"
+             hx-swap="outerHTML"
+             hx-push-url="true">{{ skill.name }}</a>
+        </td>
+        <td class="meta">{{ skill.version }}</td>
+        <td class="meta">{{ skill.tools | join(", ") }}</td>
+        <td>
+          <span class="badge badge-{{ skill.reliability.status }}">
+            {{ skill.reliability.label }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No skills registered.</p>
+  {% endif %}
+</div>
+{% endblock %}

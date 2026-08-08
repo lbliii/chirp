@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -111,6 +111,22 @@ class EnvKeystore:
             {"keys": [{"name": "OPENWEATHER_API_KEY", "present": true}, ...]}
         """
         return {"keys": [entry.to_dict() for entry in self.status(names)]}
+
+    def as_key_status_fn(self) -> Callable[[str, tuple[str, ...]], Mapping[str, bool | None]]:
+        """Adapter for :func:`~chirp.skill.console.mount_console` ``key_status``.
+
+        Returns a callable ``(skill_name, provider_key_names) -> {name: present}``
+        that reports presence only — never secret values. ``skill_name`` is
+        accepted for signature compatibility and ignored (env keys are global).
+        """
+
+        def _key_status(
+            _skill_name: str,
+            provider_key_names: tuple[str, ...],
+        ) -> dict[str, bool | None]:
+            return {name: self.present(name) for name in provider_key_names}
+
+        return _key_status
 
 
 def assert_no_secret_leak(document: Any, *, secrets: Iterable[str]) -> None:

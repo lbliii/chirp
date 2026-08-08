@@ -214,6 +214,14 @@ class TestEnvKeystoreIssue984:
 
         asyncio.run(_probe())
 
+    def test_as_key_status_fn_for_console_hook(self) -> None:
+        store = EnvKeystore({"OPENWEATHER_API_KEY": _SECRET})
+        fn = store.as_key_status_fn()
+        result = fn("weather", ("OPENWEATHER_API_KEY", "MISSING_KEY"))
+        assert result == {"OPENWEATHER_API_KEY": True, "MISSING_KEY": False}
+        assert _SECRET not in repr(result)
+        assert _SECRET not in str(result)
+
     def test_register_key_status_tool_standalone(self) -> None:
         app = App()
 

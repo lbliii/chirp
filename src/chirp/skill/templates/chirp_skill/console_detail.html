@@ -1,0 +1,135 @@
+{# Skill console detail — manifest, contract, reliability, key hooks.
+   Blocks: skill_detail, skill_keys, skill_live_log #}
+{% include "chirp_skill/_console_styles.html" %}
+
+{% block skill_detail %}
+<div id="skill_detail" class="chirp-skill-console">
+  <p class="crumb">
+    <a href="{{ list_href }}"
+       hx-get="{{ list_href }}"
+       hx-target="#skill_detail"
+       hx-swap="outerHTML"
+       hx-push-url="true">← Skills</a>
+  </p>
+
+  <h1>{{ skill_name }}</h1>
+  <p class="lede">
+    Manifest, contract, and reliability for this mounted skill.
+  </p>
+
+  <section aria-labelledby="manifest-heading">
+    <h2 id="manifest-heading">Manifest</h2>
+    <div class="panel">
+      <dl>
+        <dt>Name</dt>
+        <dd>{{ manifest.name }}</dd>
+        <dt>Version</dt>
+        <dd>{{ manifest.version }}</dd>
+        <dt>Tools</dt>
+        <dd>{{ manifest.tools | join(", ") or "(none)" }}</dd>
+        <dt>Content digest</dt>
+        <dd>{{ manifest.content_digest or "(pending freeze)" }}</dd>
+        <dt>Public key</dt>
+        <dd>{{ manifest.public_key or "(missing)" }}</dd>
+        <dt>Provider keys</dt>
+        <dd>{{ manifest.provider_keys | join(", ") or "(none)" }}</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section aria-labelledby="contract-heading">
+    <h2 id="contract-heading">Contract</h2>
+    <div class="panel">
+      <p>
+        <span class="badge badge-{{ 'pass' if contract.ok else 'fail' }}">
+          {{ "ok" if contract.ok else "issues" }}
+        </span>
+        <span class="meta">
+          signing={{ "yes" if contract.has_signing_key else "no" }},
+          public_key={{ "yes" if contract.public_key_present else "no" }},
+          digest={{ "yes" if contract.content_digest_present else "no" }},
+          tools={{ contract.tool_count }}
+        </span>
+      </p>
+      {% if contract.issues %}
+      <ul class="issues">
+        {% for issue in contract.issues %}
+        <li>{{ issue }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+  </section>
+
+  <section aria-labelledby="reliability-heading">
+    <h2 id="reliability-heading">Reliability</h2>
+    <div class="panel">
+      <span class="badge badge-{{ reliability.status }}">
+        {{ reliability.label }}
+      </span>
+      {% if reliability.total %}
+      <span class="meta">
+        {{ reliability.passed }} of {{ reliability.total }} smoke prompts faithful
+      </span>
+      {% else %}
+      <p class="empty">No smoke score recorded for this skill yet.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  {% block skill_keys %}
+  <section id="skill_keys" aria-labelledby="keys-heading"
+           data-chirp-skill-console="keys">
+    <h2 id="keys-heading">Keys</h2>
+    <div class="panel">
+      {% if keys %}
+      <table>
+        <thead>
+          <tr>
+            <th>Provider key</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in keys %}
+          <tr>
+            <td class="meta">{{ row.name }}</td>
+            <td>
+              <span class="badge badge-{{ row.badge_class }}">
+                {{ row.label }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if not keystore_wired %}
+      <p class="empty">
+        Keystore not wired — presence is unknown until the env-var keystore
+        (#984) is mounted.
+      </p>
+      {% endif %}
+      {% else %}
+      <p class="empty">This skill declares no provider keys.</p>
+      {% endif %}
+    </div>
+  </section>
+  {% endblock %}
+
+  {% block skill_live_log %}
+  <section id="skill_console_live_log"
+           aria-labelledby="live-log-heading"
+           data-chirp-skill-console="live-log"
+           hx-disinherit="hx-target hx-swap">
+    <h2 id="live-log-heading">Live log</h2>
+    <div class="live-log-hook">
+      {% if live_log_ready %}
+      Streaming invocations…
+      {% else %}
+      Invocation stream hook — wire ToolEventBus → EventStream (#983).
+      {% endif %}
+    </div>
+  </section>
+  {% endblock %}
+</div>
+{% endblock %}

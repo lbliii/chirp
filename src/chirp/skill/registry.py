@@ -9,7 +9,8 @@ When an :class:`~chirp.skill.keystore.EnvKeystore` is passed to
 ``key-status`` tool is registered for the union of skill ``provider_keys``
 (presence only — secret values never enter the MCP response).
 
-Console UI and live invocation log live in sibling issues.
+Console UI lives in :mod:`chirp.skill.console` (``mount_console``); live
+invocation log is a sibling (#983).
 """
 
 from __future__ import annotations

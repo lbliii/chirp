@@ -1,0 +1,145 @@
+{# Shared styles for the skill console (browse + detail). #}
+<style>
+.chirp-skill-console {
+  --csc-fg: #1a1a1a;
+  --csc-muted: #5c5c5c;
+  --csc-border: #d4d4d4;
+  --csc-bg: #f7f7f5;
+  --csc-accent: #1f4e79;
+  --csc-ok: #1b5e20;
+  --csc-fail: #8b1a1a;
+  --csc-unknown: #6d5a00;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  color: var(--csc-fg);
+  line-height: 1.5;
+  background:
+    radial-gradient(1200px 400px at 10% -10%, #e8eef5 0%, transparent 55%),
+    var(--csc-bg);
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+.chirp-skill-console * { box-sizing: border-box; }
+.chirp-skill-console a {
+  color: var(--csc-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+.chirp-skill-console h1 {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+  letter-spacing: -0.02em;
+}
+.chirp-skill-console .lede {
+  color: var(--csc-muted);
+  margin: 0 0 1.5rem;
+  max-width: 40rem;
+}
+.chirp-skill-console .meta {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: var(--csc-muted);
+}
+.chirp-skill-console table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--csc-border);
+}
+.chirp-skill-console th,
+.chirp-skill-console td {
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--csc-border);
+  vertical-align: top;
+}
+.chirp-skill-console th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--csc-muted);
+  background: #f0f0ec;
+}
+.chirp-skill-console tr:last-child td { border-bottom: none; }
+.chirp-skill-console .badge {
+  display: inline-block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--csc-border);
+  background: #fff;
+}
+.chirp-skill-console .badge-pass {
+  color: var(--csc-ok);
+  border-color: #a5d6a7;
+  background: #e8f5e9;
+}
+.chirp-skill-console .badge-fail {
+  color: var(--csc-fail);
+  border-color: #ef9a9a;
+  background: #ffebee;
+}
+.chirp-skill-console .badge-unknown {
+  color: var(--csc-unknown);
+  border-color: #ffe082;
+  background: #fff8e1;
+}
+.chirp-skill-console section {
+  margin: 1.5rem 0;
+}
+.chirp-skill-console section h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+.chirp-skill-console .panel {
+  background: #fff;
+  border: 1px solid var(--csc-border);
+  padding: 0.85rem 1rem;
+}
+.chirp-skill-console .panel dl {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: 0.35rem 0.75rem;
+  margin: 0;
+}
+.chirp-skill-console .panel dt {
+  color: var(--csc-muted);
+  font-size: 0.85rem;
+}
+.chirp-skill-console .panel dd {
+  margin: 0;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+.chirp-skill-console .empty {
+  color: var(--csc-muted);
+  font-style: italic;
+}
+.chirp-skill-console .crumb {
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+.chirp-skill-console .issues {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--csc-fail);
+}
+.chirp-skill-console .live-log-hook {
+  min-height: 3rem;
+  border: 1px dashed var(--csc-border);
+  padding: 0.75rem 1rem;
+  color: var(--csc-muted);
+  background: #fafaf8;
+}
+@media (max-width: 640px) {
+  .chirp-skill-console .panel dl {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
