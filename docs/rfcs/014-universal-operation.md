@@ -1,6 +1,6 @@
 # RFC 014: Universal Operation Projections
 
-**Status:** Accepted — declarative WebMCP form preview and Milo MCP Apps registration boundary implemented; rendering and other projections pending
+**Status:** Accepted — declarative WebMCP form preview, Milo MCP Apps registration boundary, and named-block resource rendering implemented; sandbox/auth host profile and other projections pending
 **Issue:** [#339](https://github.com/lbliii/chirp/issues/339)
 **Parent epic:** [#568](https://github.com/lbliii/chirp/issues/568)
 **Saga:** [#566](https://github.com/lbliii/chirp/issues/566)
@@ -12,9 +12,10 @@ Apps without giving Chirp a REST serialization layer or giving Milo ownership
 of HTML rendering. The declarative WebMCP form slice is now implemented by
 issues #574–#576 through an explicit `FormContract` projection, structured
 startup checks, and a Chrome 149/server-security parity matrix. Issue #577 now
-ships the setup-only `chirp.ext.milo` binding verifier over Milo 0.4.1. It does
-not render MCP App resources: ordinary MCP projection and named-block resource
-rendering remain pending work owned by #578 and later slices.
+ships `chirp.ext.milo` over Milo 0.4.1 for allowlist verification plus
+`MiloMCPAppAdapter.render_resource()` named-block rendering through Chirp's
+existing `Fragment` / `App.render` surface. Read-only sandbox, CSP, and host
+auth semantics remain pending work owned by #579 and later slices.
 
 The external evidence used for this decision is pinned to:
 
@@ -252,10 +253,11 @@ freeze, and its captured read model remains application-owned and must be safe
 for concurrent access.
 
 No ambient Chirp `Request`, session, Milo context, or latest-operation-result
-cache is synthesized. Issue #578 owns provider invocation and named-block
-rendering through the existing render surface, including sync/async context,
-missing-block, empty-output, and host negotiation proof. Issue #577 does not
-call `CLI.ui_resource()`, Kida, or the render pipeline.
+cache is synthesized. Issue #578 adds `MiloMCPAppAdapter.render_resource()`:
+per-read provider invocation and named-block rendering through the existing
+render surface, with sync/async context, missing-block, empty-output, and host
+negotiation proof. Issue #577 remains registration-only and does not call
+`CLI.ui_resource()`, Kida, or the render pipeline.
 
 ## 6. Inputs, contexts, and server authority
 

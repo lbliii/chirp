@@ -1,20 +1,20 @@
-# Milo MCP Apps registration preview
+# Milo MCP Apps named-block resources
 
-This offline example demonstrates the registration-only `chirp.ext.milo`
-boundary from issue #577:
+This offline example demonstrates issue #578: Chirp renders an existing named
+Kida block as a Milo MCP App `ui://` resource through the same template used for
+browser and htmx surfaces.
 
 - the caller-owned Milo command receives matching `MCPAppToolMeta` when it is
   originally registered;
 - `use_milo()` receives an exact canonical dotted-ID allowlist;
 - `adapter.bind()` names one existing Chirp template, named block, and
-  parameterless application context provider; and
+  parameterless application context provider;
 - `app.freeze()` publishes immutable Chirp binding metadata without changing
-  the Milo CLI.
+  the Milo CLI; and
+- `@cli.ui_resource` delegates to `adapter.render_resource(...)`, which invokes
+  the context provider per read and renders `Fragment` via `App.render`.
 
 Milo 0.4.1 is already installed with Chirp; there is no additional extra.
-Issue #578 separately owns invoking the context provider and rendering the
-named block as an MCP App resource. The registered resource handler therefore
-fails explicitly if invoked instead of returning parallel or placeholder HTML.
 
 ## Run
 
@@ -22,7 +22,8 @@ fails explicitly if invoked instead of returning parallel or placeholder HTML.
 PYTHONPATH=src python examples/standalone/milo_mcp_apps/app.py
 ```
 
-Open <http://localhost:8000/> to view the ordinary Chirp page.
+Open <http://localhost:8000/> for the ordinary Chirp page and
+<http://localhost:8000/create-tool> for the shared named block.
 
 ## Test
 
