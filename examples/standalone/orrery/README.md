@@ -1,10 +1,32 @@
 # Orrery
 
-Railway dogfood host for **N wrapped skills** (issue #985 / epic #964). One
-Chirp process mounts `gaze`, `resolve`, and `star` via `mount_skills`, serves
-an aggregated `/mcp` + `/skills` discovery, and a hypermedia `/console`. The
-home page streams live invocations from `ToolEventBus` so an agent call shows
-up immediately.
+Railway dogfood host for **10 wrapped skills** (issue #985 / epic #964). One
+Chirp process mounts the astronomy demos (`gaze`, `resolve`, `star`) alongside
+seven signed, deterministic trust-workflow demos via `mount_skills`, serves an
+aggregated `/mcp` + `/skills` discovery, and a hypermedia `/console`. The home
+page streams live invocations from `ToolEventBus` so an agent call shows up
+immediately.
+
+## Trust-workflow skills
+
+The additional skills are intentionally offline-safe examples: they illustrate
+the input contract and signed receipt shape without performing network calls or
+making live production claims.
+
+| Tool | Illustrative input | Signed demo receipt |
+| --- | --- | --- |
+| `verify_mcp` | MCP endpoint | transport, protocol, compatibility status |
+| `release_readiness` | revision and declared CI state | ready/blocked decision and policy |
+| `production_receipt` | deployment name | health state and deployment digest |
+| `artifact_qa` | artifact name and required section count | quality checklist result |
+| `research_evidence` | research question | fixture evidence-set identifier |
+| `handoff_receipt` | change summary and owner | scoped operational handoff |
+| `reliability_status` | skill name | fixture smoke and reliability status |
+
+Every MCP result remains signed by its owning skill. In a production skill,
+these deterministic fields are the place to attach a live verifier, policy
+version, source bundle, or observed state—while retaining the same explicit
+tool contract and receipt provenance.
 
 ## Run
 
@@ -24,13 +46,13 @@ curl -s http://localhost:8000/mcp \
   -H 'mcp-method: tools/list' \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":1,"params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
 
-# Invoke look_at — watch `/` show the call
+# Invoke verify_mcp — watch `/` show the signed compatibility receipt
 curl -s http://localhost:8000/mcp \
   -H 'Content-Type: application/json' \
   -H 'mcp-protocol-version: 2026-07-28' \
   -H 'mcp-method: tools/call' \
-  -H 'mcp-name: look_at' \
-  -d '{"jsonrpc":"2.0","method":"tools/call","id":2,"params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}},"name":"look_at","arguments":{"target":"Vega"}}}'
+  -H 'mcp-name: verify_mcp' \
+  -d '{"jsonrpc":"2.0","method":"tools/call","id":2,"params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}},"name":"verify_mcp","arguments":{"endpoint":"https://orrery.example/mcp"}}}'
 ```
 
 Boot runs freeze + smoke against the dogfood corpus so `/console` shows

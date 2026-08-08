@@ -12,7 +12,7 @@ from chirp.skill.publish import run_publish_gate
 from chirp.testing import TestClient
 
 _META_PROTOCOL_VERSION = "io.modelcontextprotocol/protocolVersion"
-N_DOGFOOD_SKILLS = 3
+N_DOGFOOD_SKILLS = 10
 
 
 def _modern_mcp_params(**extra: Any) -> dict[str, Any]:
@@ -40,7 +40,7 @@ def _modern_mcp_headers(method: str, name: str | None = None) -> dict[str, str]:
 @pytest.mark.issue(985)
 class TestOrreryDogfoodIssue985:
     async def test_host_mounts_n_skills_and_surfaces(self, example_app) -> None:
-        assert N_DOGFOOD_SKILLS == 3
+        assert N_DOGFOOD_SKILLS == 10
         async with TestClient(example_app) as client:
             home = await client.get("/")
             assert home.status == 200
@@ -60,7 +60,18 @@ class TestOrreryDogfoodIssue985:
             assert discovery.status == 200
             body = json.loads(discovery.text)
             names = {entry["name"] for entry in body["skills"]}
-            assert names == {"gaze", "resolve", "star"}
+            assert names == {
+                "gaze",
+                "resolve",
+                "star",
+                "mcp-verify",
+                "release-readiness",
+                "production-receipt",
+                "artifact-qa",
+                "research-evidence",
+                "handoff-receipt",
+                "reliability-status",
+            }
 
             console = await client.get("/console")
             assert console.status == 200
@@ -69,6 +80,10 @@ class TestOrreryDogfoodIssue985:
             detail = await client.get("/console/gaze")
             assert detail.status == 200
             assert "look_at" in detail.text
+
+            trust_detail = await client.get("/console/mcp-verify")
+            assert trust_detail.status == 200
+            assert "verify_mcp" in trust_detail.text
 
     async def test_aggregated_mcp_lists_and_invokes_dogfood_tools(self, example_app) -> None:
         async with TestClient(example_app) as client:
@@ -84,7 +99,18 @@ class TestOrreryDogfoodIssue985:
             )
             assert listed.status == 200
             tool_names = {t["name"] for t in json.loads(listed.text)["result"]["tools"]}
-            assert tool_names == {"look_at", "resolve_name", "seal_label"}
+            assert tool_names == {
+                "look_at",
+                "resolve_name",
+                "seal_label",
+                "verify_mcp",
+                "release_readiness",
+                "production_receipt",
+                "artifact_qa",
+                "research_evidence",
+                "handoff_receipt",
+                "reliability_status",
+            }
 
             called = await client.post(
                 "/mcp",
@@ -104,6 +130,24 @@ class TestOrreryDogfoodIssue985:
             assert "Vega" in text
             assert "look_at" in text or "gaze" in text
 
+            verified = await client.post(
+                "/mcp",
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "id": 3,
+                    "params": _modern_mcp_params(
+                        name="verify_mcp",
+                        arguments={"endpoint": "https://orrery.example/mcp"},
+                    ),
+                },
+                headers=_modern_mcp_headers("tools/call", "verify_mcp"),
+            )
+            assert verified.status == 200
+            verified_text = json.loads(verified.text)["result"]["content"][0]["text"]
+            assert "https://orrery.example/mcp" in verified_text
+            assert "compatible-demo" in verified_text
+
     async def test_agent_invocation_streams_on_home_feed(self, example_app) -> None:
         async with TestClient(example_app) as client:
 
@@ -114,7 +158,7 @@ class TestOrreryDogfoodIssue985:
                     json={
                         "jsonrpc": "2.0",
                         "method": "tools/call",
-                        "id": 3,
+                        "id": 4,
                         "params": _modern_mcp_params(
                             name="seal_label",
                             arguments={"label": "Orion"},
