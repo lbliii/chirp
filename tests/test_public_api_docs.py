@@ -98,7 +98,7 @@ def test_milo_adapter_is_documented_as_a_provisional_submodule_api() -> None:
     assert "not re-exported from `chirp`" in section
 
 
-@pytest.mark.issue(969, 970, 974)
+@pytest.mark.issue(969, 970, 974, 973)
 def test_skill_envelope_is_documented_as_a_provisional_submodule_api() -> None:
     section = _section_body(_PUBLIC_API_DOC.read_text(), "Provisional Submodule APIs")
 
@@ -115,6 +115,22 @@ def test_skill_envelope_is_documented_as_a_provisional_submodule_api() -> None:
         assert section.count(f"`{name}`") == 1
     assert "`chirp.skill`" in section
     assert "not re-exported from `chirp`" in section
+    assert "chirp[skill]" in section
+    assert "cryptography" in section
+    assert "Importing `chirp` does not load `chirp.skill`" in section
+
+
+@pytest.mark.issue(973)
+def test_skill_extra_is_declared_in_pyproject() -> None:
+    """Peer cryptography for envelopes is an optional skill extra, not core."""
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    text = pyproject.read_text()
+    assert 'skill = ["cryptography>=42.0.0"]' in text
+    # Deliberately out of all/full (passkeys precedent — avoid Rust build by default).
+    all_block = text.split("all = [", 1)[1].split("]", 1)[0]
+    full_block = text.split("full = [", 1)[1].split("]", 1)[0]
+    assert "cryptography" not in all_block
+    assert "cryptography" not in full_block
 
 
 def test_configuration_guide_documents_every_app_config_field() -> None:

@@ -1,5 +1,8 @@
 """Tests for chirp.__init__ — lazy import registry covers all public names."""
 
+import subprocess
+import sys
+
 import pytest
 
 import chirp
@@ -154,3 +157,48 @@ def test_public_api_status_covers_all_exports() -> None:
     """Every public export has an explicit stability classification."""
     assert set(chirp._API_STATUS) == set(chirp.__all__)
     assert set(chirp._API_STATUS.values()) == {"debug", "provisional", "stable"}
+
+
+def _modules_after(import_stmt: str) -> set[str]:
+    code = f"import sys; {import_stmt}; print('\\n'.join(sorted(sys.modules)))"
+    out = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return set(out.stdout.split())
+
+
+@pytest.mark.issue(973)
+def test_import_chirp_does_not_import_skill() -> None:
+    """``import chirp`` must not eagerly load the provisional skill submodule."""
+    mods = _modules_after("import chirp")
+    assert "chirp.skill" not in mods
+    assert not any(name.startswith("chirp.skill.") for name in mods)
+
+
+@pytest.mark.issue(973)
+def test_import_skill_does_not_import_cryptography() -> None:
+    """``import chirp.skill`` stays light — cryptography loads on call paths."""
+    mods = _modules_after("import chirp.skill")
+    assert "cryptography" not in mods
+    assert not any(name.startswith("cryptography.") for name in mods)
+
+
+@pytest.mark.issue(973)
+def test_skill_names_are_not_top_level_exports() -> None:
+    """Envelope / use_skill stay submodule-only (milo provisional posture)."""
+    for name in (
+        "Envelope",
+        "sign_envelope",
+        "verify_envelope",
+        "Skill",
+        "use_skill",
+        "Manifest",
+        "assemble_manifest",
+        "compute_content_digest",
+    ):
+        assert name not in chirp.__all__
+        with pytest.raises(AttributeError):
+            getattr(chirp, name)

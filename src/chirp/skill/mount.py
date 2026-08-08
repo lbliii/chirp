@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 _CRYPTO_INSTALL_ERROR = (
     "chirp.skill signing requires the 'cryptography' package. "
-    "Install it (e.g. `pip install cryptography`) and retry."
+    "Install it with: pip install 'chirp[skill]'"
 )
 
 
