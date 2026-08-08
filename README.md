@@ -122,10 +122,11 @@ the route table; `chirp check <app> --coverage` shows contract coverage.
 
 The core package stays small. Add only the extras you use: `[forms]` for
 multipart parsing, `[sessions]`, `[auth]`, and `[passkeys]` for identity work,
-`[ai]` for LLM streaming, `[data-pg]` for PostgreSQL, `[testing]` for an
-`httpx` transport, `[redis]` for Redis-backed sessions and rate limiting, or
-`[markdown]` for Patitas and Rosettes. When chirp-ui is installed, `chirp check`
-also verifies that `chirpui-*` classes resolve to backing styles.
+`[skill]` for signed skill envelopes (`cryptography`), `[ai]` for LLM
+streaming, `[data-pg]` for PostgreSQL, `[testing]` for an `httpx` transport,
+`[redis]` for Redis-backed sessions and rate limiting, or `[markdown]` for
+Patitas and Rosettes. When chirp-ui is installed, `chirp check` also verifies
+that `chirpui-*` classes resolve to backing styles.
 
 ## Production and deployment
 

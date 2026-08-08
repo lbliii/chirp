@@ -153,7 +153,7 @@ def _public_key_bytes(public_key: Any) -> bytes:
     except ImportError as exc:
         raise ImportError(
             "Manifest public-key encoding requires the 'cryptography' package. "
-            "Install it (e.g. `pip install cryptography`) and retry."
+            "Install it with: pip install 'chirp[skill]'"
         ) from exc
     if isinstance(public_key, Ed25519PublicKey):
         return public_key.public_bytes_raw()

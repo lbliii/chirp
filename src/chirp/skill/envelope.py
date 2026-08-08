@@ -18,7 +18,7 @@ from typing import Any
 _ALG_ED25519 = "Ed25519"
 _CRYPTO_INSTALL_ERROR = (
     "Envelope Ed25519 sign/verify requires the 'cryptography' package. "
-    "Install it (e.g. `pip install cryptography`) and retry."
+    "Install it with: pip install 'chirp[skill]'"
 )
 
 

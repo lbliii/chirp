@@ -160,7 +160,7 @@ Their qualified import paths are supported provisionally:
 | Module | Names | Boundary |
 |------|-------|----------|
 | `chirp.ext.milo` | `MiloContext`, `MiloContextProvider`, `MiloMCPAppAdapter`, `MiloMCPAppBinding`, `use_milo` | Setup-only verification of exact Milo command allowlists, MCP App tool/resource links, and immutable Chirp template/block bindings. Resource rendering remains pending in #578. |
-| `chirp.skill` | `Envelope`, `sign_envelope`, `verify_envelope`, `Skill`, `use_skill`, `Manifest`, `assemble_manifest`, `compute_content_digest` | Signed skill-tool results with Ed25519 sign/verify; negotiate() emits the wire JSON. Tool handlers are wrapped on mount onto the app MCP registry. use_skill registers the skill as a freeze domain (milo register_domain precedent); at app.freeze() the immutable Manifest is finalized with a content_digest over tool schemas + template sources + public key. `@skill.tool(..., scopes=(...))` enforces AuthSpec(scopes=...) via enforce_auth (declare scopes with app.register_scope). |
+| `chirp.skill` | `Envelope`, `sign_envelope`, `verify_envelope`, `Skill`, `use_skill`, `Manifest`, `assemble_manifest`, `compute_content_digest` | Signed skill-tool results with Ed25519 sign/verify; negotiate() emits the wire JSON. Tool handlers are wrapped on mount onto the app MCP registry. use_skill registers the skill as a freeze domain (milo register_domain precedent); at app.freeze() the immutable Manifest is finalized with a content_digest over tool schemas + template sources + public key. `@skill.tool(..., scopes=(...))` enforces AuthSpec(scopes=...) via enforce_auth (declare scopes with app.register_scope). Peer dep: optional `chirp[skill]` (`cryptography`). |
 Milo 0.4.1 is already a bounded direct Chirp dependency; this adapter does not
 add an optional extra. Importing `chirp` or `chirp.ext` does not load the
 adapter-side Milo API. Callers attach `MCPAppToolMeta` when registering the
@@ -170,6 +170,12 @@ records at app freeze and publishes only copied, frozen binding metadata. It
 does not freeze or mutate the caller-owned Milo CLI, invoke the parameterless
 application context provider, manufacture request/session state, or render the
 named block in this slice.
+
+`chirp.skill` is the opposite packaging posture: Ed25519 signing needs the
+optional `skill` extra (`pip install 'chirp[skill]'`, which pulls
+`cryptography`). Importing `chirp` does not load `chirp.skill`, and importing
+`chirp.skill` does not load `cryptography` until sign/verify/mount call paths
+run. Nothing from this package is re-exported from top-level `chirp`.
 
 The Phase 1 durable-job proof is deliberately **internal**, not a provisional
 submodule API. `chirp.data._jobs` and its frozen records may be exercised by

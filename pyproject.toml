@@ -57,6 +57,11 @@ auth = ["argon2-cffi>=23.1.0"]
 # extra (transitive cryptography/Rust build) and is never a default path.
 passkeys = ["webauthn>=2.8,<3"]
 
+# Signed skill envelopes (Ed25519 via cryptography). Kept out of `all`/`full`
+# so core installs stay free of the cryptography/Rust build; import chirp and
+# import chirp.skill stay light until sign/verify/mount call paths run.
+skill = ["cryptography>=42.0.0"]
+
 # Test client transport
 testing = ["httpx>=0.27.0"]
 
