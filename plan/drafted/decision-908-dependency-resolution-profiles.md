@@ -55,26 +55,26 @@ this checkout. Both forms resolve the same declared extras/groups.
 
 | Profile ID | Purpose | Canonical install | Import smoke (proposed for #910) | CI lane today | Release expectation | Owner |
 | --- | --- | --- | --- | --- | --- | --- |
-| `minimal` | End-user core framework only | `uv add bengal-chirp` / `pip install bengal-chirp` | `import chirp; chirp.__version__` | **Gap** — no fresh-env job yet | Wheel installs with only declared core deps (`kida-templates`, `anyio`, `bengal-pounce`, `milo-cli`) | #910 / #911 |
-| `dev` | Ordinary contributor + default CI | `uv sync --group dev` | `import chirp, pytest, httpx, multipart, itsdangerous, patitas, chirp_ui` | `ci.yml` → `ruff`, `ty`, `test` | Default contributor path; lock/group must resolve clean | #910 / #911 / #916 |
-| `docs` | Bengal docs site build | `uv sync --group docs` | `import bengal, chirp_ui` | `pages.yml` → `build` | Docs deploy must resolve without yanked packages | #910 / #911 / #916 |
-| `browser` | Playwright browser smoke | `uv sync --group dev --group browser` | `import playwright` (+ Chromium install) | `ci.yml` → `browser-smoke` | Browser lane remains isolated; not part of minimal/dev default | #910 / #911 |
-| `benchmark` | Framework comparison suite | `uv sync --extra benchmark` | `import fastapi, flask, starlette, litestar, httpx` (and FastHTML stack when exercised) | `benchmarks.yml` (core/pelt jobs use `dev` / `dev+data-pg`; networked comparison uses this extra) | Advisory perf evidence; **must not** yank-warn on refresh once #911 gates it | #910 / #911 / #916 |
-| `full` | Aggregate “common optional stack” alias | `uv add "bengal-chirp[full]"` / `pip install "bengal-chirp[full]"` | Same as composing `forms`+`sessions`+`auth`+`testing`+`markdown` smokes | **Gap** — no dedicated job | Resolves exactly the packages listed under `full` in `pyproject.toml`; does **not** imply `ui`, `passkeys`, `config`, `redis`, `ai-bedrock`, or `benchmark` | #910 / #911 |
-| `all` | Documented synonym of `full` (identical contents today) | `uv add "bengal-chirp[all]"` | Same as `full` | **Gap** — treated as alias of `full` | Must remain content-identical to `full` until a separate issue deliberately diverges or deletes one alias | #910 / #911 |
-| `extra-forms` | Multipart form parsing | `uv add "bengal-chirp[forms]"` | `import multipart` | Covered transitively by `dev`; isolated fresh-env **gap** | Optional capability remains opt-in | #910 / #911 |
-| `extra-sessions` | Signed cookie sessions | `uv add "bengal-chirp[sessions]"` | `import itsdangerous` | Covered transitively by `dev`; isolated fresh-env **gap** | Optional capability remains opt-in | #910 / #911 |
-| `extra-auth` | Argon2 password hashing | `uv add "bengal-chirp[auth]"` | `import argon2` | Covered transitively by `dev`; isolated fresh-env **gap** | Optional capability remains opt-in | #910 / #911 |
-| `extra-passkeys` | WebAuthn / passkeys | `uv add "bengal-chirp[passkeys]"` | `import webauthn` | Covered transitively by `dev` (group lists `webauthn`); isolated fresh-env **gap** | Deliberately **not** in `all`/`full` (heavy cryptography stack) | #910 / #911 |
-| `extra-testing` | httpx test-client transport | `uv add "bengal-chirp[testing]"` | `import httpx` | Covered by `dev` / `test`; isolated fresh-env **gap** | Optional for end users; present in contributor `dev` | #910 / #911 |
-| `extra-data-pg` | PostgreSQL via in-tree pelt (no PyPI deps) | `uv add "bengal-chirp[data-pg]"` / `uv sync --group dev --extra data-pg` | `import chirp.data.drivers._pelt` | `ci.yml` → `test-postgres`, `data-pg-gil-gate`; `benchmarks.yml` → `pelt-controlled-evidence` | Extra remains empty of third-party deps; capability is import/behavioral | #910 / #911 |
-| `extra-ai` | LLM streaming over raw HTTP | `uv add "bengal-chirp[ai]"` | `import httpx`; `import chirp.ai` | **Gap** — no dedicated optional-AI lane | Optional; shares `httpx` with `testing`/`ai` | #910 / #911 |
-| `extra-ai-bedrock` | AWS Bedrock signing | `uv add "bengal-chirp[ai-bedrock]"` | `import botocore, httpx` | **Gap** | Optional; not in `all`/`full` | #910 / #911 |
-| `extra-markdown` | Patitas markdown rendering | `uv add "bengal-chirp[markdown]"` | `import patitas` | Covered transitively by `dev`; isolated fresh-env **gap** | Optional; in `all`/`full` | #910 / #911 |
-| `extra-ui` | Install chirp-ui via Chirp extra | `uv add "bengal-chirp[ui]"` | `import chirp_ui` | Partial — `contract-diff.yml`; `chirp-ui-compat` uses `--extra ui` | Peer package; floor is `chirp-ui>=0.11.4` in `pyproject.toml` | #910 / #911 |
-| `extra-config` | python-dotenv for `AppConfig.from_env()` | `uv add "bengal-chirp[config]"` | `import dotenv` | **Gap** | Optional; not in `all`/`full` | #910 / #911 |
-| `extra-redis` | Redis sessions / rate limit / signal backplane | `uv add "bengal-chirp[redis]"` | `import redis` | **Gap** | Optional; not in `all`/`full` | #910 / #911 |
-| `chirp-ui-compat` | Cross-version Chirp ↔ chirp-ui compatibility | `uv sync --group dev --extra ui` then pin `chirp-ui==0.10.0` **or** upgrade to latest (as CI does) | `import chirp_ui` + `tests/test_chirpui_boundary.py` / compat suite | `ci.yml` → `chirp-ui-compat` (matrix: `0.10.0`, `latest`) | Compatibility lane only; not a default install; retain/remove owned by saga #896 / epic #897 | #910 / #911 |
+| `minimal` | End-user core framework only | `uv add bengal-chirp` / `pip install bengal-chirp` | `import chirp; chirp.__version__` | `install-smoke.yml` (+ #911 yank gate) | Wheel installs with only declared core deps (`kida-templates`, `anyio`, `bengal-pounce`, `milo-cli`) | #910 / #911 |
+| `dev` | Ordinary contributor + default CI | `uv sync --group dev` | `import chirp, pytest, httpx, multipart, itsdangerous, patitas, chirp_ui` | `ci.yml` → `ruff`/`ty`/`test`; `install-smoke.yml` | Default contributor path; lock/group must resolve clean | #910 / #911 / #916 |
+| `docs` | Bengal docs site build | `uv sync --group docs` | `import bengal, chirp_ui` | `pages.yml` → `build`; `install-smoke.yml` | Docs deploy must resolve without yanked packages | #910 / #911 / #916 |
+| `browser` | Playwright browser smoke | `uv sync --group dev --group browser` | `import playwright` (+ Chromium install) | `ci.yml` → `browser-smoke`; `install-smoke.yml` (import only) | Browser lane remains isolated; not part of minimal/dev default | #910 / #911 |
+| `benchmark` | Framework comparison suite | `uv sync --extra benchmark` | `import fastapi, flask, starlette, litestar, httpx` (and FastHTML stack when exercised) | `benchmarks.yml`; `install-smoke.yml` | Advisory perf evidence; **must not** yank-warn on refresh once #911 gates it | #910 / #911 / #916 |
+| `full` | Aggregate “common optional stack” alias | `uv add "bengal-chirp[full]"` / `pip install "bengal-chirp[full]"` | Same as composing `forms`+`sessions`+`auth`+`testing`+`markdown` smokes | `install-smoke.yml` | Resolves exactly the packages listed under `full` in `pyproject.toml`; does **not** imply `ui`, `passkeys`, `config`, `redis`, `ai-bedrock`, or `benchmark` | #910 / #911 |
+| `all` | Documented synonym of `full` (identical contents today) | `uv add "bengal-chirp[all]"` | Same as `full` | `install-smoke.yml` (alias of `full`) | Must remain content-identical to `full` until a separate issue deliberately diverges or deletes one alias | #910 / #911 |
+| `extra-forms` | Multipart form parsing | `uv add "bengal-chirp[forms]"` | `import multipart` | `install-smoke.yml` (isolated); transitively `dev` | Optional capability remains opt-in | #910 / #911 |
+| `extra-sessions` | Signed cookie sessions | `uv add "bengal-chirp[sessions]"` | `import itsdangerous` | `install-smoke.yml` (isolated); transitively `dev` | Optional capability remains opt-in | #910 / #911 |
+| `extra-auth` | Argon2 password hashing | `uv add "bengal-chirp[auth]"` | `import argon2` | `install-smoke.yml`; `ci.yml` → `auth-capability` (behavior) | Optional capability remains opt-in | #910 / #911 |
+| `extra-passkeys` | WebAuthn / passkeys | `uv add "bengal-chirp[passkeys]"` | `import webauthn` | `install-smoke.yml` (isolated); transitively `dev` | Deliberately **not** in `all`/`full` (heavy cryptography stack) | #910 / #911 |
+| `extra-testing` | httpx test-client transport | `uv add "bengal-chirp[testing]"` | `import httpx` | `install-smoke.yml`; `dev` / `test` | Optional for end users; present in contributor `dev` | #910 / #911 |
+| `extra-data-pg` | PostgreSQL via in-tree pelt (no PyPI deps) | `uv add "bengal-chirp[data-pg]"` / `uv sync --group dev --extra data-pg` | `import chirp.data.drivers._pelt` | `install-smoke.yml`; `ci.yml` → `test-postgres`, `data-pg-gil-gate` | Extra remains empty of third-party deps; capability is import/behavioral | #910 / #911 |
+| `extra-ai` | LLM streaming over raw HTTP | `uv add "bengal-chirp[ai]"` | `import httpx`; `import chirp.ai` | `install-smoke.yml` | Optional; shares `httpx` with `testing`/`ai` | #910 / #911 |
+| `extra-ai-bedrock` | AWS Bedrock signing | `uv add "bengal-chirp[ai-bedrock]"` | `import botocore, httpx` | `install-smoke.yml` | Optional; not in `all`/`full` | #910 / #911 |
+| `extra-markdown` | Patitas markdown rendering | `uv add "bengal-chirp[markdown]"` | `import patitas` | `install-smoke.yml` (isolated); transitively `dev` | Optional; in `all`/`full` | #910 / #911 |
+| `extra-ui` | Install chirp-ui via Chirp extra | `uv add "bengal-chirp[ui]"` | `import chirp_ui` | `install-smoke.yml`; `contract-diff.yml` | Peer package; floor is `chirp-ui>=0.11.4` in `pyproject.toml` | #910 / #911 |
+| `extra-config` | python-dotenv for `AppConfig.from_env()` | `uv add "bengal-chirp[config]"` | `import dotenv` | `install-smoke.yml` | Optional; not in `all`/`full` | #910 / #911 |
+| `extra-redis` | Redis sessions / rate limit / signal backplane | `uv add "bengal-chirp[redis]"` | `import redis` | `install-smoke.yml` (import); Redis behavior lane #906 | Optional; not in `all`/`full` | #910 / #911 |
+| `chirp-ui-compat` | Cross-version Chirp ↔ chirp-ui compatibility | `uv sync --group dev --extra ui` then pin `chirp-ui==0.10.0` **or** upgrade to latest (as CI does) | `import chirp_ui` + `tests/test_chirpui_boundary.py` / compat suite | `install-smoke.yml` (floor pin import); `ci.yml` → `chirp-ui-compat` | Compatibility lane only; not a default install; retain/remove owned by saga #896 / epic #897 | #910 / #911 |
 
 ### Profiles explicitly out of the supported matrix
 
@@ -180,13 +180,14 @@ Re-open or supersede this decision when any of the following occur:
 
 ### Known gaps this matrix exposes (for #910/#911/#916)
 
-- No clean-environment smoke for `minimal`, most solitary `extra-*`
-  profiles, `full`/`all`, `extra-ai`, `extra-ai-bedrock`, `extra-config`,
-  or `extra-redis`.
+- ~~No clean-environment smoke for `minimal`, solitary `extra-*`,
+  `full`/`all`, …~~ **Closed by #910** via
+  `scripts/install_smoke.py` + `.github/workflows/install-smoke.yml`.
 - Networked framework comparison (`--extra benchmark`) is documented but
-  not the default `benchmarks.yml` install line.
-- Benchmark transitive APSW 3.53.3.0 is the concrete yanked-package debt
-  named by epic #899.
+  not the default `benchmarks.yml` install line (import smoke is now in
+  `install-smoke.yml`).
+- Benchmark transitive APSW yanked-package debt is owned by #911/#907
+  (floor bump landed; yank gate remains #911).
 - `browser-smoke` pins `chirp-ui==0.10.0` while the `ui` extra floor is
   `>=0.11.4` — compatibility posture lives in `chirp-ui-compat`, not in
   `extra-ui` alone.

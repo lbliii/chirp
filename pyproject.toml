@@ -386,6 +386,12 @@ preflight = { sequence = [
     "test-invariants",
 ], help = "Fast pre-push: cheap whole-repo invariants (no full suite)" }
 
+# Fresh-env install + import smoke for supported dependency profiles (#910).
+# Isolation belongs here / in .github/workflows/install-smoke.yml — not in
+# ordinary contributor setup or specialized capability lanes.
+install-smoke = { cmd = "python scripts/install_smoke.py", help = "Fresh-env install + import smoke for supported dependency profiles (#910)" }
+install-smoke-list = { cmd = "python scripts/install_smoke.py --list", help = "List supported dependency resolution profiles" }
+
 # Build & Release
 dist = { shell = "rm -rf dist/ && uv build --out-dir dist/ && ls -la dist/", help = "Build distribution" }
 
