@@ -48,6 +48,13 @@ class TestOrreryDogfoodIssue985:
             assert "gaze" in home.text
             assert "resolve" in home.text
             assert "star" in home.text
+            # Branded page uses inline <style> + Google Fonts; default secure_stack
+            # CSP blanked production until style-src/font-src were relaxed.
+            csp = dict(home.headers).get("content-security-policy", "")
+            assert "style-src" in csp
+            assert "'unsafe-inline'" in csp
+            assert "fonts.googleapis.com" in csp
+            assert "fonts.gstatic.com" in csp
 
             discovery = await client.get("/skills")
             assert discovery.status == 200
