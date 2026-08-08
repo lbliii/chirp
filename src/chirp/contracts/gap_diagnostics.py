@@ -65,7 +65,7 @@ type GapObservation = Literal[
 _FINDING_KINDS: frozenset[str] = frozenset({"dead", "orphan", "unreachable_block"})
 
 # Gap-report label only — not an app.check() category. Keep as a name binding so
-# docs inventory scrapers that look for category="..." literals stay accurate.
+# docs inventory scrapers that look for category= string literals stay accurate.
 _ENHANCEMENT_FALLBACK_LABEL = "enhancement_fallback"
 
 _REPAIR: dict[GapKind, str] = {
