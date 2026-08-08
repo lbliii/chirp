@@ -4,8 +4,12 @@ A :class:`SkillRegistry` stores skills by name, mounts each via
 :func:`~chirp.skill.mount.use_skill` onto one app (aggregated ``/mcp``), and
 exposes a discovery route that lists frozen manifests.
 
-Console UI and keystore live in sibling issues — this module is the
-machine-facing registry + discovery surface only.
+When an :class:`~chirp.skill.keystore.EnvKeystore` is passed to
+:meth:`SkillRegistry.mount` / :func:`mount_skills`, the host-level
+``key-status`` tool is registered for the union of skill ``provider_keys``
+(presence only — secret values never enter the MCP response).
+
+Console UI and live invocation log live in sibling issues.
 """
 
 from __future__ import annotations
@@ -14,6 +18,7 @@ import threading
 from collections.abc import Iterable, Iterator, Mapping
 from typing import TYPE_CHECKING, Any
 
+from chirp.skill.keystore import EnvKeystore, register_key_status_tool
 from chirp.skill.manifest import Manifest
 from chirp.skill.mount import Skill, use_skill
 
@@ -112,6 +117,18 @@ class SkillRegistry:
                 out.append(skill.assemble_manifest())
         return tuple(out)
 
+    def provider_key_names(self) -> tuple[str, ...]:
+        """Ordered unique provider key names declared by registered skills."""
+        ordered: list[str] = []
+        seen: set[str] = set()
+        for skill in self.skills():
+            for name in skill.provider_keys:
+                if name in seen:
+                    continue
+                seen.add(name)
+                ordered.append(name)
+        return tuple(ordered)
+
     def discovery_document(self) -> dict[str, Any]:
         """JSON-serializable discovery payload listing mounted skill manifests."""
         return {
@@ -123,13 +140,19 @@ class SkillRegistry:
         app: App,
         *,
         discovery_path: str = DEFAULT_DISCOVERY_PATH,
+        keystore: EnvKeystore | None = None,
     ) -> SkillRegistry:
         """Mount every registered skill via ``use_skill`` and the discovery route.
 
         Tool names must be unique across skills — collisions fail loud at mount
-        time (aggregated ``/mcp`` has a single tool namespace). Returns ``self``.
+        time (aggregated ``/mcp`` has a single tool namespace). When ``keystore``
+        is provided, registers the host-level ``key-status`` tool for the union
+        of skill ``provider_keys`` (presence only). Returns ``self``.
         """
         path = _normalize_discovery_path(discovery_path)
+        if keystore is not None and not isinstance(keystore, EnvKeystore):
+            msg = "keystore must be an EnvKeystore instance or None"
+            raise TypeError(msg)
         with self._lock:
             if self._mounted:
                 msg = "SkillRegistry is already mounted"
@@ -140,11 +163,20 @@ class SkillRegistry:
             skills = tuple(self._skills.values())
 
         _assert_unique_tool_names(skills)
+        if keystore is not None:
+            _assert_key_status_name_free(skills)
 
         for skill in skills:
             use_skill(app, skill)
 
         _register_discovery_route(app, self, path)
+
+        if keystore is not None:
+            register_key_status_tool(
+                app,
+                keystore,
+                names=self.provider_key_names(),
+            )
 
         with self._lock:
             self._mounted = True
@@ -157,6 +189,7 @@ def mount_skills(
     skills: SkillRegistry | Iterable[Skill],
     *,
     discovery_path: str = DEFAULT_DISCOVERY_PATH,
+    keystore: EnvKeystore | None = None,
 ) -> SkillRegistry:
     """Mount skills onto ``app`` and expose a discovery endpoint.
 
@@ -168,6 +201,10 @@ def mount_skills(
     The discovery route (default ``/skills``) returns a JSON document of
     skill manifests so agents can list what the host mounts.
 
+    When ``keystore`` is an :class:`~chirp.skill.keystore.EnvKeystore`, also
+    registers the host-level ``key-status`` tool for declared provider key
+    names (presence only; secret values never enter the response).
+
     Returns the :class:`SkillRegistry` (creating one when given an iterable).
     """
     if isinstance(skills, SkillRegistry):
@@ -176,7 +213,7 @@ def mount_skills(
         registry = SkillRegistry()
         for skill in skills:
             registry.add(skill)
-    return registry.mount(app, discovery_path=discovery_path)
+    return registry.mount(app, discovery_path=discovery_path, keystore=keystore)
 
 
 def _normalize_discovery_path(path: str) -> str:
@@ -204,6 +241,19 @@ def _assert_unique_tool_names(skills: tuple[Skill, ...]) -> None:
                 )
                 raise ValueError(msg)
             seen[tool_name] = skill.name
+
+
+def _assert_key_status_name_free(skills: tuple[Skill, ...]) -> None:
+    """Fail loud when a skill tool would collide with the host key-status tool."""
+    from chirp.skill.keystore import KEY_STATUS_TOOL
+
+    for skill in skills:
+        if KEY_STATUS_TOOL in skill.tools:
+            msg = (
+                f"Skill {skill.name!r} registers tool {KEY_STATUS_TOOL!r}, "
+                "which is reserved for the host EnvKeystore key-status tool"
+            )
+            raise ValueError(msg)
 
 
 def _register_discovery_route(
