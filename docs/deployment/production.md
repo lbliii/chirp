@@ -8,9 +8,10 @@ migrations, and replica caveats, see [Railway Deployment](railway.md).
 ## Overview
 
 Chirp apps run on [Pounce](https://github.com/lbliii/pounce), a
-free-threading-native ASGI server. Chirp owns hypermedia contracts and app
-configuration; Pounce owns server bind/configuration, worker execution,
-timeouts, TLS, metrics, and operational preflight checks.
+free-threading-native ASGI server. Chirp owns hypermedia contracts, app
+configuration, and production worker auto-detect when `workers=0`; Pounce owns
+server bind/configuration, worker execution, timeouts, TLS, metrics, and
+operational preflight checks.
 
 ## Quick Start
 
@@ -46,6 +47,27 @@ chirp run myapp:app --production --workers 4 --metrics --rate-limit
 
 When you start through `app.run()` or `chirp run`, Chirp reads `AppConfig`.
 `pounce.toml` is not read by `app.run()` or `chirp run` today.
+
+### Worker auto-detect (`workers=0`)
+
+`AppConfig.workers` defaults to `0` (auto). On the Chirp production launch path
+(`app.run()` / `chirp run --production`), Chirp resolves `0` to a concrete
+worker count **before** constructing Pounce `ServerConfig`:
+
+1. Explicit `workers=N` (`N > 0`) or `--workers N` — authoritative; never
+   clamped by quota.
+2. Else if `WEB_CONCURRENCY` is a positive integer — use that platform value.
+3. Else `min(host_cpus, cgroup_cpu_quota?, cpuset_cpus?)`, floor `1`.
+
+Cgroup signals come from portable Linux paths (`cpu.max` / CFS quota + cpuset).
+Missing or malformed cgroup files fall back to the host CPU count. Startup
+prints a `chirp workers:` diagnostic naming requested, detected, and resolved
+counts.
+
+This keeps one-vCPU container deployments (including Railway) from spawning
+one worker per *host* core. Direct `pounce serve` with `workers=0` still uses
+Pounce's host `cpu_count()` path — start through Chirp for the quota-aware
+contract.
 
 ### Startup display identity
 

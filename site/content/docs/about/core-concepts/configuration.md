@@ -226,7 +226,7 @@ wire the secure-by-default stack, see
 :icon: network
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `workers` | `int` | `0` | Pounce worker count; `0` lets pounce auto-detect |
+| `workers` | `int` | `0` | Pounce worker count; `0` is quota-aware auto-detect at Chirp production launch (cgroup/cpuset/host; see deployment docs) |
 | `metrics_enabled` | `bool` | `False` | Enable Prometheus metrics |
 | `metrics_path` | `str` | `"/metrics"` | Metrics endpoint path |
 | `health_path` | `str` | `"/health"` | Auto-mounted liveness probe path (plain 200; K8s `livenessProbe`). `CHIRP_HEALTH_PATH` |
