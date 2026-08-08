@@ -127,6 +127,8 @@ and a dashboard at `/dashboard`. It refuses to overwrite an existing directory.
   - Simulated token streaming with `TemplateStream` plus an `EventStream` activity panel.
 * - `--ai`
   - AI chat with tools, an SSE activity feed, and the secure stack.
+* - `--skill`
+  - Signed skill app (`skill.tool` + `use_skill`), secure stack, and Railway config.
 * - `--with-chirpui`
   - Require [[docs/build-apps/ui-extensions/chirp-ui|chirp-ui]] templates; fail if it is not installed.
 :::

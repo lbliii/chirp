@@ -18,8 +18,9 @@ from chirp.cli import main
         ["--shell"],
         ["--stream"],
         ["--ai"],
+        ["--skill"],
     ],
-    ids=["v2", "minimal", "sse", "shell", "stream", "ai"],
+    ids=["v2", "minimal", "sse", "shell", "stream", "ai", "skill"],
 )
 def test_generated_apps_ship_railway_runtime_contract(
     tmp_path: Path,
@@ -245,6 +246,52 @@ class TestChirpNewAI:
         assert "InMemoryConversationStore" in source
         assert "secure_stack" in source
         compile(source, "app.py", "exec")
+
+
+@pytest.mark.issue(980)
+class TestChirpNewSkill:
+    def test_creates_skill_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """--skill creates a signed skill.tool scaffold with secure stack."""
+        monkeypatch.chdir(tmp_path)
+        main(["new", "myapp", "--skill"])
+
+        project = tmp_path / "myapp"
+        assert (project / "app.py").is_file()
+        assert (project / "templates" / "index.html").is_file()
+        assert (project / ".env.example").is_file()
+        assert (project / "tests" / "test_app.py").is_file()
+        assert (project / "railway.json").is_file()
+        assert (project / "pyproject.toml").is_file()
+
+        source = (project / "app.py").read_text(encoding="utf-8")
+        assert "use_skill" in source
+        assert "@skill.tool" in source
+        assert "secure_stack" in source
+        assert "CHIRP_SECRET_KEY" in source
+        assert "cryptography" in (project / "pyproject.toml").read_text(encoding="utf-8")
+        compile(source, "app.py", "exec")
+
+    def test_generated_skill_app_passes_check(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Scaffold builds and passes app.check() (#980)."""
+        import importlib.util
+        import sys
+
+        monkeypatch.chdir(tmp_path)
+        main(["new", "skillapp", "--skill"])
+
+        app_path = tmp_path / "skillapp" / "app.py"
+        spec = importlib.util.spec_from_file_location("skillapp_scaffold", app_path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["skillapp_scaffold"] = module
+        try:
+            spec.loader.exec_module(module)
+            module.app.check()  # raises SystemExit(1) on ERROR
+        finally:
+            sys.modules.pop("skillapp_scaffold", None)
 
 
 class TestChirpNewStream:

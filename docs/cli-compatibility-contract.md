@@ -57,7 +57,7 @@ required.
 
 | Command | Positionals and options | Defaults / interactions | Current exposure class |
 | --- | --- | --- | --- |
-| `new` | `name`; `--minimal`, `--stream`, `--sse`, `--shell`, `--ai`, `--with-chirpui` | Flags default `false`. If several modes are supplied, source precedence is minimal → AI → stream → SSE → shell → default. `--with-chirpui` is an independent hard requirement. | Human-only; intentionally not agent-exposed because it writes a project tree. |
+| `new` | `name`; `--minimal`, `--stream`, `--sse`, `--shell`, `--ai`, `--skill`, `--with-chirpui` | Flags default `false`. If several modes are supplied, source precedence is minimal → AI → skill → stream → SSE → shell → default. `--with-chirpui` is an independent hard requirement. | Human-only; intentionally not agent-exposed because it writes a project tree. |
 | `run` | `app`; `--host`, `--port`, `--production`, `--workers`, `--metrics`, `--rate-limit`, `--queue`, `--sentry-dsn` | Scalar overrides default to `None` then app config. Boolean capabilities OR with app config. Production is selected by `--production` or `debug=False`. | Human-only persistent process; intentionally not agent-exposed. |
 | `dev` | Same parser surface as `run` | Also forces `debug=True` and `dev_browser_reload=True`. Other resolution matches `run`. | Human-only persistent process; intentionally not agent-exposed. |
 | `check` | `app`; `--warnings-as-errors`, `--coverage`, `--deploy`, `--json`, `--baseline PATH`, `--include-info` | Flags default `false`, baseline `None`. `--deploy` implies strict warnings. `--include-info` affects structured modes. | Read-only CLI/programmatic/MCP/llms inspection. Returns stable issues and optional coverage; imports project code. |

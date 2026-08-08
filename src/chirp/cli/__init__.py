@@ -110,6 +110,7 @@ def _schemas() -> dict[str, dict[str, Any]]:
                 "sse": _flag("Include SSE boilerplate."),
                 "shell": _flag("Generate a project with a persistent app shell."),
                 "ai": _flag("Scaffold AI chat and its secure supporting stack."),
+                "skill": _flag("Scaffold a signed skill app (skill.tool + secure stack)."),
                 "with_chirpui": _flag("Require ChirpUI templates."),
             },
             "name",

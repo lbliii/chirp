@@ -31,6 +31,13 @@ from chirp.cli.templates.shell import (
     SHELL_PAGE_HTML,
     SHELL_PAGE_PY,
 )
+from chirp.cli.templates.skill import (
+    SKILL_APP_PY,
+    SKILL_ENV_EXAMPLE,
+    SKILL_INDEX_HTML,
+    SKILL_PYPROJECT_TOML,
+    SKILL_TEST_APP_PY,
+)
 from chirp.cli.templates.sse import (
     SSE_APP_PY,
     SSE_INDEX_HTML,
@@ -88,6 +95,11 @@ __all__ = [
     "SHELL_LAYOUT_HTML",
     "SHELL_PAGE_HTML",
     "SHELL_PAGE_PY",
+    "SKILL_APP_PY",
+    "SKILL_ENV_EXAMPLE",
+    "SKILL_INDEX_HTML",
+    "SKILL_PYPROJECT_TOML",
+    "SKILL_TEST_APP_PY",
     "SSE_APP_PY",
     "SSE_INDEX_HTML",
     "STREAM_APP_PY",
