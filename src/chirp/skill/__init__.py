@@ -22,10 +22,12 @@ from chirp.skill.keystore import (
 from chirp.skill.manifest import Manifest, assemble_manifest, compute_content_digest
 from chirp.skill.mount import Skill, use_skill
 from chirp.skill.registry import DEFAULT_DISCOVERY_PATH, SkillRegistry, mount_skills
+from chirp.tools.live_log import DEFAULT_INVOCATION_LOG_PATH
 
 __all__ = [
     "DEFAULT_CONSOLE_PATH",
     "DEFAULT_DISCOVERY_PATH",
+    "DEFAULT_INVOCATION_LOG_PATH",
     "KEY_STATUS_TOOL",
     "EnvKeystore",
     "Envelope",

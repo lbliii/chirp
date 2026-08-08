@@ -141,6 +141,8 @@ class TestSkillConsoleIssue982:
                 assert "present" in text
                 assert 'id="skill_console_live_log"' in text
                 assert 'data-chirp-skill-console="live-log"' in text
+                assert 'sse-connect="/invocations/live"' in text
+                assert "Streaming invocations" in text
 
                 missing = await client.get("/console/missing")
                 assert missing.status == 404
