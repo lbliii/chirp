@@ -64,6 +64,10 @@ type GapObservation = Literal[
 
 _FINDING_KINDS: frozenset[str] = frozenset({"dead", "orphan", "unreachable_block"})
 
+# Gap-report label only — not an app.check() category. Keep as a name binding so
+# docs inventory scrapers that look for category="..." literals stay accurate.
+_ENHANCEMENT_FALLBACK_LABEL = "enhancement_fallback"
+
 _REPAIR: dict[GapKind, str] = {
     "dead": (
         "Reference the template from a route, include, import, or layout; remove "
@@ -389,7 +393,7 @@ def _project_unproven_dynamic_gaps(
                 reachability="static_unresolved",
                 observation="unobserved",
                 repair=_REPAIR["unproven"],
-                category="enhancement_fallback",
+                category=_ENHANCEMENT_FALLBACK_LABEL,
                 severity=None,
                 details=(
                     f"enhanced={edge.enhanced_block_id}; "
