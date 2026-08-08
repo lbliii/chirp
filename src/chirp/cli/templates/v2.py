@@ -3,13 +3,14 @@
 V2_APP_PY = """\
 import os
 
-from chirp import App, AppConfig, Redirect, logout
+from chirp import App, AppConfig, Redirect, Request, is_safe_url, logout
 from chirp.middleware.auth import AuthConfig, AuthMiddleware
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.security_headers import SecurityHeadersMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
 from models import load_user
+from theme import normalize_theme, theme_redirect
 
 _DEFAULT_SECRET = "change-me-before-deploying"
 _secret = os.environ.get("CHIRP_SECRET_KEY", _DEFAULT_SECRET)
@@ -64,6 +65,20 @@ app.mount_pages("pages")
 def do_logout():
     logout()
     return Redirect("/")
+
+
+@app.route("/theme", methods=["POST"])
+async def set_theme(request: Request):
+    form = await request.form()
+    theme = normalize_theme(form.get("theme"))
+    next_url = form.get("next") or "/"
+    if not is_safe_url(next_url):
+        next_url = "/"
+    return theme_redirect(
+        next_url,
+        theme,
+        secure=config.env != "development",
+    )
 
 
 if __name__ == "__main__":
@@ -237,17 +252,23 @@ def verify_user(username: str, password: str) -> User | None:
 V2_LAYOUT_HTML = """\
 {# target: body #}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="{{ theme }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}App{% endblock %}</title>
-    <link rel="stylesheet" href="/static/style.css">
+    {# App-owned CSS layers — first paint uses server-rendered data-theme (no inline script). #}
+    <link rel="stylesheet" href="/static/css/tokens.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/patterns.css">
+    <link rel="stylesheet" href="/static/css/pages.css">
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" defer></script>
+    <script src="/static/js/theme.js" defer></script>
 </head>
 <body>
     {% set user = current_user() %}
-    <nav hx-boost="true" hx-target="#page-root" hx-select="#page-root">
+    <nav class="app-nav" hx-boost="true" hx-target="#page-root" hx-select="#page-root">
         <a href="/">Home</a>
         {% if user.is_authenticated %}
         <a href="/dashboard">Dashboard</a>
@@ -258,6 +279,18 @@ V2_LAYOUT_HTML = """\
         {% else %}
         <a href="/login">Login</a>
         {% end %}
+        <form method="post" action="/theme" class="theme-control" data-theme-control
+              hx-boost="false">
+            {{ csrf_field() }}
+            <input type="hidden" name="next" value="{{ current_path }}">
+            <fieldset>
+                <legend class="sr-only">Color theme</legend>
+                <label><input type="radio" name="theme" value="light"{% if theme == "light" %} checked{% end %}> Light</label>
+                <label><input type="radio" name="theme" value="dark"{% if theme == "dark" %} checked{% end %}> Dark</label>
+                <label><input type="radio" name="theme" value="system"{% if theme == "system" %} checked{% end %}> System</label>
+            </fieldset>
+            <button type="submit">Apply theme</button>
+        </form>
     </nav>
     {% block content %}{% endblock %}
 </body>
@@ -558,38 +591,9 @@ V2_DASHBOARD_CHIRPUI_HTML = """\
 {% end %}
 """
 
+# Kept for backward-compatible imports; default scaffold writes layered CSS instead.
 V2_STYLE_CSS = """\
-* {{ margin: 0; padding: 0; box-sizing: border-box; }}
-body {{
-    font-family: system-ui, -apple-system, sans-serif;
-    background: #0f172a; color: #e2e8f0;
-    min-height: 100vh; max-width: 600px; margin: 0 auto; padding: 2rem 1rem;
-}}
-nav {{
-    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
-    margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid #334155;
-}}
-nav a {{ text-decoration: none; color: #94a3b8; }}
-nav a:hover {{ color: #f8fafc; }}
-nav form {{ margin-left: auto; }}
-.panel {{ border: 1px solid #334155; border-radius: 0.75rem; padding: 1rem; }}
-.panel__body {{ display: grid; gap: 0.75rem; margin-top: 0.75rem; }}
-.status {{ display: inline-flex; align-items: center; border-radius: 999px; padding: 0.25rem 0.6rem; background: #1e3a5f; }}
-.sr-only {{ position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }}
-.error {{ color: #f87171; margin-bottom: 1rem; font-size: 0.9rem; }}
-label {{ display: block; margin-top: 0.75rem; font-weight: 600; color: #f8fafc; }}
-input {{
-    display: block; width: 100%; padding: 0.5rem 0.75rem; margin-top: 0.25rem;
-    background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem;
-    color: #e2e8f0;
-}}
-input:focus {{ outline: none; border-color: #3b82f6; }}
-button {{
-    padding: 0.5rem 1rem; cursor: pointer; margin-top: 1rem;
-    background: #3b82f6; color: #fff; border: none; border-radius: 0.5rem;
-}}
-button:hover {{ background: #2563eb; }}
-small {{ color: #64748b; }}
+/* Deprecated monolithic stylesheet — prefer static/css layered files. */
 """
 
 V2_STYLE_CHIRPUI_CSS = """\

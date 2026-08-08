@@ -116,7 +116,7 @@ and a dashboard at `/dashboard`. It refuses to overwrite an existing directory.
 * - Flag
   - Result
 * - *(none)*
-  - Auth + dashboard + filesystem routing (`pages/`), app-owned components and patterns (`templates/`), tests, `pyproject.toml`.
+  - Auth + dashboard + filesystem routing (`pages/`), app-owned components and patterns (`templates/`), layered `static/css` tokens/theme, tests, `pyproject.toml`.
 * - `--minimal`
   - A single-file project: `app.py` plus `templates/index.html`.
 * - `--sse`

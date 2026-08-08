@@ -21,6 +21,12 @@ scaffold variant may omit directories it does not need.
 - `templates/_partials/` is reserved for rare, private markup coupled to one
   owner. Promote shared or input-sensitive markup to a component or pattern.
 - `static/` is app-owned source. Chirp does not own this app's visual identity.
+- `static/css/tokens.css` holds semantic custom properties; `base.css`,
+  `components.css`, `patterns.css`, and `pages.css` layer ordinary CSS on top.
+  Theme selection uses root `data-theme` (`light` / `dark` / `system`) with
+  optional `data-skin` / `data-density` extension points. Preference is
+  server-readable (`theme.py` + cookie) so first paint needs no inline script.
+  Progressive enhancement lives in `static/js/theme.js` (no Alpine).
 
 Keep short, route-specific markup inline. Extract a component when its props,
 slots, reuse, or accessibility contract form a useful stable interface.
