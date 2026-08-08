@@ -116,7 +116,8 @@ Most applications need `App`, `@app.route`, `Template`, `Page`, forms,
 
 The `chirp` command can scaffold, run, inspect, and validate an application.
 `chirp new <name> --shell` starts with a persistent app shell; `--stream`,
-`--sse`, and `--ai` add focused examples of those patterns. `chirp dev <app>`
+`--sse`, `--ai`, and `--skill` add focused examples of those patterns. `chirp
+dev <app>`
 starts the development server with Chirp DevTools; `chirp routes <app>` prints
 the route table; `chirp check <app> --coverage` shows contract coverage.
 

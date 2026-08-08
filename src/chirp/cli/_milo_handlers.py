@@ -25,6 +25,7 @@ def new_command(
     sse: bool = False,
     shell: bool = False,
     ai: bool = False,
+    skill: bool = False,
     with_chirpui: bool = False,
 ) -> None:
     """Create a new project.
@@ -36,6 +37,7 @@ def new_command(
         sse: Include SSE boilerplate.
         shell: Generate a project with a persistent app shell.
         ai: Scaffold AI chat and its secure supporting stack.
+        skill: Scaffold a signed skill app (skill.tool + secure stack).
         with_chirpui: Require ChirpUI templates.
     """
     from chirp.cli._new import create_project
@@ -48,6 +50,7 @@ def new_command(
             sse=sse,
             shell=shell,
             ai=ai,
+            skill=skill,
             with_chirpui=with_chirpui,
         )
     )

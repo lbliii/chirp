@@ -1,10 +1,11 @@
 """``chirp new`` — project scaffolding command.
 
-Creates a new chirp project directory with starter files.  Three modes:
+Creates a new chirp project directory with starter files.  Modes include:
 
 - **Default** (v2): Auth + dashboard + primitives (filesystem routing, pages/)
 - **Minimal** (``--minimal``): ``app.py``, ``templates/index.html``
 - **SSE** (``--sse``): SSE boilerplate
+- **Skill** (``--skill``): signed ``skill.tool`` app + secure stack
 """
 
 import argparse
@@ -31,6 +32,11 @@ from chirp.cli.templates import (
     SHELL_LAYOUT_HTML,
     SHELL_PAGE_HTML,
     SHELL_PAGE_PY,
+    SKILL_APP_PY,
+    SKILL_ENV_EXAMPLE,
+    SKILL_INDEX_HTML,
+    SKILL_PYPROJECT_TOML,
+    SKILL_TEST_APP_PY,
     SSE_APP_PY,
     SSE_INDEX_HTML,
     STREAM_APP_PY,
@@ -115,6 +121,8 @@ def create_project(args: argparse.Namespace) -> None:
         _create_minimal(project_dir, args.name)
     elif getattr(args, "ai", False):
         _create_ai(project_dir, args.name)
+    elif getattr(args, "skill", False):
+        _create_skill(project_dir, args.name)
     elif getattr(args, "stream", False):
         _create_stream(project_dir, args.name)
     elif getattr(args, "sse", False):
@@ -133,11 +141,18 @@ def create_project(args: argparse.Namespace) -> None:
         )
 
     print(f"Created project '{args.name}'")
-    if (
+    if getattr(args, "skill", False):
+        print()
+        print(f"  cd {args.name} && python app.py")
+        print()
+        print("  Skill tools: echo (signed Envelope via use_skill)")
+        print("  Set CHIRP_SKILL_PRIVATE_KEY for a stable signing key")
+    elif (
         not args.minimal
         and not getattr(args, "sse", False)
         and not getattr(args, "stream", False)
         and not getattr(args, "shell", False)
+        and not getattr(args, "ai", False)
     ):
         print()
         print(f"  cd {args.name} && python app.py")
@@ -263,6 +278,27 @@ def _create_ai(project_dir: Path, name: str) -> None:
     (project_dir / ".env.example").write_text(AI_ENV_EXAMPLE)
     (tests_dir / "test_app.py").write_text(AI_TEST_APP_PY.format(name=name))
     _write_scaffold_extras(project_dir, name)
+
+
+def _create_skill(project_dir: Path, name: str) -> None:
+    """Generate a signed skill app (skill.tool + secure stack + Railway)."""
+    templates_dir = project_dir / "templates"
+    tests_dir = project_dir / "tests"
+    templates_dir.mkdir(parents=True)
+    tests_dir.mkdir(parents=True)
+
+    (project_dir / "app.py").write_text(SKILL_APP_PY, encoding="utf-8")
+    (templates_dir / "index.html").write_text(SKILL_INDEX_HTML, encoding="utf-8")
+    (project_dir / ".env.example").write_text(SKILL_ENV_EXAMPLE, encoding="utf-8")
+    (tests_dir / "test_app.py").write_text(
+        SKILL_TEST_APP_PY.format(name=name),
+        encoding="utf-8",
+    )
+    _write_scaffold_extras(project_dir, name)
+    (project_dir / "pyproject.toml").write_text(
+        SKILL_PYPROJECT_TOML.format(name=name),
+        encoding="utf-8",
+    )
 
 
 def _create_stream(project_dir: Path, name: str) -> None:
