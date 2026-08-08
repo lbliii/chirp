@@ -103,7 +103,10 @@ app would fare in production without changing your config, use `chirp check
 Duplicate render-surface and component/page ownership checkers are **not**
 `app.check()` categories — the compiler has no semantic-equivalence or
 authorial-ownership fact, so those leaves close as no-action rather than new
-predicates.
+predicates. Existing `dead` / `orphan` / `unreachable_block` findings plus
+severity overrides remain visible through private architecture-gap diagnostics
+(`docs/design/architecture-gap-diagnostics.md`) as debt, `suppressed`, or
+unproven/unobserved gaps — never as promoted ERRORs or silent clean coverage.
 
 When nested filesystem loader roots expose one file under multiple logical
 names, built-in checks scan that physical file once. Chirp prefers a logical
