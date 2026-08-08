@@ -11,7 +11,8 @@ zero-false-`ERROR` gate, and which consumers own follow-up work.
 | Field | Value |
 | --- | --- |
 | First evidence pass | 2026-08-03 (shipped in #895 / RFC 028 draft) |
-| Decision refresh | **2026-08-05** |
+| Decision refresh | **2026-08-05** (maintainer-approved; #883 closed) |
+| #884 reconcile | **2026-08-08** — no-action; empty new-predicate scope |
 | Downstream Furatena execution | Unobserved (credential-gated); policy test only |
 
 ## Proven source authorities
@@ -85,8 +86,18 @@ severity default is authorized by this decision.
 
 | Issue | Approved work | Explicitly not approved |
 | --- | --- | --- |
-| [#884](https://github.com/lbliii/chirp/issues/884) Detect duplicate render surfaces / ownership | **Empty new-predicate scope.** May only: document the rejection, close as no-action, or improve repair text for the three accepted families without severity/category changes. | New `app.check()` categories; ERROR/WARNING for “duplicate surfaces” or “ownership”; second topology scanner |
+| [#884](https://github.com/lbliii/chirp/issues/884) Detect duplicate render surfaces / ownership | **Reconciled 2026-08-08 as no-action.** Empty new-predicate scope fulfilled by documenting the rejection; optional repair-doc polish for the three accepted families only (no severity/category changes). | New `app.check()` categories; ERROR/WARNING for “duplicate surfaces” or “ownership”; second topology scanner |
 | [#885](https://github.com/lbliii/chirp/issues/885) Report dead / unreachable / suppressed / unproven gaps | Inspection/projection that surfaces existing `dead` / `orphan` / `unreachable_block`, lists severity overrides as `suppressed` (never clean), and marks undeclared dynamic edges as `unproven` / `unobserved` | Promoting those to ERROR; claiming suppressions are stale; treating static reachability as behavioral coverage |
+
+### #884 reconcile receipt (2026-08-08)
+
+[#884](https://github.com/lbliii/chirp/issues/884) is decision-complete with **empty
+new-predicate scope** per RFC 028. Shipped collateral: RFC/ledger reconcile notes
+plus published repair guidance for the three accepted families
+(`fragment_target_orphan` / `fragment_target_scan`, `template_declaration`,
+`unreachable_block`). **Not shipped:** duplicate-surface checkers, ownership
+linters, new contract categories, severity default changes, or a second
+topology scanner. Reopening those rejects requires a new decision leaf.
 
 ## Reproduction and canary receipt (2026-08-05)
 

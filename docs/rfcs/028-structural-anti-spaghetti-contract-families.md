@@ -1,7 +1,7 @@
 # RFC 028: Structural Anti-Spaghetti Contract Families
 
-**Status:** Decision — 2026-08-05 (pending maintainer approval); no runtime
-behavior change
+**Status:** Decision — 2026-08-05 (maintainer-approved via [#883](https://github.com/lbliii/chirp/issues/883));
+no runtime behavior change
 **Issue:** [#883](https://github.com/lbliii/chirp/issues/883)
 **Parent:** [#882](https://github.com/lbliii/chirp/issues/882)
 **Saga:** [#876](https://github.com/lbliii/chirp/issues/876)
@@ -9,6 +9,8 @@ behavior change
 [#885](https://github.com/lbliii/chirp/issues/885), RFC 021, RFC 025
 **Created:** 2026-08-03
 **Decision date:** 2026-08-05
+**#884 reconcile:** 2026-08-08 — closed as **no-action** (empty new-predicate
+scope); optional repair-doc polish only
 
 ## Decision — 2026-08-05
 
@@ -62,8 +64,18 @@ families; it also **does not** block classifying the in-repo inventory above.
 
 | Leaf | Decision assignment |
 | --- | --- |
-| [#884](https://github.com/lbliii/chirp/issues/884) | **No approved new predicates.** Duplicate-surface and ownership ERROR/WARNING checkers remain unimplemented. The leaf may document the rejection / close as no-action, or optionally improve repair guidance for the three accepted families without category or severity changes. |
+| [#884](https://github.com/lbliii/chirp/issues/884) | **Reconciled 2026-08-08 as no-action.** Empty new-predicate scope: no duplicate-surface or ownership checkers; no second topology scanner. Optional follow-up limited to repair-doc polish for the three accepted families (no category or severity changes). |
 | [#885](https://github.com/lbliii/chirp/issues/885) | May project existing `dead` / `orphan` / `unreachable_block`, severity-override inventory as `suppressed` (never clean), and undeclared dynamic edges as `unproven` / `unobserved`. Must not promote those to ERROR or treat static reachability as behavioral coverage. |
+
+### Leaf #884 reconcile receipt (2026-08-08)
+
+Decision-complete: [#884](https://github.com/lbliii/chirp/issues/884) does **not**
+ship new `app.check()` categories, severities, ERROR/WARNING predicates for
+duplicate render surfaces or ownership, or a second topology scanner. Closure
+collateral is documentation only (this RFC, the evidence ledger, and published
+repair guidance for the three accepted families). A later proposal that wants
+those rejected families needs a **new** decision leaf with a compiler-owned
+required promise and a zero-false-`ERROR` argument — not silent work under #884.
 
 ## Evidence
 

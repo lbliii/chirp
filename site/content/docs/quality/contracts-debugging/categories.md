@@ -78,11 +78,11 @@ app would fare in production without changing your config, use `chirp check
 | `dead` | WARNING | Remove unused templates or add a route, include, import, layout, explicit docs/tool reference, or a precise `app.declare_template()` entry for a runtime registry. |
 | `orphan` | INFO | Reference the route from a template, mark it explicitly referenced, or accept that static analysis cannot see dynamic navigation. |
 | `fragment` | ERROR | Fix `FragmentContract` declarations that point at missing templates or blocks. |
-| `template_declaration` | ERROR | Fix a template or block named by `app.declare_template()`; the message includes the setup call site and available blocks. |
+| `template_declaration` | ERROR | Correct the `app.declare_template()` call or define the promised template/block; the message includes the setup call site and available blocks. |
 | `fragment_scope` | WARNING | Move imports or bindings into the fragment block when direct block rendering would skip ancestor scope. |
-| `fragment_target_orphan` | ERROR / WARNING | Register the missing block for a required fragment target, or mark legitimately absent regions optional. |
+| `fragment_target_orphan` | ERROR / WARNING | Define the named block for the registered fragment target, or deliberately mark a legitimately absent region optional (`required=False`). |
 | `fragment_target_scan` | ERROR | Fix the template parse/load error that prevented fragment target orphan checks from completing. |
-| `unreachable_block` | WARNING | Move sibling page blocks under the rendered page root or make them real fragment targets. |
+| `unreachable_block` | WARNING | Nest the sibling page block under a recognized composing root (`page_content` / `page_root`) or register it as a real fragment target. |
 | `composition_extends` | WARNING | Stop extending layout templates from page templates; compose pages into layout content blocks instead. |
 | `htmx_partial` | ERROR | Correct `<htmx-partial>` sources, blocks, and route references. |
 | `inline_template` | WARNING | Replace inline template strings when a named template would be checkable and reusable. |
@@ -96,6 +96,14 @@ app would fare in production without changing your config, use `chirp check
 | `i18n_missing_key` | WARNING | Add the `t("…")` key to the locale JSON catalog(s) under the i18n directory, or remove the `t()` call. |
 | `macro_css` | WARNING | Activate chirp-ui (`use_chirp_ui(app)`) or ship your own CSS for the core-macro classes (`chirp-dropdown`, `chirp-modal`, `field--error`, …) when neither is present. |
 | `chirpui_css_verify` | WARNING | Fix typoed or stale `chirpui-*` class tokens in literal `class=` attributes so they resolve to classes in the installed chirp-ui CSS. Only runs when chirp-ui is active. |
+
+`fragment_target_orphan` / `fragment_target_scan`, `template_declaration`, and
+`unreachable_block` are the high-precision structural families retained by
+[RFC 028](https://github.com/lbliii/chirp/blob/main/docs/rfcs/028-structural-anti-spaghetti-contract-families.md).
+Duplicate render-surface and component/page ownership checkers are **not**
+`app.check()` categories — the compiler has no semantic-equivalence or
+authorial-ownership fact, so those leaves close as no-action rather than new
+predicates.
 
 When nested filesystem loader roots expose one file under multiple logical
 names, built-in checks scan that physical file once. Chirp prefers a logical
