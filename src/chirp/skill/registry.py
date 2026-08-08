@@ -1,12 +1,13 @@
 """Skill registry — manifest-indexed multi-skill mount for Orrery-style apps.
 
 A :class:`SkillRegistry` stores skills by name, mounts each via
-:func:`~chirp.skill.mount.use_skill` onto one app (aggregated ``/mcp``), and
-exposes a discovery route that lists frozen manifests.
+:func:`~chirp.skill.mount.use_skill` onto one app (aggregated ``/mcp``),
+exposes a discovery route that lists frozen manifests, and bridges
+``ToolEventBus`` into a live invocation-log ``EventStream``.
 
 Console UI lives in :mod:`chirp.skill.console` (``mount_console``); the
-env-var keystore is a sibling (#984). This module is the machine-facing
-registry + discovery surface.
+env-var keystore is a sibling (#984). This module owns registry + discovery
++ the live-log SSE bridge.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 from chirp.skill.manifest import Manifest
 from chirp.skill.mount import Skill, use_skill
+from chirp.tools.live_log import DEFAULT_INVOCATION_LOG_PATH, mount_invocation_log
 
 if TYPE_CHECKING:
     from chirp.app import App
@@ -35,12 +37,19 @@ class SkillRegistry:
     digested manifests finalized by each skill's freeze-time domain hook.
     """
 
-    __slots__ = ("_discovery_path", "_lock", "_mounted", "_skills")
+    __slots__ = (
+        "_discovery_path",
+        "_invocation_log_path",
+        "_lock",
+        "_mounted",
+        "_skills",
+    )
 
     def __init__(self) -> None:
         self._skills: dict[str, Skill] = {}
         self._mounted = False
         self._discovery_path: str | None = None
+        self._invocation_log_path: str | None = None
         self._lock = threading.Lock()
 
     @property
@@ -54,6 +63,12 @@ class SkillRegistry:
         """Path of the discovery route once mounted; ``None`` until then."""
         with self._lock:
             return self._discovery_path
+
+    @property
+    def invocation_log_path(self) -> str | None:
+        """Path of the live invocation-log SSE route once mounted; ``None`` if disabled."""
+        with self._lock:
+            return self._invocation_log_path
 
     @property
     def names(self) -> frozenset[str]:
@@ -124,8 +139,13 @@ class SkillRegistry:
         app: App,
         *,
         discovery_path: str = DEFAULT_DISCOVERY_PATH,
+        invocation_log_path: str | None = DEFAULT_INVOCATION_LOG_PATH,
     ) -> SkillRegistry:
-        """Mount every registered skill via ``use_skill`` and the discovery route.
+        """Mount every registered skill via ``use_skill`` and host routes.
+
+        Registers the discovery route and, unless ``invocation_log_path`` is
+        ``None``, the live ``ToolEventBus`` → ``EventStream`` invocation log
+        (see :func:`~chirp.tools.live_log.mount_invocation_log`).
 
         Tool names must be unique across skills — collisions fail loud at mount
         time (aggregated ``/mcp`` has a single tool namespace). Returns ``self``.
@@ -147,9 +167,14 @@ class SkillRegistry:
 
         _register_discovery_route(app, self, path)
 
+        log_path: str | None = None
+        if invocation_log_path is not None:
+            log_path = mount_invocation_log(app, path=invocation_log_path)
+
         with self._lock:
             self._mounted = True
             self._discovery_path = path
+            self._invocation_log_path = log_path
         return self
 
 
@@ -158,8 +183,9 @@ def mount_skills(
     skills: SkillRegistry | Iterable[Skill],
     *,
     discovery_path: str = DEFAULT_DISCOVERY_PATH,
+    invocation_log_path: str | None = DEFAULT_INVOCATION_LOG_PATH,
 ) -> SkillRegistry:
-    """Mount skills onto ``app`` and expose a discovery endpoint.
+    """Mount skills onto ``app`` and expose discovery + live invocation log.
 
     Accepts either a pre-built :class:`SkillRegistry` or an iterable of
     :class:`~chirp.skill.mount.Skill` instances. Each skill is mounted via
@@ -167,7 +193,9 @@ def mount_skills(
     MCP surface then serves one aggregated ``/mcp`` with all tools.
 
     The discovery route (default ``/skills``) returns a JSON document of
-    skill manifests so agents can list what the host mounts.
+    skill manifests so agents can list what the host mounts. The invocation
+    log route (default ``/invocations/live``) streams ``ToolCallEvent``
+    fragments over SSE; pass ``invocation_log_path=None`` to skip it.
 
     Returns the :class:`SkillRegistry` (creating one when given an iterable).
     """
@@ -177,7 +205,11 @@ def mount_skills(
         registry = SkillRegistry()
         for skill in skills:
             registry.add(skill)
-    return registry.mount(app, discovery_path=discovery_path)
+    return registry.mount(
+        app,
+        discovery_path=discovery_path,
+        invocation_log_path=invocation_log_path,
+    )
 
 
 def _normalize_discovery_path(path: str) -> str:
@@ -223,6 +255,7 @@ def _register_discovery_route(
 
 __all__ = [
     "DEFAULT_DISCOVERY_PATH",
+    "DEFAULT_INVOCATION_LOG_PATH",
     "SkillRegistry",
     "mount_skills",
 ]
