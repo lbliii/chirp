@@ -87,7 +87,7 @@ severity default is authorized by this decision.
 | Issue | Approved work | Explicitly not approved |
 | --- | --- | --- |
 | [#884](https://github.com/lbliii/chirp/issues/884) Detect duplicate render surfaces / ownership | **Reconciled 2026-08-08 as no-action.** Empty new-predicate scope fulfilled by documenting the rejection; optional repair-doc polish for the three accepted families only (no severity/category changes). | New `app.check()` categories; ERROR/WARNING for “duplicate surfaces” or “ownership”; second topology scanner |
-| [#885](https://github.com/lbliii/chirp/issues/885) Report dead / unreachable / suppressed / unproven gaps | Inspection/projection that surfaces existing `dead` / `orphan` / `unreachable_block`, lists severity overrides as `suppressed` (never clean), and marks undeclared dynamic edges as `unproven` / `unobserved` | Promoting those to ERROR; claiming suppressions are stale; treating static reachability as behavioral coverage |
+| [#885](https://github.com/lbliii/chirp/issues/885) Report dead / unreachable / suppressed / unproven gaps | Inspection/projection that surfaces existing `dead` / `orphan` / `unreachable_block`, lists severity overrides as `suppressed` (never clean), and marks undeclared dynamic edges as `unproven` / `unobserved`. **Shipped** as the private `src/chirp/contracts/gap_diagnostics.py` projection (see `docs/design/architecture-gap-diagnostics.md`). | Promoting those to ERROR; claiming suppressions are stale; treating static reachability as behavioral coverage |
 
 ### #884 reconcile receipt (2026-08-08)
 

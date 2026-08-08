@@ -67,3 +67,12 @@ compiler; the projection must not grow a parallel scanner.
 When `CheckResult` is unavailable, findings and coverage are empty and the
 projection includes `contract_findings_and_coverage:unavailable`. Consumers
 must render that state as unavailable, never clean.
+
+## Related: architecture gap diagnostics
+
+Approved dead / orphan / unreachable / suppressed / unproven / unobserved
+inventory for agents lives in the sibling private module
+`src/chirp/contracts/gap_diagnostics.py`. See
+[`architecture-gap-diagnostics.md`](architecture-gap-diagnostics.md). That
+projection copies existing check findings and override inventory; it does not
+replace this topology projection or promote non-blocking categories to ERROR.
