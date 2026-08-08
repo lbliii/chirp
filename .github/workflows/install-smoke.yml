@@ -1,0 +1,72 @@
+name: Install smoke
+
+# Fresh-environment install + import smoke for every supported dependency
+# resolution profile (issue #910 / decision #908). Kept as a dedicated workflow
+# so specialized capability lanes (#906 Redis, #917 skip-fail, auth/browser/PG)
+# stay lean.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: install-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.gen.outputs.include }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14t"
+
+      - name: Generate profile x python matrix
+        id: gen
+        run: |
+          {
+            echo "include<<EOF"
+            python scripts/install_smoke.py --matrix-json
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+  install-smoke:
+    needs: matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.matrix.outputs.include) }}
+    name: ${{ matrix.profile }} (${{ matrix.python-version }})
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-install-smoke-${{ matrix.profile }}-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-install-smoke-${{ matrix.profile }}-${{ matrix.python-version }}-
+            uv-${{ runner.os }}-install-smoke-
+
+      - name: Fresh-environment install + import smoke
+        env:
+          PYTHON_GIL: ${{ matrix.free_threaded == 'true' && '0' || '' }}
+        run: >
+          python scripts/install_smoke.py
+          --profile ${{ matrix.profile }}
+          --python ${{ matrix.python-version }}
