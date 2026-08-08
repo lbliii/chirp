@@ -123,6 +123,10 @@ branch: main
 root_directory: examples/chirpui/lucky_cat
 ```
 
+The Orrery skill host (service root `examples/standalone/orrery/`) uses the same
+GitHub + `GIT_REF` pattern with `bengal-chirp[skill,sessions]` and mounts N
+dogfood skills on one aggregated `/mcp`. See that directory's `railway.toml`.
+
 If you keep using `railway up`, run it from an up-to-date `main` checkout so the
 Dockerfile's git-install layer (`GIT_REF=main`) always matches the framework the
 demo imports. See `examples/chirpui/lucky_cat/railway.toml` for the required

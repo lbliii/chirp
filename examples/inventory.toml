@@ -400,6 +400,17 @@ readme = "present"
 test_entrypoint = "examples/standalone/optimistic_apply"
 
 [[examples]]
+path = "standalone/orrery"
+lane = "standalone"
+status = "canonical"
+tier = 3
+extras = ["sessions", "skill"]
+network = "none"
+capabilities = ["contracts", "csrf", "fragments", "pages", "security", "sessions", "sse", "tools"]
+readme = "present"
+test_entrypoint = "examples/standalone/orrery"
+
+[[examples]]
 path = "standalone/passkeys_minimal"
 lane = "standalone"
 status = "supporting"

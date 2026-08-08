@@ -60,6 +60,7 @@ PYTHONPATH=src python examples/standalone/hello/app.py
 - [`ollama`](ollama/) — canonical, tier 3
 - [`oob_layout_chain`](oob_layout_chain/) — experimental, tier 3
 - [`optimistic_apply`](optimistic_apply/) — experimental, tier 3
+- [`orrery`](orrery/) — canonical, tier 3
 - [`passkeys_minimal`](passkeys_minimal/) — supporting, tier 3
 - [`pokedex`](pokedex/) — supporting, tier 2
 - [`production`](production/) — canonical, tier 3

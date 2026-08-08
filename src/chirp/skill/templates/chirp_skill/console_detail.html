@@ -126,7 +126,8 @@
       {% if live_log_ready and live_log_path %}
       <div id="chirp-invocation-log"
            hx-ext="sse"
-           sse-connect="{{ live_log_path }}">
+           sse-connect="{{ live_log_path }}"
+           hx-disinherit="hx-target hx-swap">
         <div sse-swap="message" hx-target="this" hx-swap="afterbegin"></div>
         <p class="live-log-waiting">Streaming invocations…</p>
       </div>
