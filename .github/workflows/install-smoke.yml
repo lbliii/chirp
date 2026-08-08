@@ -27,13 +27,14 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.14t"
+          enable-cache: false
 
       - name: Generate profile x python matrix
         id: gen
         run: |
           {
             echo "include<<EOF"
-            python scripts/install_smoke.py --matrix-json
+            uv run --no-project python scripts/install_smoke.py --matrix-json
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -67,6 +68,6 @@ jobs:
         env:
           PYTHON_GIL: ${{ matrix.free_threaded == 'true' && '0' || '' }}
         run: >
-          python scripts/install_smoke.py
+          uv run --no-project python scripts/install_smoke.py
           --profile ${{ matrix.profile }}
           --python ${{ matrix.python-version }}
