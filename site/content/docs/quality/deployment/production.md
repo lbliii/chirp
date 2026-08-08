@@ -253,7 +253,7 @@ These you opt into through `AppConfig` or CLI flags:
   - What it does
 * - `workers`
   - `0` (auto)
-  - Worker count; `0` resolves to the CPU count.
+  - Worker count. Explicit `N` is authoritative. `0` is resolved by Chirp before Pounce using cgroup CPU quota / cpuset when present (else host `cpu_count`), so a one-vCPU container does not inherit the host's core count. Optional `WEB_CONCURRENCY` overrides auto mode.
 * - `worker_mode`
   - `"auto"`
   - Pounce worker execution mode; use `"async"` when you register worker lifecycle hooks.

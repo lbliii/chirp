@@ -141,6 +141,19 @@ Railway can horizontally scale with replicas, but public traffic is randomly
 distributed and sticky sessions are not available. Any state kept only in one
 process can be invisible to requests that land on another replica.
 
+### Workers and CPU quota
+
+Chirp production auto-detect (`AppConfig.workers=0`) is **quota-aware**: it
+reads cgroup CPU quota/cpuset so a service does not inherit the host machine's
+core count (the failure mode that launched dozens of Pounce workers on a
+one-vCPU Launch Board deploy). Prefer leaving `workers=0` and letting Chirp
+resolve, or set an explicit `workers=N` / `WEB_CONCURRENCY` when you want a
+fixed count. Startup logs a `chirp workers:` line with the resolution inputs.
+
+Catalog starters that temporarily pinned `workers=1` solely to avoid host-CPU
+auto-detect (Launch Board / `chirp-railway-starter`) can drop that pin after
+this Chirp release once in-memory single-process requirements no longer apply.
+
 ## References
 
 - [Railway public networking](https://docs.railway.com/public-networking)

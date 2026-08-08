@@ -270,7 +270,9 @@ class AppConfig:
     max_upload_parts: int = 1000  # multipart part-count cap
 
     # Production (pounce Phase 6 features)
-    workers: int = 0  # 0 = auto-detect from CPU count (multi-worker for production)
+    # 0 = quota-aware auto-detect at production launch (cgroup/cpuset/host;
+    # see chirp.server.workers). Explicit N is authoritative.
+    workers: int = 0
     # Pounce worker execution: "auto" | "sync" | "async" | "subinterpreter"
     # sync = blocking I/O, no asyncio; async = event loop; auto = sync on 3.14t, async on GIL
     # subinterpreter = PEP 734 concurrent.interpreters (thread-like perf, process-like isolation)

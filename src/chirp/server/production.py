@@ -23,7 +23,7 @@ def run_production_server(
     app: App,
     host: str = "0.0.0.0",
     port: int = 8000,
-    workers: int = 0,  # 0 = auto-detect from CPU count
+    workers: int = 0,  # 0 = quota-aware auto-detect (see chirp.server.workers)
     worker_mode: str = "auto",  # "auto" | "sync" | "async" | "subinterpreter"
     *,
     display: DisplayConfig | None = None,
@@ -73,7 +73,8 @@ def run_production_server(
         app: Chirp App instance.
         host: Bind address (default: 0.0.0.0 for all interfaces).
         port: Bind port (default: 8000).
-        workers: Worker count (0 = auto-detect from CPU count).
+        workers: Worker count (0 = quota-aware auto-detect from cgroup/host
+            CPUs; see ``chirp.server.workers.resolve_production_workers``).
 
         metrics_enabled: Enable Prometheus /metrics endpoint.
         metrics_path: Path for metrics endpoint (default: /metrics).
@@ -139,13 +140,8 @@ def run_production_server(
         ... )
 
     Environment Variables:
-        You can also configure via environment variables:
-
-        - WORKERS: Worker count
-        - METRICS_ENABLED: Enable metrics (true/false)
-        - RATE_LIMIT_ENABLED: Enable rate limiting (true/false)
-        - SENTRY_DSN: Sentry DSN
-        - OTEL_ENDPOINT: OpenTelemetry endpoint
+        Prefer ``AppConfig`` / ``CHIRP_*`` fields for Chirp-owned settings.
+        When ``workers=0``, optional ``WEB_CONCURRENCY`` overrides auto-detect.
 
     """
     if worker_mode == "subinterpreter":
@@ -161,6 +157,13 @@ def run_production_server(
     app.freeze()
     from chirp.contracts.rules_signal_backplane import check_signal_bus_single_worker
     from chirp.errors import ConfigurationError
+    from chirp.server.workers import emit_worker_resolution, resolve_production_workers
+
+    # Chirp owns workers=0 resolution so containers honor cgroup quota instead of
+    # the host CPU count that Pounce's os.cpu_count() auto-detect would use.
+    resolution = resolve_production_workers(workers)
+    emit_worker_resolution(resolution)
+    effective_workers = resolution.resolved
 
     posture = copy.copy(app.config)
     object.__setattr__(posture, "env", "production")
@@ -169,7 +172,7 @@ def run_production_server(
         posture,
         app._runtime_state._signal_backplane_descriptor,
         signal_registry.names if signal_registry is not None else frozenset(),
-        workers=workers,
+        workers=effective_workers,
     )
     if issues:
         issue = issues[0]
@@ -178,11 +181,12 @@ def run_production_server(
     from pounce.config import ServerConfig
     from pounce.server import Server
 
-    # Build pounce configuration
+    # Pass a concrete worker count (never 0) so Pounce does not re-expand via
+    # host cpu_count inside quota-bounded containers.
     config = ServerConfig(
         host=host,
         port=port,
-        workers=workers,
+        workers=effective_workers,
         worker_mode=worker_mode,
         worker_startup_failure=(
             "shutdown" if app._worker_startup_hooks or app._worker_shutdown_hooks else "ignore"
