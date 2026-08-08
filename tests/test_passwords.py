@@ -1,5 +1,6 @@
 """Tests for password hashing — scrypt fallback and argon2 (if available)."""
 
+import os
 from unittest.mock import patch
 
 import pytest
@@ -24,6 +25,22 @@ from chirp.security.passwords import (
     verify_login,
     verify_password,
 )
+
+# Specialized CI sets this so the auth-capability lane fails closed when
+# argon2-cffi is missing instead of silently skipping Argon2 proof (#909).
+_REQUIRE_ARGON2_ENV = "CHIRP_REQUIRE_ARGON2"
+
+
+def _ensure_argon2() -> None:
+    """Skip locally without chirp[auth]; fail when the capability lane requires it."""
+    if _has_argon2():
+        return
+    if os.environ.get(_REQUIRE_ARGON2_ENV) == "1":
+        pytest.fail(
+            "argon2-cffi is required in the auth-capability CI lane "
+            f"(set via {_REQUIRE_ARGON2_ENV}=1); install chirp[auth]"
+        )
+    pytest.skip("argon2-cffi not installed")
 
 
 def _scrypt_hash_with(n: int, r: int = _SCRYPT_R, p: int = 1) -> str:
@@ -131,19 +148,25 @@ class TestVerifyPassword:
 
 
 # ---------------------------------------------------------------------------
-# Argon2 (if available)
+# Argon2 (if available; required in auth-capability CI — #909)
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.issue(909)
+def test_capability_lane_requires_live_argon2() -> None:
+    """auth-capability CI must install chirp[auth]; default installs stay optional."""
+    if os.environ.get(_REQUIRE_ARGON2_ENV) != "1":
+        return
+    assert _has_argon2(), "chirp[auth] / argon2-cffi missing in auth-capability lane"
+
+
+@pytest.mark.issue(909)
 class TestArgon2:
-    """Tests that run only if argon2-cffi is installed."""
+    """argon2id hash/verify proof — skip locally without chirp[auth]."""
 
     @pytest.fixture(autouse=True)
-    def _skip_without_argon2(self) -> None:
-        try:
-            import argon2  # noqa: F401
-        except ImportError:
-            pytest.skip("argon2-cffi not installed")
+    def _require_argon2(self) -> None:
+        _ensure_argon2()
 
     def test_argon2_is_preferred(self) -> None:
         hashed = hash_password("argon2-test")
@@ -175,13 +198,17 @@ class TestArgon2:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(not _has_argon2(), reason="argon2-cffi not installed")
+@pytest.mark.issue(909)
 class TestArgon2FailClosed:
     """Argon2 hardening — fail-closed verification and pinned cost params.
 
-    Guarded with skipif (not a fixture) so the base env, which has no
-    argon2-cffi, skips cleanly instead of erroring on import.
+    Local installs without chirp[auth] skip; the auth-capability CI lane
+    sets CHIRP_REQUIRE_ARGON2=1 so absence fails instead of skipping (#909).
     """
+
+    @pytest.fixture(autouse=True)
+    def _require_argon2(self) -> None:
+        _ensure_argon2()
 
     def test_verify_corrupt_hash_fails_closed(self) -> None:
         """A corrupt/truncated argon2 hash returns False, never raises.
@@ -379,9 +406,13 @@ class TestNeedsRehashUpgradeGating:
             assert needs_rehash(current_hash, upgrade_algorithm=True) is False
 
 
-@pytest.mark.skipif(not _has_argon2(), reason="argon2-cffi not installed")
+@pytest.mark.issue(909)
 class TestNeedsRehashArgon2:
     """Argon2-path rehash detection — only when argon2-cffi is installed."""
+
+    @pytest.fixture(autouse=True)
+    def _require_argon2(self) -> None:
+        _ensure_argon2()
 
     def test_fresh_argon2_not_stale(self) -> None:
         fresh = _hash_argon2("argon2-fresh")
@@ -467,8 +498,14 @@ class TestVerifyAndUpgrade:
         spy_hash.assert_not_called()
 
 
-@pytest.mark.skipif(not _has_argon2(), reason="argon2-cffi not installed")
+@pytest.mark.issue(909)
 class TestVerifyAndUpgradeArgon2:
+    """Live scrypt→argon2 upgrade proof when chirp[auth] is installed."""
+
+    @pytest.fixture(autouse=True)
+    def _require_argon2(self) -> None:
+        _ensure_argon2()
+
     def test_correct_and_current_argon2_returns_none(self) -> None:
         current = _hash_argon2("argon2-current")
         ok, new_hash = verify_and_upgrade("argon2-current", current)
@@ -477,7 +514,7 @@ class TestVerifyAndUpgradeArgon2:
 
     @pytest.mark.issue(751)
     def test_opt_in_upgrades_current_scrypt_to_argon2(self) -> None:
-        """upgrade_algorithm=True rehashes current-cost scrypt → argon2id (#751)."""
+        """upgrade_algorithm=True rehashes current-cost scrypt → argon2id (#751/#909)."""
         current_hash = _scrypt_hash_with(n=_SCRYPT_N, r=_SCRYPT_R)
         ok, new_hash = verify_and_upgrade("test", current_hash, upgrade_algorithm=True)
         assert ok is True

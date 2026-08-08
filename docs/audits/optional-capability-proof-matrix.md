@@ -87,6 +87,7 @@ is only proof when the matrix names the job that uses that profile.
 | Default unit | `ci.yml` → `test` | `uv sync --group dev` (free-threaded 3.14t) | Ordinary suite; currently also carries several optional packages via `dev` |
 | Browser | `ci.yml` → `browser-smoke` | `--group browser` + Playwright Chromium | Real-browser smoke (not an optional-extra row) |
 | Query interop | `ci.yml` → `query-interop` | protocol clients + nginx | RFC 10008 wire proof (not an optional-extra row) |
+| Auth (Argon2) | `ci.yml` → `auth-capability` | `--extra auth` + `CHIRP_REQUIRE_ARGON2=1` | `auth` argon2id hash/verify/upgrade |
 | PostgreSQL matrix | `ci.yml` → `test-postgres` | `--extra data-pg` + Postgres 13–18 | `data-pg` live backend |
 | Free-threaded PG | `ci.yml` → `data-pg-gil-gate` | `--extra data-pg` + Postgres 18 + `PYTHON_GIL=0` | `data-pg` concurrency |
 | Chirp UI compat | `ci.yml` → `chirp-ui-compat` | `--extra ui` + version matrix | `ui` compatibility |
@@ -125,7 +126,7 @@ optional packages **without** `--extra <name>`:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `forms` | `python-multipart` | Multipart parse, upload caps, bomb guards | none | `tests/test_forms.py`, form integration | `ci.yml`/`test` via `dev` | `already_proved` | http / validation | Receipt: multipart in `dev`. #917 for skip-fail. |
 | `sessions` | `itsdangerous` | Signed cookie sessions / middleware | none | `tests/test_sessions.py` (non-Redis) | `ci.yml`/`test` via `dev` | `already_proved` | middleware / security | Receipt: itsdangerous in `dev`. #917. |
-| `auth` | `argon2-cffi` | argon2id hash/verify; upgrade path | none | `tests/test_passwords.py` Argon2 classes; `tests/contracts/test_password_extra.py` | **none today** | `needs_lane` | security | Gap → **#909**. Default CI skips Argon2 classes. |
+| `auth` | `argon2-cffi` | argon2id hash/verify; upgrade path | none | `tests/test_passwords.py` Argon2 classes; `tests/contracts/test_password_extra.py` | `ci.yml` → `auth-capability` | `already_proved` | security | Lane installs `--extra auth`, asserts import, sets `CHIRP_REQUIRE_ARGON2=1` so Argon2 skips become failures (#909). Default `dev` still omits argon2. Skip-fail hardening for other lanes remains #917. |
 | `passkeys` | `webauthn` (+ cryptography) | WebAuthn begin/finish ceremony | none for unit; browser authenticator for e2e | `tests/test_passkeys.py`; contracts `test_passkeys_rule.py`; opt-in `examples/standalone/passkeys_minimal` (`passkeys_e2e`) | `ci.yml`/`test` via `dev` (unit/contract) | `already_proved` (unit) | security | Browser e2e is local/opt-in, not PR CI — explicit N/A for PR credential/browser lane; do not fold into #906. #917. |
 | `testing` | `httpx` | Test client transport | none | TestClient / httpx-backed suite | `ci.yml`/`test` via `dev` | `already_proved` | testing | Same httpx install as `ai`. #917. |
 | `data-pg` | _(empty; in-tree pelt)_ | Live PostgreSQL round-trip, TLS/auth, jobs, GIL gate | Postgres service | `tests/test_pelt/*`, `tests/test_jobs_postgres.py`, schema introspect | `test-postgres` + `data-pg-gil-gate` | `already_proved` | data / pelt | Preserve 13–18 + free-threaded lanes. #917. |
@@ -144,7 +145,7 @@ optional packages **without** `--extra <name>`:
 | Gap | Priority | Child | Rationale |
 | --- | --- | --- | --- |
 | Live Redis capability + failure paths | P1 | #906 | Advertised `redis` extra; defining tests skip or mock without a Redis service. |
-| Argon2 authentication path | P1 | #909 | Advertised `auth` extra; Argon2 tests skip in default CI (`argon2-cffi` absent from `dev`). |
+| Argon2 authentication path | P1 | #909 | **Closed by `auth-capability` lane** — `--extra auth` + focused password tests + `CHIRP_REQUIRE_ARGON2=1`. |
 | Remaining provider / heavy extras (`ai-bedrock`, `config`, any similar) | P2 | #915 | Credential-free / proportional lanes; do not bill third parties in PR CI. |
 | Fail specialized lanes on unexpected skips | P1 | #917 | Makes every `already_proved` row non-silently-skippable. |
 | Publish evidence + local skip guidance | P2 | #926 | User-facing view of this matrix; install-doc drift for `passkeys` / `ai-bedrock`. |
@@ -167,7 +168,7 @@ approved.
 | Situation | Expected locally | CI expectation |
 | --- | --- | --- |
 | No Redis | Redis session/secure_stack tests skip | After #906: specialized lane must not skip |
-| No argon2-cffi | Argon2 password tests skip; scrypt path still runs | After #909: auth lane must not skip |
+| No argon2-cffi | Argon2 password tests skip; scrypt path still runs | `auth-capability` installs `chirp[auth]` and must not skip (`CHIRP_REQUIRE_ARGON2=1`) |
 | No botocore | Bedrock generate test importorskips | After #915: bedrock lane must not skip |
 | No python-dotenv | `from_env` still works from process env | After #915: config lane proves `.env` load |
 | No Playwright | Browser tests importorskip | `browser-smoke` lane installs browser group |
