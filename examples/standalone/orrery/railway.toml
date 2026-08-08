@@ -1,0 +1,27 @@
+# Orrery — Railway service config.
+#
+# Deploy with the example directory as the service root directory:
+#     railway up   (from examples/standalone/orrery/)
+# or connect GitHub (lbliii/chirp, root directory examples/standalone/orrery).
+#
+# See docs/deployment/railway.md. Required service variables:
+#   CHIRP_ENV=production
+#   CHIRP_DEBUG=0
+#   CHIRP_SECRET_KEY=<generated secret>
+#   CHIRP_LOG_FORMAT=json
+#   GIT_REF=main
+#
+# Stateless MCP (no sticky sessions) — safe to scale replicas later; keep
+# ORRERY_SKIP_PUBLISH=0 (default) so boot records smoke ReliabilityScores.
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "python app.py"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+numReplicas = 1

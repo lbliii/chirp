@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orrery — skills you point at</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <style>
+    :root {
+      --void: #070b12;
+      --night: #0d1520;
+      --fog: #9aafc2;
+      --brass: #c4a06a;
+      --brass-dim: #8a6d42;
+      --phosphor: #7ec8a3;
+      --signal: #d4e4f0;
+      --line: color-mix(in oklab, var(--signal) 12%, transparent);
+      --font-display: "Bricolage Grotesque", "Avenir Next", sans-serif;
+      --font-body: "Source Serif 4", Georgia, serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { color-scheme: dark; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--signal);
+      font-family: var(--font-body);
+      font-size: 1.05rem;
+      line-height: 1.55;
+      background:
+        radial-gradient(ellipse 90% 60% at 70% -10%, color-mix(in oklab, var(--brass) 11%, transparent), transparent 50%),
+        radial-gradient(ellipse 70% 50% at 5% 30%, color-mix(in oklab, #1b3d5c 55%, transparent), transparent 55%),
+        linear-gradient(180deg, #04060c 0%, #070b14 40%, #0a121c 100%);
+    }
+    .shell {
+      position: relative;
+      z-index: 1;
+      max-width: 52rem;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 3rem;
+    }
+    .brand {
+      font-family: var(--font-display);
+      font-size: clamp(2.75rem, 8vw, 4.5rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 0.95;
+      color: var(--brass);
+      margin: 0;
+      animation: rise 0.9s var(--ease) both;
+    }
+    .lede {
+      margin: 0.85rem 0 0;
+      max-width: 28rem;
+      color: var(--fog);
+      font-size: 1.1rem;
+      animation: rise 0.9s var(--ease) 0.08s both;
+    }
+    .paths {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      margin: 1.75rem 0 0;
+      animation: rise 0.9s var(--ease) 0.16s both;
+    }
+    .paths a {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--phosphor);
+      text-decoration: none;
+      border-bottom: 1px solid color-mix(in oklab, var(--phosphor) 35%, transparent);
+      padding-bottom: 0.1rem;
+      transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+    }
+    .paths a:hover {
+      color: var(--signal);
+      border-color: var(--signal);
+    }
+    .skills {
+      margin: 2.25rem 0 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--fog);
+      animation: rise 0.9s var(--ease) 0.22s both;
+    }
+    .skills li::before {
+      content: "★ ";
+      color: var(--brass-dim);
+    }
+    .feed {
+      margin-top: 2.5rem;
+      border-top: 1px solid var(--line);
+      padding-top: 1.25rem;
+      animation: rise 0.9s var(--ease) 0.28s both;
+    }
+    .feed-head {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      margin-bottom: 0.85rem;
+    }
+    .feed-head h2 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--fog);
+    }
+    .live {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--phosphor);
+    }
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--phosphor);
+      animation: pulse 2s var(--ease) infinite;
+    }
+    .activity {
+      min-height: 4rem;
+    }
+    .activity-item {
+      padding: 0.65rem 0;
+      border-bottom: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      animation: fade-in 0.35s var(--ease);
+    }
+    .tool-name { color: var(--brass); font-weight: 500; }
+    .call-time { color: color-mix(in oklab, var(--fog) 55%, transparent); font-size: 0.7rem; margin-left: 0.5rem; }
+    .call-args { color: var(--fog); margin-top: 0.15rem; font-size: 0.75rem; }
+    .empty {
+      color: color-mix(in oklab, var(--fog) 55%, transparent);
+      font-style: italic;
+      font-size: 0.9rem;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(0.6rem); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(0.25rem); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <h1 class="brand">Orrery</h1>
+    <p class="lede">{{ skill_count }} wrapped skills on one aggregated <code>/mcp</code> — point an agent here; the console shows the call.</p>
+    <nav class="paths" aria-label="Host surfaces">
+      <a href="{{ console_path }}">{{ console_path }}</a>
+      <a href="{{ discovery_path }}">{{ discovery_path }}</a>
+      <a href="{{ mcp_path }}"><code>{{ mcp_path }}</code></a>
+    </nav>
+    <ul class="skills">
+      {% for name in skill_names %}
+      <li><a href="{{ console_path }}/{{ name }}" style="color:inherit;text-decoration:none">{{ name }}</a></li>
+      {% end %}
+    </ul>
+
+    <section class="feed" aria-label="Live invocations">
+      <div class="feed-head">
+        <h2>Invocations</h2>
+        <span class="live"><span class="live-dot" aria-hidden="true"></span> live</span>
+      </div>
+      {# sse-eager-connect: intentional #}
+      <div class="activity" hx-ext="sse" sse-connect="/feed" hx-disinherit="hx-target hx-swap">
+        <div sse-swap="message" hx-target="this" hx-swap="afterbegin"></div>
+        <p class="empty">Waiting for an MCP <code>tools/call</code>&hellip;</p>
+      </div>
+    </section>
+  </main>
+
+  {% block activity_row %}
+  {% if (event ?? none) %}
+  <div class="activity-item">
+    <div>
+      <span class="tool-name">{{ event.tool_name }}</span>
+      <span class="call-time">{{ event.timestamp | format_call_time }}</span>
+    </div>
+    <div class="call-args">{{ event.arguments | format_args }}</div>
+  </div>
+  {% end %}
+  {% end %}
+</body>
+</html>
