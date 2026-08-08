@@ -41,10 +41,10 @@ def test_packaged_entrypoint_uses_milo_without_argparse_registration() -> None:
 def test_precomputed_schemas_match_typed_lazy_handlers() -> None:
     cli = _build_cli()
 
-    for name, command in cli.commands.items():
+    for path, command in cli.walk_commands():
         module_name, _, attribute = command.import_path.rpartition(":")
         handler = getattr(importlib.import_module(module_name), attribute)
-        assert command.schema == function_to_schema(handler), name
+        assert command.schema == function_to_schema(handler), path
 
 
 @pytest.mark.issue(573)
@@ -53,6 +53,9 @@ def test_agent_surfaces_use_an_explicit_read_only_allowlist() -> None:
     exposed = {"check", "diff", "routes"}
 
     assert len(cli.commands) == 11
+    assert "skill" in cli.groups
+    assert set(cli.groups["skill"].commands) == {"publish"}
+    assert cli.groups["skill"].commands["publish"].surfaces == ("cli",)
     assert {
         name for name, command in cli.commands.items() if command.surfaces != ("cli",)
     } == exposed

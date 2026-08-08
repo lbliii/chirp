@@ -26,8 +26,14 @@ _HELP_HEADINGS = {
     ("makemigrations",): "chirp makemigrations - Auto-generate schema migration from SQL diff",
     ("migrate",): "chirp migrate - Apply pending schema migrations (one-shot deploy job)",
     ("shapes-codegen",): "chirp shapes-codegen - Suggest @shape decorators and audit Shape drift",
+    ("skill",): "chirp skill - Skill authoring and publish-oracle gates",
+    (
+        "skill",
+        "publish",
+    ): "chirp skill publish - Run check + freeze + smoke and emit a publish receipt",
 }
 
+# Top-level command names only (root help order). Nested groups use _NESTED_*.
 _POSITIONALS = {
     "new": ("name",),
     "run": ("app",),
@@ -40,6 +46,11 @@ _POSITIONALS = {
     "makemigrations": (),
     "migrate": (),
     "shapes-codegen": ("path",),
+    "skill": (),
+}
+
+_NESTED_POSITIONALS = {
+    ("skill", "publish"): ("app",),
 }
 
 _FLAGS = {
@@ -80,6 +91,12 @@ _FLAGS = {
     "makemigrations": ("--db", "--schema", "--migrations-dir"),
     "migrate": ("--db", "--migrations-dir"),
     "shapes-codegen": ("--dry-run", "--audit", "--migrations"),
+    "skill.publish": (
+        "--corpus",
+        "--fixture",
+        "--warnings-as-errors",
+        "--json",
+    ),
 }
 
 
@@ -113,7 +130,10 @@ def test_milo_help_preserves_command_meaning(command: tuple[str, ...], expected:
     assert result.returncode == 0
     assert result.stderr == ""
     assert result.stdout.splitlines()[0] == expected
-    if command:
+    if command in _NESTED_POSITIONALS:
+        for positional in _NESTED_POSITIONALS[command]:
+            assert f"  {positional} {positional}" in result.stdout
+    elif command:
         for positional in _POSITIONALS[command[0]]:
             assert f"  {positional} {positional}" in result.stdout
     else:
@@ -124,7 +144,12 @@ def test_milo_help_preserves_command_meaning(command: tuple[str, ...], expected:
 @pytest.mark.issue(571)
 @pytest.mark.parametrize("command", _FLAGS)
 def test_help_and_contract_doc_inventory_every_flag(command: str) -> None:
-    args = () if command == "global" else (command,)
+    if command == "global":
+        args: tuple[str, ...] = ()
+    elif "." in command:
+        args = tuple(command.split("."))
+    else:
+        args = (command,)
     result = _run_cli(*args, "--help")
     assert result.returncode == 0
     contract = _CONTRACT_DOC.read_text(encoding="utf-8")
@@ -141,7 +166,7 @@ def test_no_command_and_version_are_stdout_exit_zero() -> None:
     assert no_command.stdout.startswith(_HELP_HEADINGS[()] + "\n")
     assert "  new " in no_command.stdout
     assert "  shapes-codegen " in no_command.stdout
-
+    assert "  skill " in no_command.stdout
     version = _run_cli("--version")
     assert version.returncode == 0
     assert version.stderr == ""

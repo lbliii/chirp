@@ -301,3 +301,30 @@ def shapes_codegen_command(
     from chirp.cli._shapes_codegen import run_shapes_codegen
 
     run_shapes_codegen(_args(path=path, dry_run=dry_run, audit=audit, migrations_dir=migrations))
+
+
+def skill_publish_command(
+    app: Annotated[str, Positional("app")],
+    corpus: Annotated[str | None, Option(metavar="PATH")] = None,
+    fixture: bool = False,
+    warnings_as_errors: bool = False,
+    json: bool = False,
+) -> dict[str, Any]:
+    """Run the skill publish gate (check + freeze + smoke) and emit a receipt.
+
+    Args:
+        app: Application import string, for example myapp:app.
+        corpus: JSON path to a golden NL smoke corpus (array of CorpusPrompt).
+        fixture: Use the built-in fixture-echo corpus from chirp.skill.smoke.
+        warnings_as_errors: Fail the check stage when contract warnings exist.
+        json: Emit the stable JSON publish receipt.
+    """
+    from chirp.cli._skill_publish import collect_skill_publish_result
+
+    return collect_skill_publish_result(
+        app,
+        corpus=corpus,
+        fixture=fixture,
+        warnings_as_errors=warnings_as_errors,
+        json_output=json,
+    )

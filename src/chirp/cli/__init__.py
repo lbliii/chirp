@@ -231,6 +231,23 @@ def _schemas() -> dict[str, dict[str, Any]]:
                 ),
             }
         ),
+        "skill.publish": _schema(
+            {
+                "app": _positional(
+                    "string", "Application import string, for example myapp:app.", "app"
+                ),
+                "corpus": _option(
+                    "string",
+                    "JSON path to a golden NL smoke corpus (array of CorpusPrompt).",
+                    "PATH",
+                    default=None,
+                ),
+                "fixture": _flag("Use the built-in fixture-echo corpus from chirp.skill.smoke."),
+                "warnings_as_errors": _flag("Fail the check stage when contract warnings exist."),
+                "json": _flag("Emit the stable JSON publish receipt."),
+            },
+            "app",
+        ),
     }
 
 
@@ -334,6 +351,18 @@ def _build_cli() -> CLI:
         },
     )
     register("shapes-codegen", "Suggest @shape decorators and audit Shape drift")
+
+    skill = cli.group("skill", description="Skill authoring and publish-oracle gates")
+    skill.lazy_command(
+        "publish",
+        "chirp.cli._milo_handlers:skill_publish_command",
+        description="Run check + freeze + smoke and emit a publish receipt",
+        schema=schemas["skill.publish"],
+        surfaces=_CLI_ONLY,
+        display_result=True,
+        terminal_renderer=_render_inspection_result,
+        annotations={"readOnlyHint": True, "openWorldHint": True},
+    )
     return cli
 
 
