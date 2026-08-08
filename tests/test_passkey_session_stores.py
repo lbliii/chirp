@@ -32,18 +32,9 @@ from chirp.security.passkeys import (
     _pop_challenge,
     _stash_challenge,
 )
+from tests.helpers.redis_capability import ensure_redis_package
 
 pytestmark = pytest.mark.issue(871)
-
-
-def _redis_available() -> bool:
-    try:
-        return importlib.util.find_spec("redis.asyncio") is not None
-    except ModuleNotFoundError:
-        return False
-
-
-_REDIS_AVAILABLE = _redis_available()
 
 
 def _session_cookie_value(response: Response, name: str = "chirp_session") -> str:
@@ -171,8 +162,19 @@ class TestCookieChallengeRoundtrip:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(not _REDIS_AVAILABLE, reason="requires the optional 'redis' extra")
+@pytest.mark.issue(906)
 class TestRedisChallengeRoundtrip:
+    """Redis ceremony path — skip locally without chirp[redis].
+
+    The redis-capability CI lane sets CHIRP_REQUIRE_REDIS=1 so absence fails
+    instead of skipping (#906). These tests still patch redis.asyncio.from_url
+    with an in-memory client (package presence is the gate).
+    """
+
+    @pytest.fixture(autouse=True)
+    def _require_redis(self) -> None:
+        ensure_redis_package()
+
     async def test_challenge_survives_begin_finish_exactly_once(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

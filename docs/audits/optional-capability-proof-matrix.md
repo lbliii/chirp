@@ -88,6 +88,7 @@ is only proof when the matrix names the job that uses that profile.
 | Browser | `ci.yml` → `browser-smoke` | `--group browser` + Playwright Chromium | Real-browser smoke (not an optional-extra row) |
 | Query interop | `ci.yml` → `query-interop` | protocol clients + nginx | RFC 10008 wire proof (not an optional-extra row) |
 | Auth (Argon2) | `ci.yml` → `auth-capability` | `--extra auth` + `CHIRP_REQUIRE_ARGON2=1` | `auth` argon2id hash/verify/upgrade |
+| Redis | `ci.yml` → `redis-capability` | `--extra redis` + Redis service + `CHIRP_REQUIRE_REDIS=1` | `redis` sessions / cache / rate-limit + outage |
 | PostgreSQL matrix | `ci.yml` → `test-postgres` | `--extra data-pg` + Postgres 13–18 | `data-pg` live backend |
 | Free-threaded PG | `ci.yml` → `data-pg-gil-gate` | `--extra data-pg` + Postgres 18 + `PYTHON_GIL=0` | `data-pg` concurrency |
 | Chirp UI compat | `ci.yml` → `chirp-ui-compat` | `--extra ui` + version matrix | `ui` compatibility |
@@ -135,7 +136,7 @@ optional packages **without** `--extra <name>`:
 | `markdown` | `patitas[syntax]` | Markdown render + highlighting filter | none | `tests/test_markdown.py` | `ci.yml`/`test` via `dev` | `already_proved` | markdown | Receipt: patitas in `dev`. #917. |
 | `ui` | `chirp-ui` | Layout macros, CSS verify, shell examples | none | `tests/test_chirpui_*`, contracts ChirpUI rules, shell examples | `chirp-ui-compat` (+ `contract-diff.yml`) | `already_proved` | ext / site | Authoritative lane is `chirp-ui-compat`, not incidental `dev` install. #917; demotion work stays under #897. |
 | `config` | `python-dotenv` | `AppConfig.from_env()` loads `.env` when installed | none (local file only) | No dedicated dotenv behavioral test today; silent `ImportError` pass in `config.py` | **none today** | `needs_lane` | settings / public | Gap → **#915**. Proportional proof: install dotenv, assert `.env` values load without live secrets. |
-| `redis` | `redis` | Redis sessions, secure_stack redis path, cache backend, signal backplane | **live Redis** for capability proof; failure-path without flaky network | `tests/test_sessions.py` Redis class; `tests/test_secure_stack.py`; `tests/test_cache_redis_optional.py` (mock); signal backplane | **none today** | `needs_lane` | middleware / realtime / cache | Gap → **#906**. Current coverage is import-gated or mocked; no Redis service in CI. |
+| `redis` | `redis` | Redis sessions, secure_stack redis path, cache backend, signal backplane | **live Redis** for capability proof; failure-path without flaky network | `tests/test_redis_capability.py`; `tests/test_sessions.py` Redis class; `tests/test_secure_stack.py`; `tests/test_cache_redis_optional.py`; passkey Redis store | `ci.yml` → `redis-capability` | `already_proved` | middleware / realtime / cache | Lane installs `--extra redis`, starts Redis, asserts import, sets `CHIRP_REQUIRE_REDIS=1` + `CHIRP_TEST_REDIS_URL` so package/service skips become failures (#906). Default `dev` still omits redis. Skip-fail hardening for other lanes remains #917. |
 | `all` | union of common deps (see pyproject; **excludes** `ui`, `config`, `redis`, `passkeys`, `ai-bedrock`, `benchmark`) | Install profile, not a capability | n/a | Profile resolution under #899 | n/a | `n_a` | settings / root | Aggregate extra. Composition integrity → epic #899 / decision #908. |
 | `full` | same dep list as `all` today | Install profile, not a capability | n/a | Profile resolution under #899 | n/a | `n_a` | settings / root | Aggregate extra. Same gap ownership as `all`. |
 | `benchmark` | peer frameworks (FastAPI, Flask, …) | Comparative / pelt benchmark tooling | Postgres for pelt-controlled | `benchmarks/*`, `tests/test_benchmarks_core.py` | `benchmarks.yml` (path-filtered) + pelt smoke on PG lane | `already_proved` | benchmarks | Tooling extra; not every-PR. Unexpected skip policy still #917 if a required bench step is asserted. |
@@ -144,7 +145,7 @@ optional packages **without** `--extra <name>`:
 
 | Gap | Priority | Child | Rationale |
 | --- | --- | --- | --- |
-| Live Redis capability + failure paths | P1 | #906 | Advertised `redis` extra; defining tests skip or mock without a Redis service. |
+| Live Redis capability + failure paths | P1 | #906 | **Closed by `redis-capability` lane** — `--extra redis` + Redis service + live session/cache/rate-limit proofs + unreachable-port failure path + `CHIRP_REQUIRE_REDIS=1`. |
 | Argon2 authentication path | P1 | #909 | **Closed by `auth-capability` lane** — `--extra auth` + focused password tests + `CHIRP_REQUIRE_ARGON2=1`. |
 | Remaining provider / heavy extras (`ai-bedrock`, `config`, any similar) | P2 | #915 | Credential-free / proportional lanes; do not bill third parties in PR CI. |
 | Fail specialized lanes on unexpected skips | P1 | #917 | Makes every `already_proved` row non-silently-skippable. |
@@ -167,7 +168,7 @@ approved.
 
 | Situation | Expected locally | CI expectation |
 | --- | --- | --- |
-| No Redis | Redis session/secure_stack tests skip | After #906: specialized lane must not skip |
+| No Redis | Redis session/secure_stack/live capability tests skip | `redis-capability` installs `chirp[redis]`, starts Redis, and must not skip (`CHIRP_REQUIRE_REDIS=1`, `CHIRP_TEST_REDIS_URL`) |
 | No argon2-cffi | Argon2 password tests skip; scrypt path still runs | `auth-capability` installs `chirp[auth]` and must not skip (`CHIRP_REQUIRE_ARGON2=1`) |
 | No botocore | Bedrock generate test importorskips | After #915: bedrock lane must not skip |
 | No python-dotenv | `from_env` still works from process env | After #915: config lane proves `.env` load |
