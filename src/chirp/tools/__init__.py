@@ -6,8 +6,8 @@ HTML routes. Tool calls emit events for real-time dashboards.
 
 Usage::
 
-    from chirp import App, EventStream, Fragment
-    from chirp.tools import ToolCallEvent
+    from chirp import App
+    from chirp.tools import mount_invocation_log
 
     app = App()
 
@@ -15,12 +15,8 @@ Usage::
     async def search(query: str) -> list[dict]:
         return await db.search(query)
 
-    @app.route("/dashboard/feed")
-    async def feed(request):
-        async def stream():
-            async for event in app.tool_events.subscribe():
-                yield Fragment("dashboard.html", "row", event=event)
-        return EventStream(stream())
+    # Live ToolEventBus → EventStream bridge (console / Orrery)
+    mount_invocation_log(app)
 """
 
 from chirp.tools.approval import (
@@ -31,9 +27,21 @@ from chirp.tools.approval import (
     ToolApprovalStore,
 )
 from chirp.tools.events import ToolCallEvent, ToolEventBus
+from chirp.tools.live_log import (
+    DEFAULT_INVOCATION_LOG_BLOCK,
+    DEFAULT_INVOCATION_LOG_PATH,
+    DEFAULT_INVOCATION_LOG_TARGET,
+    DEFAULT_INVOCATION_LOG_TEMPLATE,
+    mount_invocation_log,
+    tool_event_stream,
+)
 from chirp.tools.registry import ToolDef, ToolRegistry
 
 __all__ = [
+    "DEFAULT_INVOCATION_LOG_BLOCK",
+    "DEFAULT_INVOCATION_LOG_PATH",
+    "DEFAULT_INVOCATION_LOG_TARGET",
+    "DEFAULT_INVOCATION_LOG_TEMPLATE",
     "InMemoryToolApprovalStore",
     "PendingToolApproval",
     "SessionToolApprovalStore",
@@ -43,4 +51,6 @@ __all__ = [
     "ToolDef",
     "ToolEventBus",
     "ToolRegistry",
+    "mount_invocation_log",
+    "tool_event_stream",
 ]

@@ -98,7 +98,7 @@ def test_milo_adapter_is_documented_as_a_provisional_submodule_api() -> None:
     assert "not re-exported from `chirp`" in section
 
 
-@pytest.mark.issue(969, 970, 974, 973, 975, 976, 981, 982)
+@pytest.mark.issue(969, 970, 974, 973, 975, 976, 981, 982, 983)
 def test_skill_envelope_is_documented_as_a_provisional_submodule_api() -> None:
     section = _section_body(_PUBLIC_API_DOC.read_text(), "Provisional Submodule APIs")
 
@@ -114,6 +114,7 @@ def test_skill_envelope_is_documented_as_a_provisional_submodule_api() -> None:
         "SkillRegistry",
         "mount_skills",
         "DEFAULT_DISCOVERY_PATH",
+        "DEFAULT_INVOCATION_LOG_PATH",
         "mount_console",
         "DEFAULT_CONSOLE_PATH",
         "ReliabilityScore",
@@ -144,6 +145,8 @@ def test_skill_envelope_is_documented_as_a_provisional_submodule_api() -> None:
     assert "cryptography" in section
     assert "Importing `chirp` does not load `chirp.skill`" in section
     assert "chirp skill publish" in section
+    assert "ToolEventBus" in section
+    assert "/invocations/live" in section
 
 
 @pytest.mark.issue(973)
