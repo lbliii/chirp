@@ -7,13 +7,17 @@ top-level ``chirp``. See ``docs/public-api.md`` (Provisional Submodule APIs).
 from chirp.skill.envelope import Envelope, sign_envelope, verify_envelope
 from chirp.skill.manifest import Manifest, assemble_manifest, compute_content_digest
 from chirp.skill.mount import Skill, use_skill
+from chirp.skill.registry import DEFAULT_DISCOVERY_PATH, SkillRegistry, mount_skills
 
 __all__ = [
+    "DEFAULT_DISCOVERY_PATH",
     "Envelope",
     "Manifest",
     "Skill",
+    "SkillRegistry",
     "assemble_manifest",
     "compute_content_digest",
+    "mount_skills",
     "sign_envelope",
     "use_skill",
     "verify_envelope",
