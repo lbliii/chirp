@@ -66,6 +66,13 @@ How swaps work, when they redirect, and the tripwires that catch silent failures
 One vocabulary for Chirp + chirp-ui layouts and ``chirp.shell_regions``.
 :::{/card}
 
+:::{card} App-owned tokens and themes
+:icon: palette
+:link: /chirp/docs/build-apps/ui-extensions/app-theme/
+:description: Semantic CSS tokens, data-theme, cookie preference
+Layered CSS and light/dark/system without a UI runtime or Alpine.
+:::{/card}
+
 :::{card} chirp-ui
 :icon: palette
 :link: /chirp/docs/build-apps/ui-extensions/chirp-ui/

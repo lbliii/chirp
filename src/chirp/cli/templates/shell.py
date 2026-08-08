@@ -3,10 +3,12 @@
 SHELL_APP_PY = """\
 import os
 
-from chirp import App, AppConfig
+from chirp import App, AppConfig, Request, is_safe_url
 from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
 from chirp.middleware.security_headers import SecurityHeadersMiddleware
 from chirp.middleware.sessions import SessionConfig, SessionMiddleware
+
+from theme import normalize_theme, theme_redirect
 
 _DEFAULT_SECRET = "change-me-before-deploying"
 _secret = os.environ.get("CHIRP_SECRET_KEY", _DEFAULT_SECRET)
@@ -53,25 +55,61 @@ app.add_middleware(SecurityHeadersMiddleware())
 
 app.mount_pages("pages")
 
+
+@app.route("/theme", methods=["POST"])
+async def set_theme(request: Request):
+    form = await request.form()
+    theme = normalize_theme(form.get("theme"))
+    next_url = form.get("next") or "/"
+    if not is_safe_url(next_url):
+        next_url = "/"
+    return theme_redirect(
+        next_url,
+        theme,
+        secure=config.env != "development",
+    )
+
+
 if __name__ == "__main__":
     app.run()
 """
 
 SHELL_CONTEXT_PY = """\
+from theme import read_theme
+
+
 def context(request) -> dict:
-    return {"current_path": request.path}
+    return {"current_path": request.path, "theme": read_theme(request)}
 """
 
 SHELL_LAYOUT_HTML = """\
 {# target: body #}
 {# outlet: main #}
 {% extends "chirp/layouts/shell.html" %}
+{% block html_attrs %}data-theme="{{ theme }}"{% end %}
 {% block head %}
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/css/tokens.css">
+<link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/components.css">
+<link rel="stylesheet" href="/static/css/patterns.css">
+<link rel="stylesheet" href="/static/css/pages.css">
+<script src="/static/js/theme.js" defer></script>
 {% end %}
 {% block shell %}
-<header style="padding:1rem;border-bottom:1px solid #e2e8f0">
+<header class="app-nav" style="margin-bottom:var(--space-4)">
     <a href="/" style="font-weight:600">{{ current_path or "App" }}</a>
+    <form method="post" action="/theme" class="theme-control" data-theme-control
+          hx-boost="false">
+        {{ csrf_field() }}
+        <input type="hidden" name="next" value="{{ current_path }}">
+        <fieldset>
+            <legend class="sr-only">Color theme</legend>
+            <label><input type="radio" name="theme" value="light"{% if theme == "light" %} checked{% end %}> Light</label>
+            <label><input type="radio" name="theme" value="dark"{% if theme == "dark" %} checked{% end %}> Dark</label>
+            <label><input type="radio" name="theme" value="system"{% if theme == "system" %} checked{% end %}> System</label>
+        </fieldset>
+        <button type="submit">Apply theme</button>
+    </form>
 </header>
 <main id="main" hx-boost="true" hx-target="#main"
       hx-swap="innerHTML" hx-select="#page-content">

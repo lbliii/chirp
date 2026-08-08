@@ -79,7 +79,10 @@ class TestChirpNewDefaultV2:
         assert (project / "templates" / "components" / "chrome" / "panel.html").is_file()
         assert (project / "templates" / "patterns" / "account_summary.html").is_file()
         assert (project / "templates" / "_partials" / ".gitkeep").is_file()
-        assert (project / "static" / "style.css").is_file()
+        assert (project / "static" / "css" / "tokens.css").is_file()
+        assert (project / "static" / "js" / "theme.js").is_file()
+        assert (project / "theme.py").is_file()
+        assert not (project / "static" / "style.css").exists()
         assert not (project / "static" / "theme.css").exists()
         assert (project / "AGENTS.md").is_file()
         assert (project / "pyproject.toml").is_file()
@@ -339,6 +342,8 @@ class TestChirpNewShell:
         assert (project / "pages" / "items" / "page.html").is_file()
         assert (project / "AGENTS.md").is_file()
         assert (project / "pyproject.toml").is_file()
+        assert (project / "static" / "css" / "tokens.css").is_file()
+        assert (project / "theme.py").is_file()
         assert not (project / "static" / "theme.css").exists()
 
     def test_shell_app_is_valid_python(

@@ -18,9 +18,14 @@ from chirp.cli.templates import (
     AI_CHAT_HTML,
     AI_ENV_EXAMPLE,
     AI_TEST_APP_PY,
+    BASE_CSS,
+    COMPONENTS_CSS,
+    INTERACTIONS_JS,
     MIGRATIONS_README,
     MINIMAL_APP_PY,
     MINIMAL_INDEX_HTML,
+    PAGES_CSS,
+    PATTERNS_CSS,
     PYPROJECT_TOML,
     RAILWAY_JSON,
     SHELL_APP_PY,
@@ -48,9 +53,13 @@ from chirp.cli.templates import (
     STYLE_CSS,
     TEST_APP_PY,
     THEME_CSS_STUB,
+    THEME_JS,
+    THEME_PY,
+    TOKENS_CSS,
     V2_APP_CHIRPUI_PY,
     V2_APP_PY,
     V2_CONFTEST_PY,
+    V2_CONTEXT_PY,
     V2_DASHBOARD_CHIRPUI_HTML,
     V2_DASHBOARD_HTML,
     V2_DASHBOARD_PAGE_PY,
@@ -66,7 +75,6 @@ from chirp.cli.templates import (
     V2_PANEL_COMPONENT_HTML,
     V2_PATTERN_ACCOUNT_SUMMARY_HTML,
     V2_STYLE_CHIRPUI_CSS,
-    V2_STYLE_CSS,
     V2_TEST_APP_PY,
 )
 
@@ -79,6 +87,21 @@ def _has_chirpui() -> bool:
         return True
     except ImportError:
         return False
+
+
+def _write_app_theme_assets(static_dir: Path) -> None:
+    """Write app-owned CSS layers + theme/interaction scripts (#858)."""
+    css_dir = static_dir / "css"
+    js_dir = static_dir / "js"
+    css_dir.mkdir(parents=True, exist_ok=True)
+    js_dir.mkdir(parents=True, exist_ok=True)
+    (css_dir / "tokens.css").write_text(TOKENS_CSS, encoding="utf-8")
+    (css_dir / "base.css").write_text(BASE_CSS, encoding="utf-8")
+    (css_dir / "components.css").write_text(COMPONENTS_CSS, encoding="utf-8")
+    (css_dir / "patterns.css").write_text(PATTERNS_CSS, encoding="utf-8")
+    (css_dir / "pages.css").write_text(PAGES_CSS, encoding="utf-8")
+    (js_dir / "theme.js").write_text(THEME_JS, encoding="utf-8")
+    (js_dir / "interactions.js").write_text(INTERACTIONS_JS, encoding="utf-8")
 
 
 def _write_scaffold_extras(project_dir: Path, name: str) -> None:
@@ -214,9 +237,12 @@ def _create_v2(project_dir: Path, name: str, *, with_chirpui: bool) -> None:
             V2_PATTERN_ACCOUNT_SUMMARY_HTML,
         )
         (templates_dir / "_partials" / ".gitkeep").write_text("")
-
-    style = V2_STYLE_CHIRPUI_CSS if use_chirpui else V2_STYLE_CSS
-    (static_dir / "style.css").write_text(style.format())
+        (project_dir / "theme.py").write_text(THEME_PY, encoding="utf-8")
+        (pages_dir / "_context.py").write_text(V2_CONTEXT_PY, encoding="utf-8")
+        _write_app_theme_assets(static_dir)
+    else:
+        style = V2_STYLE_CHIRPUI_CSS
+        (static_dir / "style.css").write_text(style.format())
 
     (tests_dir / "conftest.py").write_text(V2_CONFTEST_PY)
     (tests_dir / "test_app.py").write_text(V2_TEST_APP_PY.format(name=name))
@@ -253,6 +279,9 @@ def _create_shell(project_dir: Path, name: str, *, with_chirpui: bool) -> None:
     _write_scaffold_extras(project_dir, name)
     if use_chirpui:
         (static_dir / "theme.css").write_text(THEME_CSS_STUB, encoding="utf-8")
+    else:
+        (project_dir / "theme.py").write_text(THEME_PY, encoding="utf-8")
+        _write_app_theme_assets(static_dir)
 
 
 def _create_minimal(project_dir: Path, name: str) -> None:

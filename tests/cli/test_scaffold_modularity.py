@@ -66,7 +66,7 @@ def test_default_scaffold_teaches_explicit_template_roles(
     assert 'from "components/chrome/panel.html" import panel' in pattern
     assert "{% block " not in pattern
     assert (project / "templates" / "_partials" / ".gitkeep").is_file()
-    assert "{{" not in (project / "static" / "style.css").read_text()
+    assert "{{" not in (project / "static" / "css" / "tokens.css").read_text()
 
 
 _REQUEST_POSTURES = r"""
