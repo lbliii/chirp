@@ -16,6 +16,7 @@ to browse manifests and reliability scores.
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 
@@ -121,11 +122,16 @@ def feed():
 
 # Publish-oracle dogfood: freeze + smoke after all routes are registered so the
 # console shows ReliabilityScore values. Skip with ORRERY_SKIP_PUBLISH=1.
+# Also skip ``run_smoke`` when an event loop is already running (async pytest
+# loaders) — ``asyncio.run`` inside ``run_smoke`` cannot nest.
 if os.environ.get("ORRERY_SKIP_PUBLISH", "").strip() not in ("1", "true", "True"):
     app.freeze()
-    _smoke = run_smoke(app, DOGFOOD_CORPUS, answer_fn=render_faithful_answer)
-    for _skill in registry.skills():
-        scores.record(_skill.name, _smoke)
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        _smoke = run_smoke(app, DOGFOOD_CORPUS, answer_fn=render_faithful_answer)
+        for _skill in registry.skills():
+            scores.record(_skill.name, _smoke)
 
 
 if __name__ == "__main__":

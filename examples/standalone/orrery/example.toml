@@ -1,0 +1,7 @@
+# Orrery smoke manifest.
+#
+# Module-level publish-oracle uses asyncio.run(run_smoke(...)), which cannot
+# nest under the async example smoke harness. Skip it here; behavior coverage
+# lives in test_app.py (including test_dogfood_skills_pass_publish_oracle).
+[env]
+ORRERY_SKIP_PUBLISH = "1"
