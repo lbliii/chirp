@@ -136,6 +136,9 @@ jobs:
         run: uv pip install "chirp-ui==0.10.0"
 
       - name: Browser smoke
+        env:
+          # Fail closed on unexpected Playwright/Chromium skips (#917).
+          CHIRP_CAPABILITY_LANE: "browser-smoke"
         run: >-
           uv run --no-sync pytest
           examples/chirpui/lucky_cat/test_browser_smoke.py
@@ -186,6 +189,9 @@ jobs:
           nginx -v
 
       - name: QUERY wire, retry, redirect, limit, log, and proxy proof
+        env:
+          # Fail closed when H2/H3 clients or nginx soft-skip (#917).
+          CHIRP_CAPABILITY_LANE: "query-interop"
         run: >-
           uv run --no-sync pytest
           tests/interop/test_query_wire.py
@@ -227,6 +233,8 @@ jobs:
       - name: Argon2 hash/verify/upgrade and password_extra proof
         env:
           CHIRP_REQUIRE_ARGON2: "1"
+          # Selector + skip-fail gate for the auth capability lane (#917).
+          CHIRP_CAPABILITY_LANE: "auth-capability"
           PYTHON_GIL: "0"
         run: >-
           uv run --no-sync pytest
@@ -280,6 +288,8 @@ jobs:
         env:
           CHIRP_REQUIRE_REDIS: "1"
           CHIRP_TEST_REDIS_URL: redis://localhost:6379/15
+          # Selector + skip-fail gate for the redis capability lane (#917).
+          CHIRP_CAPABILITY_LANE: "redis-capability"
           PYTHON_GIL: "0"
         run: >-
           uv run --no-sync pytest
@@ -361,6 +371,8 @@ jobs:
           CHIRP_TEST_PG_PASSWORD_DSN: postgresql://pelt_password:pelt-password@localhost:5432/chirp_test
           CHIRP_TEST_PG_TLS_CA: ${{ runner.temp }}/pelt-tls/ca.crt
           CHIRP_TEST_PG_BAD_TLS_CA: ${{ runner.temp }}/pelt-tls/bad-ca.crt
+          # Fail closed if PG/TLS env regressions soft-skip live proof (#917).
+          CHIRP_CAPABILITY_LANE: "test-postgres"
         run: >-
           uv run pytest
           tests/test_schema_introspect.py
@@ -428,6 +440,8 @@ jobs:
           PYTHON_GIL: "0"
           PYTHONWARNINGS: error
           CHIRP_TEST_PG_DSN: postgresql://chirp:chirp@localhost:5432/chirp_test
+          # Fail closed if free-threaded / PG gates soft-skip (#917).
+          CHIRP_CAPABILITY_LANE: "data-pg-gil-gate"
         run: >-
           uv run pytest
           tests/test_pelt/test_data_pg_gil.py
@@ -477,11 +491,14 @@ jobs:
       - name: Cross-version boundary and contract tests
         env:
           PYTHON_GIL: "0"
+          # Fail closed if chirp-ui soft-skips in the compat matrix (#917).
+          CHIRP_CAPABILITY_LANE: "chirp-ui-compat"
         run: |
           uv run pytest tests/test_chirpui_boundary.py tests/contracts/test_custom_checks_integration.py tests/test_chirpui_compat_ci.py -q --tb=short --timeout=60
 
       - name: Cross-version shell example smoke
         env:
           PYTHON_GIL: "0"
+          CHIRP_CAPABILITY_LANE: "chirp-ui-compat-shells"
         run: |
           uv run pytest examples/chirpui/contacts_shell examples/chirpui/forum_shell examples/chirpui/pages_shell -q --tb=short --timeout=60 -m "not slow"
