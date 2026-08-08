@@ -50,4 +50,6 @@ def test_browser_smoke_preserves_chirp_ui_floor_after_final_sync() -> None:
     smoke = workflow.index("      - name: Browser smoke")
 
     assert chromium < floor < smoke
-    assert "uv run --no-sync pytest" in workflow[floor : smoke + 200]
+    # Allow env blocks (e.g. CHIRP_CAPABILITY_LANE) between the step name and
+    # the pytest invocation without tightening the pin→smoke ordering check.
+    assert "uv run --no-sync pytest" in workflow[floor : smoke + 500]

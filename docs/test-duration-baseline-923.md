@@ -72,8 +72,8 @@ Workflow source: `.github/workflows/ci.yml`.
 | Full suite (steward) | `uv run pytest tests -q` | Single authoritative `tests/` entrypoint |
 | Default paths | `uv run pytest` / `poe test` | `testpaths = ["tests", "examples"]` |
 | Browser smoke | CI `browser-smoke` job | Playwright + Chromium (isolated) |
-| Auth (Argon2) | CI `auth-capability` | `--extra auth` + password / `password_extra` proof |
-| Redis | CI `redis-capability` | `--extra redis` + Redis service + live / outage proof |
+| Auth (Argon2) | CI `auth-capability` | `--extra auth` + password / `password_extra` proof + `CHIRP_CAPABILITY_LANE` |
+| Redis | CI `redis-capability` | `--extra redis` + Redis service + live / outage proof + `CHIRP_CAPABILITY_LANE` |
 | PostgreSQL | CI `test-postgres` matrix + `data-pg-gil-gate` | Live Postgres / GIL gate |
 | Query interop | CI `query-interop` | Optional H2/H3 clients + nginx |
 
