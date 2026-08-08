@@ -4,8 +4,9 @@ A :class:`SkillRegistry` stores skills by name, mounts each via
 :func:`~chirp.skill.mount.use_skill` onto one app (aggregated ``/mcp``), and
 exposes a discovery route that lists frozen manifests.
 
-Console UI and keystore live in sibling issues — this module is the
-machine-facing registry + discovery surface only.
+Console UI lives in :mod:`chirp.skill.console` (``mount_console``); the
+env-var keystore is a sibling (#984). This module is the machine-facing
+registry + discovery surface.
 """
 
 from __future__ import annotations

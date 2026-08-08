@@ -140,6 +140,7 @@ where = ["src"]
 chirp = [
     "py.typed",
     "templating/macros/**/*.html",
+    "skill/templates/**/*.html",
     "server/devtools/js/*.js",
     "static/*.js",
     "data/migrations/**/*.sql",
