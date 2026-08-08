@@ -24,6 +24,7 @@ from dogfood import DOGFOOD_CORPUS, N_DOGFOOD_SKILLS, build_dogfood_skills
 
 from chirp import App, AppConfig, EventStream, Fragment, Request, Template, secure_stack
 from chirp.middleware.csrf import CSRFConfig
+from chirp.middleware.security_headers import SecurityHeadersConfig
 from chirp.skill import (
     ReliabilityStore,
     mount_console,
@@ -32,6 +33,19 @@ from chirp.skill import (
 from chirp.skill.smoke import render_faithful_answer, run_smoke
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+# Default secure_stack CSP allows CDN scripts but NOT inline <style>, style=, or
+# fonts.googleapis.com — which blanked the branded home page in production.
+# Keep scripts host-allowlisted; permit the demo's inline CSS + Google Fonts.
+_ORRERY_CSP = (
+    "default-src 'self'; "
+    "img-src 'self' data:; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com data:; "
+    "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+    "connect-src 'self'; "
+    "base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
+)
 
 _DEFAULT_SECRET = "change-me-before-deploying"
 _secret = os.environ.get("CHIRP_SECRET_KEY", _DEFAULT_SECRET)
@@ -63,6 +77,7 @@ for middleware in secure_stack(
     app.config,
     # MCP JSON-RPC clients have no browser CSRF cookie; exempt the machine face.
     csrf=CSRFConfig(exempt_paths=frozenset({"/mcp"})),
+    headers=SecurityHeadersConfig(content_security_policy=_ORRERY_CSP),
 ):
     app.add_middleware(middleware)
 
