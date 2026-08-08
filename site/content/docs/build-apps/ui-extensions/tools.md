@@ -257,21 +257,28 @@ A caller missing the scope gets a 403 from ``enforce_auth``; the skill wrapper
 maps that to ``ToolAuthError`` and MCP ``tools/call`` returns a JSON-RPC error
 (``-32603``, message ``Forbidden``) while emitting ``authz.scope.denied``.
 
-## Milo MCP Apps registration preview
+## Milo MCP Apps named-block resources
 
-`chirp.ext.milo` is a provisional, setup-only bridge for applications that
-already register commands with Milo 0.4.1. It is separate from the stable
-`app.tool()` registry described above: it does not convert either registry,
-copy Milo schemas, or expose every Milo command automatically.
+`chirp.ext.milo` is a provisional bridge for applications that already register
+commands with Milo 0.4.1. It is separate from the stable `app.tool()` registry
+described above: it does not convert either registry, copy Milo schemas, or
+expose every Milo command automatically.
 
 The caller attaches `MCPAppToolMeta` when the Milo command is originally
 registered, registers the linked `ui://` resource, and opts the canonical
 dotted command ID into an exact Chirp allowlist. `adapter.bind()` then records
 one existing Chirp template, named block, and parameterless application context
 provider. At `app.freeze()`, Chirp verifies the public Milo command/resource
-link and publishes frozen binding metadata:
+link and publishes frozen binding metadata. On each MCP App resource read, the
+caller-owned `@cli.ui_resource` handler delegates to
+`adapter.render_resource(operation_id)`, which invokes the context provider and
+renders that named block through `Fragment` / `App.render`:
 
 ```python
+@cli.ui_resource("ui://chirp/work-items/create", name="Create work item")
+def create_work_item_resource() -> str:
+    return adapter.render_resource("work-items.create")
+
 adapter = use_milo(app, cli, allowlist=("work-items.create",))
 adapter.bind(
     "work-items.create",
@@ -282,20 +289,22 @@ adapter.bind(
 
 app.freeze()
 print(adapter.bindings[0].resource_uri)
+print(adapter.render_resource("work-items.create"))
 ```
 
 Milo is already a bounded direct dependency of Chirp, so this preview needs no
 additional extra. The adapter never freezes or mutates the caller-owned Milo
 CLI, invokes the context provider during freeze, or manufactures a Chirp
 request/session. Application state captured by the provider remains
-application-owned and must be safe for concurrent reads.
+application-owned and must be safe for concurrent reads. Missing blocks raise
+`BlockNotFoundError`; empty required UI output and non-mapping context raise
+`ConfigurationError`. Host CSP/sandbox/auth semantics for the read-only
+resource profile remain with issue #579.
 
-This is registration groundwork, not MCP App HTML rendering. Issue #578 owns
-invoking the provider and rendering the named block through Chirp's existing
-fail-loud render surface. The offline
+The offline
 [`milo_mcp_apps` example](https://github.com/lbliii/chirp/tree/main/examples/standalone/milo_mcp_apps)
-keeps that boundary executable without adding a parallel template or
-placeholder HTML path.
+proves browser page, htmx fragment, MCP tool structured result, and negotiated
+MCP App resource HTML from one template contract.
 
 ## The shipping example
 

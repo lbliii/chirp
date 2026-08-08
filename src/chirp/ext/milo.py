@@ -1,18 +1,21 @@
-"""Milo MCP Apps registration boundary.
+"""Milo MCP Apps registration and named-block resource rendering.
 
 The adapter verifies caller-owned Milo commands and UI resources at Chirp's
-freeze boundary.  Rendering the declared template block is deliberately a
-separate concern: this module publishes only immutable binding metadata.
+freeze boundary, then projects frozen bindings through Chirp's existing
+``Fragment`` / ``App.render`` surface on each resource read.
 """
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 from collections.abc import Awaitable, Callable, Iterable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from chirp.errors import ConfigurationError
+from chirp.templating.returns import Fragment
 
 if TYPE_CHECKING:
     from milo import CLI
@@ -50,11 +53,13 @@ class _PendingMiloMCPAppBinding:
 
 
 class MiloMCPAppAdapter:
-    """Setup-only compiler for explicit Chirp-to-Milo MCP App bindings."""
+    """Setup compiler and per-read named-block projector for Milo MCP Apps."""
 
     __slots__ = (
         "_allowlist",
+        "_app",
         "_bindings",
+        "_bindings_by_id",
         "_check_not_frozen",
         "_cli",
         "_is_frozen",
@@ -75,6 +80,8 @@ class MiloMCPAppAdapter:
         self._is_frozen = is_frozen
         self._pending: dict[str, _PendingMiloMCPAppBinding] = {}
         self._bindings: tuple[MiloMCPAppBinding, ...] = ()
+        self._bindings_by_id: dict[str, MiloMCPAppBinding] = {}
+        self._app: App | None = None
 
     @property
     def bindings(self) -> tuple[MiloMCPAppBinding, ...]:
@@ -116,6 +123,59 @@ class MiloMCPAppAdapter:
             block=block,
             context_provider=context,
         )
+
+    def render_resource(self, operation_id: str) -> str:
+        """Render one frozen binding's named block for a Milo ``ui://`` resource read.
+
+        Resolves the immutable freeze-time binding, invokes that binding's
+        explicit parameterless application context provider for *this* read,
+        and renders ``Fragment(template, block, **context)`` through
+        ``App.render``.  Milo continues to own MIME/profile negotiation and
+        protocol errors; the caller-owned ``@cli.ui_resource`` handler should
+        delegate here.
+        """
+        if not self._is_frozen() or self._app is None:
+            msg = (
+                "Milo MCP App resource rendering requires a frozen Chirp app. "
+                "Call app.freeze(), app.check(), app.run(), or serve the first request "
+                "before reading ui:// resources."
+            )
+            raise RuntimeError(msg)
+        operation_id = _required_name(operation_id, field="operation_id")
+        binding = self._bindings_by_id.get(operation_id)
+        if binding is None:
+            known = ", ".join(self._bindings_by_id) or "(none)"
+            msg = (
+                f"Milo operation {operation_id!r} has no frozen Chirp MCP App binding. "
+                f"Known bindings: {known}."
+            )
+            raise ConfigurationError(msg)
+
+        context = _resolve_context(binding.context_provider, operation_id=operation_id)
+        if not isinstance(context, Mapping):
+            msg = (
+                f"Context provider for Milo operation {operation_id!r} must return a mapping; "
+                f"got {type(context).__name__}."
+            )
+            raise ConfigurationError(msg)
+        try:
+            context_kwargs = {str(key): value for key, value in context.items()}
+        except (TypeError, ValueError) as exc:
+            msg = (
+                f"Context provider for Milo operation {operation_id!r} returned a mapping "
+                "Chirp cannot unpack into template context."
+            )
+            raise ConfigurationError(msg) from exc
+
+        html = self._app.render(Fragment(binding.template, binding.block, **context_kwargs))
+        if not html.strip():
+            msg = (
+                f"Milo MCP App resource for {operation_id!r} rendered empty HTML from "
+                f"template {binding.template!r} block {binding.block!r}. "
+                "Required UI resources must produce non-empty markup."
+            )
+            raise ConfigurationError(msg)
+        return html
 
     def register(self, app: App) -> None:
         """Compile the binding snapshot under Chirp's existing freeze lock."""
@@ -209,7 +269,9 @@ class MiloMCPAppAdapter:
 
         # One assignment publishes a deterministic immutable read model.  The
         # caller-owned Milo CLI and its registries are never frozen or mutated.
+        self._app = app
         self._bindings = tuple(compiled)
+        self._bindings_by_id = {binding.operation_id: binding for binding in self._bindings}
 
 
 def use_milo(
@@ -287,6 +349,63 @@ def _require_parameterless(func: Callable[..., Any], *, label: str) -> None:
         names = ", ".join(parameters)
         msg = f"{label} must be parameterless; found: {names}."
         raise ConfigurationError(msg)
+
+
+def _resolve_context(provider: MiloContextProvider, *, operation_id: str) -> Any:
+    """Invoke a sync or async parameterless context provider for one resource read."""
+    try:
+        if inspect.iscoroutinefunction(provider):
+            return _run_awaitable(provider(), operation_id=operation_id)
+        result = provider()
+    except ConfigurationError:
+        raise
+    except Exception as exc:
+        msg = (
+            f"Context provider for Milo operation {operation_id!r} failed: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        raise ConfigurationError(msg) from exc
+    if inspect.isawaitable(result):
+        return _run_awaitable(result, operation_id=operation_id)
+    return result
+
+
+async def _await_result(awaitable: Awaitable[Any]) -> Any:
+    return await awaitable
+
+
+def _run_awaitable(awaitable: Awaitable[Any], *, operation_id: str) -> Any:
+    """Resolve one awaitable from Milo's synchronous resource-handler thread.
+
+    When an event loop is already running, resolve the provider in a per-call
+    worker thread.  No global executor or shared mutable state is retained.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        try:
+            return asyncio.run(_await_result(awaitable))
+        except ConfigurationError:
+            raise
+        except Exception as exc:
+            msg = (
+                f"Async context provider for Milo operation {operation_id!r} failed: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            raise ConfigurationError(msg) from exc
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(asyncio.run, _await_result(awaitable))
+        try:
+            return future.result()
+        except ConfigurationError:
+            raise
+        except Exception as exc:
+            msg = (
+                f"Async context provider for Milo operation {operation_id!r} failed: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            raise ConfigurationError(msg) from exc
 
 
 __all__ = [
