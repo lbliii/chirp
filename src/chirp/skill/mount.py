@@ -79,7 +79,7 @@ class Skill:
         name: str,
         *,
         version: str,
-        private_key: Any,
+        private_key: Any | None = None,
         key_id: str,
         public_key: Any | None = None,
         provider_keys: tuple[str, ...] = (),
@@ -98,7 +98,14 @@ class Skill:
         self._version = version.strip()
         self._private_key = private_key
         self._key_id = key_id.strip()
-        self._public_key = public_key if public_key is not None else _derive_public_key(private_key)
+        if public_key is not None:
+            self._public_key = public_key
+        elif private_key is not None:
+            self._public_key = _derive_public_key(private_key)
+        else:
+            # Incomplete — ``skill_contract`` ERRORs at app.check(); freeze
+            # publishes an empty-key stub so contracts can inspect the skill.
+            self._public_key = None
         self._provider_keys = tuple(provider_keys)
         self._pending: list[_PendingSkillTool] = []
         self._template_sources: dict[str, str] = {}
@@ -118,7 +125,7 @@ class Skill:
         return self._key_id
 
     @property
-    def public_key(self) -> Any:
+    def public_key(self) -> Any | None:
         return self._public_key
 
     @property
@@ -224,9 +231,18 @@ class Skill:
 
         After freeze, returns the finalized immutable manifest (same object as
         :attr:`manifest`). Before freeze, returns a provisional identity digest.
+        Incomplete skills (no public key) return a stub so ``skill_contract``
+        can flag them at ``app.check()``.
         """
         if self._manifest is not None:
             return self._manifest
+        if self._public_key is None:
+            return _incomplete_manifest(
+                name=self._name,
+                version=self._version,
+                tools=self.tools,
+                provider_keys=self._provider_keys,
+            )
         return assemble_manifest(
             name=self._name,
             version=self._version,
@@ -245,6 +261,14 @@ class Skill:
         """
         if self._manifest is not None:
             return
+        if self._public_key is None:
+            self._manifest = _incomplete_manifest(
+                name=self._name,
+                version=self._version,
+                tools=self.tools,
+                provider_keys=self._provider_keys,
+            )
+            return
         self._manifest = assemble_manifest(
             name=self._name,
             version=self._version,
@@ -262,8 +286,10 @@ def use_skill(app: App, skill: Skill) -> Skill:
     Registers ``skill`` as an app domain so ``app.freeze()`` finalizes an
     immutable :class:`Manifest` with a content digest (milo
     ``register_domain`` precedent). Eagerly verifies the Ed25519 peer
-    dependency so missing ``cryptography`` fails at setup rather than on the
-    first tool call. Returns ``skill``.
+    dependency when a signing key is present so missing ``cryptography`` fails
+    at setup rather than on the first tool call. Registers the
+    ``skill_contract`` ``app.check()`` category (chirp_ui
+    ``register_contract_check`` pattern). Returns ``skill``.
     """
     if not isinstance(skill, Skill):
         msg = "use_skill() requires a chirp.skill.Skill instance"
@@ -275,7 +301,8 @@ def use_skill(app: App, skill: Skill) -> Skill:
         msg = f"Skill {skill.name!r} has no tools; decorate handlers with @skill.tool before use_skill()"
         raise ValueError(msg)
 
-    _require_cryptography()
+    if skill._private_key is not None:
+        _require_cryptography()
 
     for pending in skill._pending:
         app.tool(
@@ -286,7 +313,43 @@ def use_skill(app: App, skill: Skill) -> Skill:
 
     skill._mounted = True
     app.register_domain(skill)
+    _register_skill_contract(app, skill)
     return skill
+
+
+def _incomplete_manifest(
+    *,
+    name: str,
+    version: str,
+    tools: tuple[str, ...],
+    provider_keys: tuple[str, ...],
+) -> Manifest:
+    """Stub manifest for skills missing a public/signing key (contract-visible)."""
+    return Manifest(
+        name=name,
+        version=version,
+        tools=tools,
+        public_key="",
+        provider_keys=provider_keys,
+        content_digest="",
+    )
+
+
+def _register_skill_contract(app: App, skill: Skill) -> None:
+    """Append skill descriptors and register ``skill_contract`` once per app."""
+    from chirp.contracts.rules_skill_contract import (
+        SkillContractCheck,
+        skill_record_from_skill,
+    )
+
+    extras = getattr(app._mutable_state, "contract_check_data", {})
+    existing = list(extras.get("skills", ()))
+    existing.append(skill_record_from_skill(skill))
+    app.set_contract_check_data("skills", tuple(existing))
+    if extras.get("_skill_contract_registered"):
+        return
+    app.register_contract_check(SkillContractCheck(app))
+    app.set_contract_check_data("_skill_contract_registered", True)
 
 
 def _skill_tool_schemas(pending: list[_PendingSkillTool]) -> dict[str, dict[str, Any]]:
