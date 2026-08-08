@@ -98,7 +98,7 @@ def test_milo_adapter_is_documented_as_a_provisional_submodule_api() -> None:
     assert "not re-exported from `chirp`" in section
 
 
-@pytest.mark.issue(969, 970, 974, 973, 975, 976, 981, 982, 983)
+@pytest.mark.issue(969, 970, 974, 973, 975, 976, 981, 982, 983, 984)
 def test_skill_envelope_is_documented_as_a_provisional_submodule_api() -> None:
     section = _section_body(_PUBLIC_API_DOC.read_text(), "Provisional Submodule APIs")
 
@@ -119,6 +119,12 @@ def test_skill_envelope_is_documented_as_a_provisional_submodule_api() -> None:
         "DEFAULT_CONSOLE_PATH",
         "ReliabilityScore",
         "ReliabilityStore",
+        "EnvKeystore",
+        "KeyStatus",
+        "KEY_STATUS_TOOL",
+        "SecretLeakError",
+        "assert_no_secret_leak",
+        "register_key_status_tool",
     ):
         assert section.count(f"`{name}`") == 1
     assert "`chirp.skill`" in section
@@ -147,6 +153,9 @@ def test_skill_envelope_is_documented_as_a_provisional_submodule_api() -> None:
     assert "chirp skill publish" in section
     assert "ToolEventBus" in section
     assert "/invocations/live" in section
+    assert "EnvKeystore" in section
+    assert "key-status" in section
+    assert "presence" in section.lower() or "present" in section.lower()
 
 
 @pytest.mark.issue(973)

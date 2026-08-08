@@ -5,8 +5,8 @@ pages over a mounted :class:`~chirp.skill.registry.SkillRegistry`. Machine
 discovery and the live invocation SSE bridge stay on
 :func:`~chirp.skill.registry.mount_skills`; this module renders the
 browse/detail UI and sse-connects the detail live-log hook when the
-registry mounted an invocation log. The env-var keystore (#984) plugs in
-via the ``key_status`` callback.
+registry mounted an invocation log. Env-var key presence plugs in via
+``key_status`` (pass :meth:`~chirp.skill.keystore.EnvKeystore.as_key_status_fn`).
 """
 
 from __future__ import annotations

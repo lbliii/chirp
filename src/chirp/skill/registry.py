@@ -5,9 +5,13 @@ A :class:`SkillRegistry` stores skills by name, mounts each via
 exposes a discovery route that lists frozen manifests, and bridges
 ``ToolEventBus`` into a live invocation-log ``EventStream``.
 
-Console UI lives in :mod:`chirp.skill.console` (``mount_console``); the
-env-var keystore is a sibling (#984). This module owns registry + discovery
-+ the live-log SSE bridge.
+When an :class:`~chirp.skill.keystore.EnvKeystore` is passed to
+:meth:`SkillRegistry.mount` / :func:`mount_skills`, the host-level
+``key-status`` tool is registered for the union of skill ``provider_keys``
+(presence only — secret values never enter the MCP response).
+
+Console UI lives in :mod:`chirp.skill.console` (``mount_console``). This
+module owns registry + discovery + the live-log SSE bridge.
 """
 
 from __future__ import annotations
@@ -16,6 +20,7 @@ import threading
 from collections.abc import Iterable, Iterator, Mapping
 from typing import TYPE_CHECKING, Any
 
+from chirp.skill.keystore import EnvKeystore, register_key_status_tool
 from chirp.skill.manifest import Manifest
 from chirp.skill.mount import Skill, use_skill
 from chirp.tools.live_log import DEFAULT_INVOCATION_LOG_PATH, mount_invocation_log
@@ -128,6 +133,18 @@ class SkillRegistry:
                 out.append(skill.assemble_manifest())
         return tuple(out)
 
+    def provider_key_names(self) -> tuple[str, ...]:
+        """Ordered unique provider key names declared by registered skills."""
+        ordered: list[str] = []
+        seen: set[str] = set()
+        for skill in self.skills():
+            for name in skill.provider_keys:
+                if name in seen:
+                    continue
+                seen.add(name)
+                ordered.append(name)
+        return tuple(ordered)
+
     def discovery_document(self) -> dict[str, Any]:
         """JSON-serializable discovery payload listing mounted skill manifests."""
         return {
@@ -140,6 +157,7 @@ class SkillRegistry:
         *,
         discovery_path: str = DEFAULT_DISCOVERY_PATH,
         invocation_log_path: str | None = DEFAULT_INVOCATION_LOG_PATH,
+        keystore: EnvKeystore | None = None,
     ) -> SkillRegistry:
         """Mount every registered skill via ``use_skill`` and host routes.
 
@@ -148,9 +166,14 @@ class SkillRegistry:
         (see :func:`~chirp.tools.live_log.mount_invocation_log`).
 
         Tool names must be unique across skills — collisions fail loud at mount
-        time (aggregated ``/mcp`` has a single tool namespace). Returns ``self``.
+        time (aggregated ``/mcp`` has a single tool namespace). When ``keystore``
+        is provided, registers the host-level ``key-status`` tool for the union
+        of skill ``provider_keys`` (presence only). Returns ``self``.
         """
         path = _normalize_discovery_path(discovery_path)
+        if keystore is not None and not isinstance(keystore, EnvKeystore):
+            msg = "keystore must be an EnvKeystore instance or None"
+            raise TypeError(msg)
         with self._lock:
             if self._mounted:
                 msg = "SkillRegistry is already mounted"
@@ -161,6 +184,8 @@ class SkillRegistry:
             skills = tuple(self._skills.values())
 
         _assert_unique_tool_names(skills)
+        if keystore is not None:
+            _assert_key_status_name_free(skills)
 
         for skill in skills:
             use_skill(app, skill)
@@ -170,6 +195,13 @@ class SkillRegistry:
         log_path: str | None = None
         if invocation_log_path is not None:
             log_path = mount_invocation_log(app, path=invocation_log_path)
+
+        if keystore is not None:
+            register_key_status_tool(
+                app,
+                keystore,
+                names=self.provider_key_names(),
+            )
 
         with self._lock:
             self._mounted = True
@@ -184,6 +216,7 @@ def mount_skills(
     *,
     discovery_path: str = DEFAULT_DISCOVERY_PATH,
     invocation_log_path: str | None = DEFAULT_INVOCATION_LOG_PATH,
+    keystore: EnvKeystore | None = None,
 ) -> SkillRegistry:
     """Mount skills onto ``app`` and expose discovery + live invocation log.
 
@@ -197,6 +230,10 @@ def mount_skills(
     log route (default ``/invocations/live``) streams ``ToolCallEvent``
     fragments over SSE; pass ``invocation_log_path=None`` to skip it.
 
+    When ``keystore`` is an :class:`~chirp.skill.keystore.EnvKeystore`, also
+    registers the host-level ``key-status`` tool for declared provider key
+    names (presence only; secret values never enter the response).
+
     Returns the :class:`SkillRegistry` (creating one when given an iterable).
     """
     if isinstance(skills, SkillRegistry):
@@ -209,6 +246,7 @@ def mount_skills(
         app,
         discovery_path=discovery_path,
         invocation_log_path=invocation_log_path,
+        keystore=keystore,
     )
 
 
@@ -237,6 +275,19 @@ def _assert_unique_tool_names(skills: tuple[Skill, ...]) -> None:
                 )
                 raise ValueError(msg)
             seen[tool_name] = skill.name
+
+
+def _assert_key_status_name_free(skills: tuple[Skill, ...]) -> None:
+    """Fail loud when a skill tool would collide with the host key-status tool."""
+    from chirp.skill.keystore import KEY_STATUS_TOOL
+
+    for skill in skills:
+        if KEY_STATUS_TOOL in skill.tools:
+            msg = (
+                f"Skill {skill.name!r} registers tool {KEY_STATUS_TOOL!r}, "
+                "which is reserved for the host EnvKeystore key-status tool"
+            )
+            raise ValueError(msg)
 
 
 def _register_discovery_route(
