@@ -149,6 +149,7 @@ def test_skill_envelope_is_documented_as_a_provisional_submodule_api() -> None:
     assert "key-status" in section
     assert "presence" in section.lower() or "present" in section.lower()
 
+
 @pytest.mark.issue(973)
 def test_skill_extra_is_declared_in_pyproject() -> None:
     """Peer cryptography for envelopes is an optional skill extra, not core."""
