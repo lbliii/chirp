@@ -1,7 +1,6 @@
 """Tests for session middleware — signed cookie sessions."""
 
 import hashlib
-import importlib.util
 from typing import Any, ClassVar
 
 import pytest
@@ -19,6 +18,7 @@ from chirp.middleware.sessions import (
 )
 from chirp.testing import TestClient
 from tests.helpers.auth import extract_session_cookie
+from tests.helpers.redis_capability import ensure_redis_package
 
 
 def _set_cookie_header(response: object, cookie_name: str = "chirp_session") -> str | None:
@@ -897,21 +897,17 @@ class TestSessionSecureEndToEnd:
             assert "Secure" not in header.split("; ")
 
 
-def _redis_available() -> bool:
-    # find_spec raises ModuleNotFoundError when the top-level 'redis' package is
-    # absent (not just when the submodule is missing), so guard the lookup.
-    try:
-        return importlib.util.find_spec("redis.asyncio") is not None
-    except ModuleNotFoundError:
-        return False
-
-
-_REDIS_AVAILABLE = _redis_available()
-
-
-@pytest.mark.skipif(not _REDIS_AVAILABLE, reason="requires the optional 'redis' extra")
+@pytest.mark.issue(906)
 class TestRedisStoreSecureResolution:
-    """RedisSessionStore honors the resolved secure value (no real Redis needed)."""
+    """RedisSessionStore honors the resolved secure value (no real Redis needed).
+
+    Local installs without chirp[redis] skip; the redis-capability CI lane
+    sets CHIRP_REQUIRE_REDIS=1 so absence fails instead of skipping (#906).
+    """
+
+    @pytest.fixture(autouse=True)
+    def _require_redis(self) -> None:
+        ensure_redis_package()
 
     def test_redis_store_resolve_secure_auto_production(self) -> None:
         store = RedisSessionStore(SessionConfig(secret_key="s", secure="auto"), "redis://localhost")

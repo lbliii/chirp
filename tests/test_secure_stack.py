@@ -13,8 +13,6 @@ force-injecting anything. These tests assert:
 - ``secret_key`` flows from the app config.
 """
 
-import importlib.util
-
 import pytest
 
 from chirp.config import AppConfig
@@ -31,18 +29,7 @@ from chirp.middleware.sessions import (
     SessionMiddleware,
 )
 from chirp.middleware.stack import secure_stack
-
-
-def _redis_available() -> bool:
-    # find_spec raises ModuleNotFoundError when the top-level 'redis' package is
-    # absent (not just when the submodule is missing), so guard the lookup.
-    try:
-        return importlib.util.find_spec("redis.asyncio") is not None
-    except ModuleNotFoundError:
-        return False
-
-
-_REDIS_AVAILABLE = _redis_available()
+from tests.helpers.redis_capability import ensure_redis_package
 
 
 class _Route:
@@ -205,9 +192,10 @@ def test_explicit_headers_config_is_used_verbatim() -> None:
     assert stack[2].config is custom
 
 
-@pytest.mark.skipif(not _REDIS_AVAILABLE, reason="requires the optional 'redis' extra")
+@pytest.mark.issue(906)
 def test_redis_url_backs_session_with_redis_store() -> None:
     """redis_url (sans explicit session config) routes sessions to Redis."""
+    ensure_redis_package()
     cfg = AppConfig(secret_key="x" * 32)
     stack = secure_stack(cfg, redis_url="redis://localhost:6379/0")
     session_mw = stack[0]

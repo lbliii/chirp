@@ -234,6 +234,62 @@ jobs:
           tests/contracts/test_password_extra.py
           -q --tb=short --timeout=60
 
+  # Live Redis capability + failure-path proof (issue #906). Default installs
+  # keep chirp[redis] optional; this specialized lane installs the redis extra,
+  # starts Redis, and fails if package/service absence would otherwise skip.
+  redis-capability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14t"
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-redis-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-redis-
+            uv-${{ runner.os }}-
+
+      - name: Install dependencies (redis extra)
+        run: uv sync --no-sources --group dev --extra redis
+
+      - name: Prove redis is importable
+        run: >-
+          uv run --no-sync python -c
+          "import redis.asyncio as r; assert callable(r.from_url),
+          'chirp[redis] did not install redis'"
+
+      - name: Live Redis session/cache/rate-limit and failure-path proof
+        env:
+          CHIRP_REQUIRE_REDIS: "1"
+          CHIRP_TEST_REDIS_URL: redis://localhost:6379/15
+          PYTHON_GIL: "0"
+        run: >-
+          uv run --no-sync pytest
+          tests/test_redis_capability.py
+          tests/test_sessions.py
+          tests/test_secure_stack.py
+          tests/test_cache_redis_optional.py
+          tests/test_passkey_session_stores.py
+          -q --tb=short --timeout=60
+
   # Dedicated live-PostgreSQL backend matrix. PostgreSQL 13 is pinned to its
   # final EOL image as a compatibility lane; supported majors track their
   # current official image. The free-threaded gate below supplies the separate
