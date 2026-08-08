@@ -5,7 +5,8 @@ passes smoke only when each corpus prompt yields an answer that is faithful
 to the tool's engine JSON — not a refusal, capability catalog, or
 section-skip fallback.
 
-This module is the L3.2 harness; publish-gate wiring lives in a sibling issue.
+This module is the L3.2 harness; publish-gate wiring lives in
+``chirp.skill.publish`` / ``chirp skill publish``.
 """
 
 from __future__ import annotations

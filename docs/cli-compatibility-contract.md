@@ -39,14 +39,15 @@ from the typed adapters.
 | Parse failure or unknown option | Empty | `usage:` plus `error:` | `2` | Parser-owned failure; handler is not imported. |
 
 The legacy aliases `-h`/`--help` and `-V`/`--version` remain. There are no
-command aliases or nested commands. Milo adds its standard root operations
+command aliases. Nested commands are limited to the `skill` group
+(`chirp skill publish`). Milo adds its standard root operations
 (`--llms-txt`, `--mcp`, gateway registration, completions, verbosity, quiet,
 dry-run, output-file, and force) plus per-command `--format`. `check`, `diff`,
-and `routes` use `surfaces=("cli", "mcp", "llms")`; the other eight commands
-remain `surfaces=("cli",)`. The selected handlers return domain dictionaries,
-and Milo's terminal renderer preserves their established human text and exit
-policy. `--format json` and `--output-file` therefore govern the selected
-inspections without changing legacy `--json` behavior.
+and `routes` use `surfaces=("cli", "mcp", "llms")`; the other top-level commands
+and `skill.publish` remain `surfaces=("cli",)`. The selected handlers return
+domain dictionaries, and Milo's terminal renderer preserves their established
+human text and exit policy. `--format json` and `--output-file` therefore govern
+the selected inspections without changing legacy `--json` behavior.
 
 ## Command, argument, and exposure inventory
 
@@ -67,17 +68,20 @@ required.
 | `makemigrations` | required `--db`, required `--schema`; `--migrations-dir` | Migrations directory defaults to `migrations`. | Human-only; intentionally not agent-exposed because it inspects a database and writes migration files. |
 | `migrate` | required `--db`; `--migrations-dir` | Migrations directory defaults to `migrations`. | Human-only deploy mutation; intentionally not agent-exposed. |
 | `shapes-codegen` | optional `path`; `--dry-run`, `--audit`, `--migrations DIR` | Path defaults to `.`. Default behavior is already dry-run; the flag is compatibility syntax. `--migrations` defaults to `migrations` and is reserved. Under `--audit`, path is an app import string. | Human-only today. Audit needs structured output before agent exposure. |
+| `skill` | (group) | Nested namespace for skill authoring / publish-oracle gates. | Group help only; no handler. |
+| `skill publish` | `app`; `--corpus PATH`, `--fixture`, `--warnings-as-errors`, `--json` | Requires `--corpus` or `--fixture`. Runs check + freeze + smoke and emits a receipt; exit `1` when any stage fails. | Human-only; intentionally not agent-exposed (imports project code; publish gate). |
 
 ## App resolution and environment ownership
 
-`run`, `dev`, `check`, `diff`, `routes`, `security-check`, `freeze`, and
-`shapes-codegen --audit` accept `module[:attribute]`. Missing attributes default
-to `app`; a non-`App` callable is invoked as a factory. Module, attribute,
-factory, and type failures normally become `Error: …` on stderr and exit `1`.
-`security-check` is the current exception: its resolver failure is uncaught, so
-Python writes a traceback to stderr and exits `1`. The subprocess suite freezes
-that fact without endorsing it; normalizing it requires a separate behavior
-change before or after parser migration.
+`run`, `dev`, `check`, `diff`, `routes`, `security-check`, `freeze`,
+`skill publish`, and `shapes-codegen --audit` accept `module[:attribute]`.
+Missing attributes default to `app`; a non-`App` callable is invoked as a
+factory. Module, attribute, factory, and type failures normally become
+`Error: …` on stderr and exit `1`. `security-check` is the current exception:
+its resolver failure is uncaught, so Python writes a traceback to stderr and
+exits `1`. The subprocess suite freezes that fact without endorsing it;
+normalizing it requires a separate behavior change before or after parser
+migration.
 
 Environment behavior remains handler-owned:
 
@@ -124,6 +128,7 @@ error codes, the failing app/ref/path context, and a repair suggestion.
 | `makemigrations` | No-change or generated SQL summary on stdout; exit `0` | Missing/empty schema currently prints on stdout; exit `1` |
 | `migrate` | Migration summary on stdout; exit `0` | Migration failure currently prints on stdout; exit `1` |
 | `shapes-codegen` | Suggestions/audit on stdout; exit `0` | Resolution or drift text currently prints on stdout; exit `1` |
+| `skill publish` | Human receipt or JSON on stdout; exit `0` | Any failing gate stage, missing corpus, or resolution failure exit `1`; resolution text uses stderr |
 
 Uncaught programmer errors are not normalized into a new compatibility promise.
 Any future cleanup of a legacy stdout failure channel is a separately reviewed
@@ -133,9 +138,9 @@ behavior change, not part of parser migration.
 
 Importing `chirp.cli`, rendering root/subcommand help, and reporting parse
 errors do not import command handlers. `_new`, `_run`, `_check`, `_diff`,
-`_routes`, `_security_check`, `_freeze`, `_makemigrations`, `_migrate`, and
-`_shapes_codegen` load only after their command is selected. `_version` loads
-only for `-V`/`--version`.
+`_routes`, `_security_check`, `_freeze`, `_makemigrations`, `_migrate`,
+`_shapes_codegen`, and `_skill_publish` load only after their command is
+selected. `_version` loads only for `-V`/`--version`.
 
 The Milo registry and parser are built inside each `main()` call, so concurrent
 callers do not share parser state. Registration uses fresh precomputed schema
@@ -162,7 +167,7 @@ version-report, and terminal-rendering gaps identified by this contract.
 
 | Chirp requirement | Milo public seam | Implemented boundary |
 | --- | --- | --- |
-| Command registration and typed parameters | `CLI.lazy_command()`, `Positional`, `Option`, `function_to_schema()` | Eleven typed adapters; precomputed schemas are parity-tested. |
+| Command registration and typed parameters | `CLI.lazy_command()`, `CLI.group()`, `Positional`, `Option`, `function_to_schema()` | Eleven top-level typed adapters plus `skill.publish`; precomputed schemas are parity-tested via `walk_commands()`. |
 | Deferred command imports | `LazyCommandDef` with `schema=` | Root and command help load no Chirp handler module. |
 | Human output and exit ownership | `terminal_renderer` plus JSON-compatible handler results | Selected inspections preserve terminal text/streams/exits without scraping prose; other handlers retain `display_result=False`. |
 | Surface policy | Explicit per-command `surfaces` | Only `check`, `diff`, and `routes` appear in MCP and llms.txt; all mutation/lifecycle commands remain CLI-only. |
