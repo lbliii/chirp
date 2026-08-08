@@ -161,18 +161,23 @@ path is configurable: `AppConfig(mcp_path="/agent")` moves it.
 ## Real-time tool activity
 
 Every successful tool call emits a `ToolCallEvent` through `app.tool_events`.
-Subscribe from an SSE route to build a live agent-activity dashboard.
+Bridge that bus into an `EventStream` for a live invocation log (or hand-roll
+the same pattern with `Fragment` yields).
 
 ```python
-from chirp import EventStream, Fragment
+from chirp.tools import mount_invocation_log, tool_event_stream
 
+# One-liner: SSE route + packaged invocation_row fragment (default /invocations/live)
+mount_invocation_log(app)
+
+# Or compose the bridge yourself:
 @app.route("/activity/feed", referenced=True)
 def activity_feed():
-    async def stream():
-        async for event in app.tool_events.subscribe():
-            yield Fragment("dashboard.html", "activity_row", event=event)
-    return EventStream(stream())
+    return tool_event_stream(app.tool_events, template="dashboard.html", block="activity_row")
 ```
+
+`mount_skills(...)` wires `mount_invocation_log` by default for Orrery-style
+hosts; pass `invocation_log_path=None` to skip the live log.
 
 `EventStream` is one of Chirp's [[docs/about/core-concepts/return-values|return types]]; for
 the wire format and connection lifecycle see

@@ -2,9 +2,11 @@
 
 Human face for an Orrery-style host: ``Page``/``Fragment`` list + detail
 pages over a mounted :class:`~chirp.skill.registry.SkillRegistry`. Machine
-discovery stays on :func:`~chirp.skill.registry.mount_skills`; this module
-does not own live invocation SSE (#983) or the env-var keystore (#984) —
-those plug in via the live-log DOM hook and ``key_status`` callback.
+discovery and the live invocation SSE bridge stay on
+:func:`~chirp.skill.registry.mount_skills`; this module renders the
+browse/detail UI and sse-connects the detail live-log hook when the
+registry mounted an invocation log. The env-var keystore (#984) plugs in
+via the ``key_status`` callback.
 """
 
 from __future__ import annotations
@@ -292,8 +294,8 @@ def _detail_context(
         "keystore_wired": key_status is not None,
         "console_path": console_path,
         "list_href": console_path,
-        # Integration point for #983 — empty live-log region in the template.
-        "live_log_ready": False,
+        "live_log_path": registry.invocation_log_path,
+        "live_log_ready": registry.invocation_log_path is not None,
     }
 
 
