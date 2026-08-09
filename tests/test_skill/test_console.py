@@ -72,10 +72,15 @@ class TestSkillConsoleIssue982:
         assert score.passed == score.total
         assert score.ratio == 1.0
         assert "pass" in score.label
+        assert "·" in score.label
 
         unknown = ReliabilityScore.unknown()
         assert unknown.status == "unknown"
         assert unknown.ratio is None
+        assert unknown.label == "unscored"
+
+        failed = ReliabilityScore(passed=5, total=7, status="fail")
+        assert failed.label == "5/7 · fail"
 
     def test_console_list_and_detail_render_manifest_and_score(self) -> None:
         alpha = _make_skill(
@@ -122,8 +127,8 @@ class TestSkillConsoleIssue982:
                 assert "alpha" in body
                 assert "beta" in body
                 assert "1.2.0" in body
-                assert "2/2 pass" in body
-                assert "0/1 fail" in body
+                assert "2/2 · pass" in body
+                assert "0/1 · fail" in body
                 assert 'id="skill_list"' in body
 
                 detail = await client.get("/console/alpha")
@@ -135,7 +140,7 @@ class TestSkillConsoleIssue982:
                 assert "echo_alpha" in text
                 assert "sha256:" in text
                 assert "Reliability" in text
-                assert "2/2 pass" in text
+                assert "2/2 · pass" in text
                 assert "Contract" in text
                 assert "OPENAI_API_KEY" in text
                 assert "present" in text
