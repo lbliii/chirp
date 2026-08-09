@@ -31,6 +31,8 @@ _CI_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _EXPECTED_CI_LANES = (
     "auth-capability",
     "redis-capability",
+    "config-capability",
+    "ai-bedrock-capability",
     "browser-smoke",
     "query-interop",
     "test-postgres",

@@ -82,6 +82,30 @@ LANE_REGISTRY: dict[str, CapabilityLane] = {
             "test_passkey_session_stores.py::",
         ),
     ),
+    "config-capability": CapabilityLane(
+        name="config-capability",
+        capability="chirp[config] / python-dotenv (.env via AppConfig.from_env)",
+        install_hint=(
+            "uv sync --group dev --extra config; keep CHIRP_REQUIRE_DOTENV=1 "
+            "on the config-capability CI job"
+        ),
+        required_selectors=(
+            "test_config_capability.py::test_from_env_loads_dotenv_file",
+            "test_config_capability.py::test_from_env_process_env_wins_over_dotenv",
+        ),
+    ),
+    "ai-bedrock-capability": CapabilityLane(
+        name="ai-bedrock-capability",
+        capability="chirp[ai-bedrock] / botocore (credential-free Bedrock signing)",
+        install_hint=(
+            "uv sync --group dev --extra ai-bedrock; keep "
+            "CHIRP_REQUIRE_BOTOCORE=1 on the ai-bedrock-capability CI job"
+        ),
+        required_selectors=(
+            "test_ai_bedrock_capability.py::test_bedrock_generate_signs_with_botocore",
+            "test_ai/test_phase3.py::TestAdditionalProviders::test_bedrock_generate_requires_botocore",
+        ),
+    ),
     "browser-smoke": CapabilityLane(
         name="browser-smoke",
         capability="Playwright + Chromium (real-browser smoke)",
