@@ -63,6 +63,13 @@ arrives, then render the loaded state:
 Each resolved block streams back as an [[docs/build-apps/html-fragments/fragment-blocks|OOB swap]]
 that replaces its skeleton in place.
 
+When those loaders hit PostgreSQL through Chirp's `Database` / Pelt pool, each
+independent defer checks out its **own** connection for that await. If more
+defers need a connection than `pool_size` allows, excess acquires wait until a
+sibling releases — size the pool to peak concurrent independent checkouts, or
+accept queueing. Do not hold one checkout across unrelated awaits between
+defers.
+
 :::{tip} Suspense vs. an event stream
 Reach for `Suspense` when slow data should fill an *initial* render in one round
 trip — the shell paints, then deferred blocks arrive on the same response. For
