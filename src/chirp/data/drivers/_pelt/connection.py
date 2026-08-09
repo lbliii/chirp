@@ -190,6 +190,7 @@ class Connection:
         "_protocol",
         "_registry",
         "_stream",
+        "_type_catalog",
     )
 
     def __init__(
@@ -198,6 +199,7 @@ class Connection:
         stream: _transport.PGStream,
         protocol: ExtendedQueryProtocol,
         config: ConnectionConfig,
+        type_catalog: _type_discovery.TypeCatalogCache | None = None,
     ) -> None:
         self._stream = stream
         self._protocol = protocol
@@ -208,6 +210,8 @@ class Connection:
         # Per-connection and single-owner: catalog misses are remembered so an
         # unsupported OID remains a cheap text fallback on later executions.
         self._catalog_attempted_oids: set[int] = set()
+        # Shared warm metadata (pool-owned); codecs stay connection-local.
+        self._type_catalog = type_catalog
         self._listeners: dict[str, list[Callable[[Connection, int, str, str], None]]] = {}
         self._listener_tg: Any = None
         self._listener_tg_cm: Any = None
@@ -218,6 +222,7 @@ class Connection:
         config: ConnectionConfig,
         *,
         statement_cache_size: int = 100,
+        type_catalog: _type_discovery.TypeCatalogCache | None = None,
     ) -> Connection:
         """Open, authenticate, and return a ready connection."""
         session = await _transport.connect_session(config)
@@ -226,7 +231,12 @@ class Connection:
             transaction_status=session.protocol.transaction_status,
             cache=PreparedStatementCache(size=statement_cache_size),
         )
-        return cls(stream=session.stream, protocol=protocol, config=config)
+        return cls(
+            stream=session.stream,
+            protocol=protocol,
+            config=config,
+            type_catalog=type_catalog,
+        )
 
     def transaction(self) -> Transaction:
         return Transaction(self)
@@ -372,19 +382,41 @@ class Connection:
         return self._protocol.cache.get(sql, param_oids) or statement
 
     async def _ensure_result_codecs(self, description: Any) -> None:
-        """Discover server-assigned result OIDs once for this connection."""
+        """Discover server-assigned result OIDs once for this connection.
+
+        When a shared :class:`~._type_discovery.TypeCatalogCache` is warm,
+        hydrate the connection-local registry from the immutable snapshot
+        before any ``pg_catalog`` round-trip. Newly discovered metadata warms
+        a cold cache once; the snapshot stays immutable until pool reset/close.
+        """
         known = self._registry.snapshot()
         pending = {
             field.type_oid
             for field in description.fields
             if field.type_oid not in known and field.type_oid not in self._catalog_attempted_oids
         }
+        catalog = self._type_catalog
+        if catalog is not None and pending:
+            _type_discovery.apply_type_catalog_snapshot(
+                self._registry,
+                self._catalog_attempted_oids,
+                catalog.snapshot(),
+            )
+            known = self._registry.snapshot()
+            pending = {
+                field.type_oid
+                for field in description.fields
+                if field.type_oid not in known
+                and field.type_oid not in self._catalog_attempted_oids
+            }
         discovered: dict[int, _type_discovery.TypeMetadata] = {}
+        queried = False
         while pending:
             batch = tuple(sorted(pending))
             result = await self._execute_simple(_type_discovery.build_type_catalog_query(batch))
             metadata = _type_discovery.parse_type_catalog_rows(result.rows)
             self._catalog_attempted_oids.update(batch)
+            queried = True
             for item in metadata:
                 discovered[item.oid] = item
             known = self._registry.snapshot()
@@ -394,10 +426,14 @@ class Connection:
                 for dependency in item.dependencies
                 if dependency not in known and dependency not in self._catalog_attempted_oids
             }
-        _type_discovery.register_type_codecs(
-            self._registry,
-            tuple(discovered.values()),
-        )
+        if discovered:
+            _type_discovery.register_type_codecs(
+                self._registry,
+                tuple(discovered.values()),
+            )
+        if catalog is not None and not catalog.is_warm and queried:
+            # Publish under a short lock; do not hold it across the I/O above.
+            catalog.warm(tuple(discovered.values()), self._catalog_attempted_oids)
 
     async def _roundtrip(
         self,

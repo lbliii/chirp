@@ -5,12 +5,20 @@ catalog query; this module validates its text rows and publishes codecs through
 the existing lock-guarded registry.  Only enum, true-array, range, and composite
 families are synthesized.  Unknown base, domain, pseudo, and multirange types
 remain on PostgreSQL's text result path.
+
+A process-wide :class:`TypeCatalogCache` (keyed by host/port/database) holds an
+immutable warm snapshot of discovered :class:`TypeMetadata` so pool checkouts
+reuse catalog facts without re-querying ``pg_catalog``.  Codecs remain
+connection-local; the cache stores metadata only.  Writers take a short
+``threading.Lock`` around publish/invalidate and never hold it across I/O.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import threading
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, NoReturn
 
 from chirp.data.drivers._pelt import _codecs_array
@@ -46,6 +54,137 @@ class TypeMetadata:
                 if oid
             )
         )
+
+
+@dataclass(frozen=True, slots=True)
+class TypeCatalogSnapshot:
+    """Immutable warm ``pg_catalog`` facts shared across pool checkouts."""
+
+    by_oid: Mapping[int, TypeMetadata]
+    attempted_oids: frozenset[int]
+
+
+class TypeCatalogCache:
+    """Process-wide shared type-catalog cache; immutable after first warm.
+
+    Readers copy the published snapshot reference under a short lock. After
+    :meth:`warm`, the snapshot never mutates in place — invalidation clears it
+    for a later re-warm (pool reset/close). Never hold the lock across await
+    or network I/O.
+    """
+
+    __slots__ = ("_identity", "_lock", "_snapshot")
+
+    def __init__(self, identity: tuple[str, int, str]) -> None:
+        self._identity = identity
+        self._lock = threading.Lock()
+        self._snapshot: TypeCatalogSnapshot | None = None
+
+    @property
+    def identity(self) -> tuple[str, int, str]:
+        """``(host, port, database)`` key that scopes this cache."""
+        return self._identity
+
+    @property
+    def is_warm(self) -> bool:
+        """True once an immutable snapshot has been published."""
+        with self._lock:
+            return self._snapshot is not None
+
+    def snapshot(self) -> TypeCatalogSnapshot | None:
+        """Return the warm snapshot, or ``None`` before the first warm."""
+        with self._lock:
+            return self._snapshot
+
+    def warm(
+        self,
+        metadata: Sequence[TypeMetadata],
+        attempted_oids: Iterable[int],
+    ) -> TypeCatalogSnapshot:
+        """Publish an immutable snapshot. First warm wins; later calls no-op."""
+        with self._lock:
+            existing = self._snapshot
+            if existing is not None:
+                return existing
+            by_oid = {item.oid: item for item in metadata}
+            published = TypeCatalogSnapshot(
+                by_oid=MappingProxyType(by_oid),
+                attempted_oids=frozenset(int(oid) for oid in attempted_oids),
+            )
+            self._snapshot = published
+            return published
+
+    def invalidate(self) -> None:
+        """Drop the warm snapshot (pool reset/close)."""
+        with self._lock:
+            self._snapshot = None
+
+
+# Process-wide warm catalogs keyed by (host, port, database). Refcounted so
+# closing one pool does not invalidate a sibling pool to the same database.
+_CATALOG_CACHES: dict[tuple[str, int, str], tuple[TypeCatalogCache, int]] = {}
+_CATALOG_CACHES_LOCK = threading.Lock()
+
+
+def catalog_identity(host: str, port: int, database: str) -> tuple[str, int, str]:
+    """Normalize the process-wide cache key for a connection target."""
+    return (host, port, database)
+
+
+def acquire_type_catalog_cache(host: str, port: int, database: str) -> TypeCatalogCache:
+    """Return the shared cache for ``identity``, bumping its pool refcount."""
+    identity = catalog_identity(host, port, database)
+    with _CATALOG_CACHES_LOCK:
+        entry = _CATALOG_CACHES.get(identity)
+        if entry is None:
+            cache = TypeCatalogCache(identity)
+            _CATALOG_CACHES[identity] = (cache, 1)
+            return cache
+        cache, refs = entry
+        _CATALOG_CACHES[identity] = (cache, refs + 1)
+        return cache
+
+
+def release_type_catalog_cache(cache: TypeCatalogCache) -> None:
+    """Drop one pool reference; invalidate when the last pool releases."""
+    identity = cache.identity
+    with _CATALOG_CACHES_LOCK:
+        entry = _CATALOG_CACHES.get(identity)
+        if entry is None:
+            return
+        current, refs = entry
+        if current is not cache:
+            return
+        if refs > 1:
+            _CATALOG_CACHES[identity] = (current, refs - 1)
+            return
+        del _CATALOG_CACHES[identity]
+    cache.invalidate()
+
+
+def clear_type_catalog_caches() -> None:
+    """Drop every process-wide catalog cache (test isolation only)."""
+    with _CATALOG_CACHES_LOCK:
+        caches = [entry[0] for entry in _CATALOG_CACHES.values()]
+        _CATALOG_CACHES.clear()
+    for cache in caches:
+        cache.invalidate()
+
+
+def apply_type_catalog_snapshot(
+    registry: CodecRegistry,
+    attempted_oids: set[int],
+    snapshot: TypeCatalogSnapshot | None,
+) -> None:
+    """Hydrate a connection-local registry from a warm catalog snapshot.
+
+    Marks every attempted OID on the connection ledger and registers codecs for
+    cached metadata. Sans-I/O: no ``pg_catalog`` round-trip.
+    """
+    if snapshot is None:
+        return
+    attempted_oids.update(snapshot.attempted_oids)
+    register_type_codecs(registry, tuple(snapshot.by_oid.values()))
 
 
 def build_type_catalog_query(oids: Sequence[int]) -> str:
@@ -211,8 +350,15 @@ def _raise_malformed_catalog(cause: BaseException | None = None) -> NoReturn:
 
 
 __all__ = [
+    "TypeCatalogCache",
+    "TypeCatalogSnapshot",
     "TypeMetadata",
+    "acquire_type_catalog_cache",
+    "apply_type_catalog_snapshot",
     "build_type_catalog_query",
+    "catalog_identity",
+    "clear_type_catalog_caches",
     "parse_type_catalog_rows",
     "register_type_codecs",
+    "release_type_catalog_cache",
 ]

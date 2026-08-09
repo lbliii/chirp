@@ -29,8 +29,9 @@ async def test_create_pool_closes_opened_connections_after_partial_failure(
             config: ConnectionConfig,
             *,
             statement_cache_size: int,
+            type_catalog: object | None = None,
         ) -> _StubConnection:
-            del cls, config, statement_cache_size
+            del cls, config, statement_cache_size, type_catalog
             if opened:
                 raise RuntimeError("second connection failed")
             conn = _StubConnection()

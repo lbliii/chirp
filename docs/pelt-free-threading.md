@@ -15,8 +15,13 @@ and database-specific codec registry. Registry writes take a short
 snapshot. Keeping live registries connection-local prevents server-assigned OID
 metadata from one database leaking into another. The process-wide built-in
 registry remains lock-guarded for module consumers and construction templates.
-Pool reset I/O finishes before the connection is published as available, so no
-pool lock is held across network I/O.
+Pool construction acquires a process-wide immutable type-catalog cache keyed by
+host/port/database (#953): the first checkout that discovers `pg_catalog` facts
+publishes a warm snapshot; later checkouts hydrate connection-local codecs from
+that snapshot without re-querying. Writers take a short lock only around
+publish/invalidate — never across await or I/O. Pool reset I/O finishes before
+the connection is published as available, so no pool lock is held across network
+I/O.
 
 ## Product boundary
 
@@ -40,6 +45,7 @@ ships.
 | Server-assigned OID codecs do not cross database sessions | one fresh `CodecRegistry` and attempted-OID ledger per `Connection` | `test_dynamic_codec_registries_are_connection_local` resolves conflicting same-OID metadata in isolated registries |
 | A pool connection has exactly one checked-out owner | `Pool.acquire()` / `Pool.release()` | `test_pool_checkout_is_exclusive_under_task_contention` runs 64 contenders across four yielding connections |
 | Reset completes before a released connection can be checked out again | `Pool.release()` awaits `reset_if_needed()` before taking the pool lock and releasing the semaphore | `test_pool_does_not_republish_connection_until_reset_finishes` |
+| Warm type-catalog metadata is shared immutably across pool checkouts | `TypeCatalogCache` / `create_pool` | `test_second_checkout_skips_redundant_catalog_queries`; `test_type_catalog_cache_concurrent_reads_are_safe` |
 | A server error is drained through `ReadyForQuery` before it is raised to application code | `Connection._roundtrip()` retains the first error while consuming the exchange and publishing transaction state | `test_error_drains_ready_frame_before_rollback_and_reuse` fragments the error and ready frames, then reuses the same connection |
 | Failed PostgreSQL transactions are rolled back before reuse | `Connection.reset_if_needed()` | `test_pool_rolls_back_failed_transaction_before_reuse` against PostgreSQL 17 |
 | Prepared statements are computed once per checked-out connection, not shared globally | per-connection `PreparedStatementCache` | `test_parallel_checkouts_keep_statement_caches_single_owner` repeats the same query on four concurrent live connections and observes one cache entry/name per owner |
