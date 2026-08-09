@@ -2,8 +2,8 @@ name: Install smoke
 
 # Fresh-environment install + import smoke for every supported dependency
 # resolution profile (issue #910 / decision #908). Kept as a dedicated workflow
-# so specialized capability lanes (#906 Redis, #917 skip-fail, auth/browser/PG)
-# stay lean.
+# so specialized capability lanes (#906 Redis, #909 auth, #915 config/bedrock,
+# #917 skip-fail, browser/PG) stay lean.
 
 on:
   push:

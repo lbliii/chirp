@@ -181,10 +181,15 @@ class TestAdditionalProviders:
         assert seen["api_key"] == "azure-key"
 
     @pytest.mark.asyncio
+    @pytest.mark.issue(915)
     async def test_bedrock_generate_requires_botocore(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        pytest.importorskip("botocore")
+        # Soft-skip locally without chirp[ai-bedrock]; fail closed under
+        # CHIRP_REQUIRE_BOTOCORE=1 (ai-bedrock-capability lane / #915).
+        from tests.helpers.bedrock_capability import ensure_botocore_package
+
+        ensure_botocore_package()
         import botocore.session
         import httpx
 
