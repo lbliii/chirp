@@ -13,7 +13,7 @@ client-side JavaScript beyond htmx.
 - **Recursive templates** — Comment trees rendered with kida's `{% def %}` (self-calling functions)
 - **View Transitions** — Cross-fade when navigating list→detail (scoped to avoid OOB swap flicker)
 - **Fragment caching** — `{% cache %}` for the site header
-- **Lifecycle hooks** — `@app.on_worker_startup` / `@app.on_worker_shutdown` for HTTP client management
+- **Lifecycle hooks** — `@app.on_worker_startup` / `@app.on_worker_shutdown` for HTTP client management (Chirp dispatch for Pounce `pounce.worker.startup`; full freeze → Kida → Pelt warm ordering is documented in [`docs/design/warm-state-startup-protocol.md`](../../../docs/design/warm-state-startup-protocol.md))
 - **Multi-worker Pounce** — 4 worker threads with free-threading
 
 ## Architecture

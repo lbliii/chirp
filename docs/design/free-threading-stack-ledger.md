@@ -35,6 +35,14 @@ Each project draws a hard line between **setup** and **serve**:
 | **Pounce** | `Server` / config construction, lifespan startup before workers accept | Frozen shared config; per-worker loops and queues | Workers share the process; app must finish warm-state publication before multi-thread accept |
 | **Pelt** | Module import, default codec registry build, pool construction | Exclusive checkout ownership; decode against immutable snapshots | Pool `acquire`/`release`; registry writers take a short lock and publish `MappingProxyType` snapshots |
 
+**Ordered warm sequence** (Chirp freeze → Kida precompile /
+`static_context` → Pelt pool + type warmup), aligned to Pounce
+`pounce.worker.startup` / Chirp `@app.on_worker_startup`, lives in
+[warm-state-startup-protocol.md](warm-state-startup-protocol.md) (#945).
+That protocol owns cold-vs-warm RSS measurement notes for ≥4 workers and the
+cross-link to [pounce#321](https://github.com/lbliii/pounce/issues/321); this
+ledger owns shared-vs-isolated classification only.
+
 After that boundary, **do not** mutate the warm snapshot from request threads
 except through the locked or ownership-based paths named below.
 
@@ -141,6 +149,11 @@ ordering. Live wire I/O and parallel decode remain covered by
 | Pelt (in Chirp) | `docs/pelt-free-threading.md` | Links here |
 | Kida | https://lbliii.github.io/kida/docs/about/thread-safety/ | Reciprocal link tracked with epic #941 sibling repos |
 | Pounce | https://lbliii.github.io/pounce/docs/about/thread-safety/ | Reciprocal link tracked with epic #941 sibling repos |
+
+Warm-state ordering (not ownership classification):
+[warm-state-startup-protocol.md](warm-state-startup-protocol.md). Pounce-side
+hook documentation is tracked in
+[pounce#321](https://github.com/lbliii/pounce/issues/321) (out of this repo).
 
 This Chirp leaf publishes the ledger and Chirp/Pelt inbound links. Kida and
 Pounce retain their own thread-safety pages; pointing those pages at this
