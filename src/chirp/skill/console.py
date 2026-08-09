@@ -68,7 +68,8 @@ class ReliabilityScore:
     def label(self) -> str:
         if self.status == "unknown":
             return "unscored"
-        return f"{self.passed}/{self.total} {self.status}"
+        # Middle dot keeps "5/7 · fail" from reading as "five failures".
+        return f"{self.passed}/{self.total} · {self.status}"
 
     def to_dict(self) -> dict[str, Any]:
         return {
