@@ -85,6 +85,7 @@ Published guidance:
 | Surface | Mode | Notes |
 | --- | --- | --- |
 | Built-in codec registry templates | Shared warm / locked writes | Process-wide; writers lock; readers use snapshots |
+| Type-catalog metadata cache | Shared warm (immutable after publish) | Keyed by host/port/database; pool create acquires; invalidate on last pool close / `reset_type_catalog` |
 | Pool | Shared coordinator | Exclusive checkout; reset completes before republication |
 | Checked-out connection | Isolated | Protocol, prepared-statement cache, dynamic OID ledger are connection-local |
 | Parallel row decode | Isolated workers | Fans out only when GIL is off and row/cell thresholds are met |
