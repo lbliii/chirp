@@ -24,6 +24,7 @@ def test_pelt_evidence_maps_every_concurrency_gate() -> None:
         "test_codec_registry_concurrent_writes_publish_untorn_snapshots",
         "test_dynamic_codec_registries_are_connection_local",
         "test_pool_checkout_is_exclusive_under_task_contention",
+        "test_suspense_shaped_pool_checkout_stress_stays_exclusive_and_idle",
         "test_pool_does_not_republish_connection_until_reset_finishes",
         "test_error_drains_ready_frame_before_rollback_and_reuse",
         "test_pool_rolls_back_failed_transaction_before_reuse",
