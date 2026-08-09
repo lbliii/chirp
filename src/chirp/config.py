@@ -481,7 +481,12 @@ class AppConfig:
         try:
             from dotenv import load_dotenv
 
-            load_dotenv()
+            # Docstring contract: load ``.env`` from the *current working*
+            # directory. Bare ``load_dotenv()`` uses find_dotenv() from the
+            # caller frame (this module), which misses app-cwd ``.env`` files.
+            _env_file = Path.cwd() / ".env"
+            if _env_file.is_file():
+                load_dotenv(_env_file)
         except ImportError:
             pass
 
