@@ -382,13 +382,20 @@ worked example.
 ## Advanced
 
 :::{dropdown} Worker lifecycle hooks and async workers
-Use `@app.on_worker_startup` and `@app.on_worker_shutdown` for resources that must be created inside each production worker — async HTTP clients or event-loop-bound database pools.
+Use `@app.on_worker_startup` and `@app.on_worker_shutdown` for resources that must be created inside each production worker — async HTTP clients or event-loop-bound database pools. Those decorators are Chirp's dispatch for Pounce's `pounce.worker.startup` / `pounce.worker.shutdown` scopes.
 
 ```python
 config = AppConfig(debug=False, workers=4, worker_mode="async")
 ```
 
 Worker lifecycle hooks require async workers in production. On free-threaded Python, `worker_mode="auto"` resolves to sync workers, which do not emit worker lifecycle scopes — so Chirp rejects production launch when worker hooks are registered and the effective mode is sync. If you do not register worker hooks, `worker_mode="auto"` stays valid.
+
+For the ordered cross-stack warm sequence (Chirp freeze → Kida precompile /
+`static_context` → Pelt pool + type warmup), cold-vs-warm RSS measurement notes
+for ≥4 workers, and the Pounce-side tracking issue, see the
+[warm-state startup protocol](https://github.com/lbliii/chirp/blob/main/docs/design/warm-state-startup-protocol.md)
+(#945). Sync thread workers that never see `pounce.worker.startup` warm shared
+state at freeze + `@app.on_startup` instead.
 :::{/dropdown}
 
 ::::{dropdown} Worker startup failure semantics
