@@ -35,8 +35,9 @@ Pipeline::
 import contextvars
 import inspect
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import TYPE_CHECKING, Any
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Literal
 
 import anyio
 import anyio.to_thread
@@ -50,6 +51,61 @@ logger = logging.getLogger("chirp.suspense")
 
 if TYPE_CHECKING:
     from chirp.templating.fragment_target_registry import FragmentTargetRegistry
+
+type DeferEdgeKind = Literal["feeds", "couples"]
+
+
+@dataclass(frozen=True, slots=True)
+class DeferEdge:
+    """One edge in a Suspense defer execution DAG.
+
+    ``feeds`` links a deferred context key to a leaf block discovered via
+    ``depends_on``. ``couples`` links two deferred keys that share a leaf block
+    (they are not independent for concurrent checkout / contract purposes).
+    """
+
+    kind: DeferEdgeKind
+    source: str
+    destination: str
+
+
+@dataclass(frozen=True, slots=True)
+class DeferExecutionPlan:
+    """Internal Suspense defer plan — discovery + ancestor pruning.
+
+    Not a public return type. Used by runtime ``render_suspense`` and by
+    ``AppCompiler``'s freeze-time Suspense DAG (#948).
+    """
+
+    template_name: str
+    deferred_keys: tuple[str, ...]
+    blocks: tuple[str, ...]
+    key_to_blocks: tuple[tuple[str, tuple[str, ...]], ...]
+    pruned_ancestors: tuple[str, ...]
+    edges: tuple[DeferEdge, ...]
+    explicit_blocks: bool = False
+
+    @property
+    def key_blocks(self) -> Mapping[str, tuple[str, ...]]:
+        return dict(self.key_to_blocks)
+
+    def independent_keys(self) -> frozenset[str]:
+        """Deferred keys that do not share a leaf block with any other key."""
+        coupled: set[str] = set()
+        for edge in self.edges:
+            if edge.kind == "couples":
+                coupled.add(edge.source)
+                coupled.add(edge.destination)
+        return frozenset(self.deferred_keys) - coupled
+
+    def coupled_key_pairs(self) -> frozenset[tuple[str, str]]:
+        """Unordered pairs of deferred keys that share at least one leaf block."""
+        return frozenset(
+            (min(edge.source, edge.destination), max(edge.source, edge.destination))
+            for edge in self.edges
+            if edge.kind == "couples"
+        )
+
 
 #: Shell / deferred-block template context key for which context keys are
 #: still awaiting resolution.  Shell render: ``frozenset`` of deferred names;
@@ -227,24 +283,39 @@ def _find_deferred_blocks(
     multiple blocks, and a block may appear under multiple keys
     (de-duplicated during rendering).
     """
+    key_to_blocks, _pruned = _find_deferred_blocks_with_pruning(env, template_name, deferred_keys)
+    return key_to_blocks
+
+
+def _find_deferred_blocks_with_pruning(
+    env: Environment,
+    template_name: str,
+    deferred_keys: set[str],
+) -> tuple[dict[str, list[str]], tuple[str, ...]]:
+    """Like ``_find_deferred_blocks``, also returning pruned ancestor names."""
     template = env.get_template(template_name)
     metadata = template.block_metadata()
 
-    key_to_blocks: dict[str, list[str]] = {}
-
+    raw_by_key: dict[str, list[str]] = {}
     for block_name, block_meta in metadata.items():
         for dep_path in block_meta.depends_on:
             root_key = dep_path.split(".")[0]
             if root_key in deferred_keys:
-                key_to_blocks.setdefault(root_key, []).append(block_name)
+                raw_by_key.setdefault(root_key, []).append(block_name)
 
-    for key, blocks in key_to_blocks.items():
-        if len(blocks) <= 1:
+    key_to_blocks: dict[str, list[str]] = {}
+    pruned: set[str] = set()
+    for key, blocks in raw_by_key.items():
+        unique = list(dict.fromkeys(blocks))
+        if len(unique) <= 1:
+            key_to_blocks[key] = unique
             continue
-        deps_by_block = {b: metadata[b].depends_on for b in blocks}
-        key_to_blocks[key] = _prune_ancestor_blocks(blocks, deps_by_block)
+        deps_by_block = {b: metadata[b].depends_on for b in unique}
+        kept = _prune_ancestor_blocks(unique, deps_by_block)
+        key_to_blocks[key] = kept
+        pruned.update(set(unique) - set(kept))
 
-    return key_to_blocks
+    return key_to_blocks, tuple(sorted(pruned))
 
 
 def _prune_ancestor_blocks(
@@ -268,6 +339,74 @@ def _prune_ancestor_blocks(
                 drop.add(a)
                 break
     return [b for b in blocks if b not in drop]
+
+
+def _edges_from_key_blocks(
+    key_to_blocks: Mapping[str, list[str] | tuple[str, ...]],
+) -> tuple[DeferEdge, ...]:
+    """Build feeds + couples edges from a key→leaf-blocks mapping."""
+    edges: list[DeferEdge] = []
+    block_owners: dict[str, list[str]] = {}
+    for key in sorted(key_to_blocks):
+        for block in key_to_blocks[key]:
+            edges.append(DeferEdge("feeds", key, block))
+            block_owners.setdefault(block, []).append(key)
+    for owners in block_owners.values():
+        unique = sorted(set(owners))
+        if len(unique) < 2:
+            continue
+        edges.extend(
+            DeferEdge("couples", left, right)
+            for i, left in enumerate(unique)
+            for right in unique[i + 1 :]
+        )
+    return tuple(edges)
+
+
+def plan_defer_execution(
+    env: Environment,
+    template_name: str,
+    deferred_keys: set[str] | frozenset[str],
+    *,
+    defer_blocks: tuple[str, ...] | None = None,
+) -> DeferExecutionPlan:
+    """Build an explicit defer execution DAG for *template_name*.
+
+    Extends Suspense block discovery + ancestor-superset pruning into a
+    frozen plan with ``feeds`` (key→block) and ``couples`` (shared-block)
+    edges. Explicit ``defer_blocks`` bypasses discovery (same as runtime).
+    """
+    keys = tuple(sorted(deferred_keys))
+    if defer_blocks is not None:
+        blocks = tuple(dict.fromkeys(defer_blocks))
+        # Explicit bypass: every deferred key feeds every listed block.
+        # Coupling is retained when more than one key is present so #949
+        # can still see "not independent" for opaque explicit plans.
+        key_map = {key: list(blocks) for key in keys}
+        return DeferExecutionPlan(
+            template_name=template_name,
+            deferred_keys=keys,
+            blocks=blocks,
+            key_to_blocks=tuple((key, tuple(blocks)) for key in keys),
+            pruned_ancestors=(),
+            edges=_edges_from_key_blocks(key_map),
+            explicit_blocks=True,
+        )
+
+    key_to_blocks, pruned = _find_deferred_blocks_with_pruning(
+        env, template_name, set(deferred_keys)
+    )
+    blocks = tuple(dict.fromkeys(block for key in keys for block in key_to_blocks.get(key, ())))
+    frozen_map = tuple((key, tuple(key_to_blocks.get(key, ()))) for key in keys)
+    return DeferExecutionPlan(
+        template_name=template_name,
+        deferred_keys=keys,
+        blocks=blocks,
+        key_to_blocks=frozen_map,
+        pruned_ancestors=pruned,
+        edges=_edges_from_key_blocks(key_to_blocks),
+        explicit_blocks=False,
+    )
 
 
 def _should_wrap_in_layouts(
@@ -384,7 +523,10 @@ async def render_suspense(
     # blocks) then raises a clean ConfigurationError *before* any shell bytes
     # are flushed — never a half-rendered page with frozen skeletons + a 500.
     # The resolved list is reused in Phase 4 so discovery runs exactly once.
+    # plan_defer_execution builds the explicit execution DAG (feeds/couples)
+    # that AppCompiler also freezes for #948 / #949.
     blocks_to_render: list[str] = []
+    defer_plan: DeferExecutionPlan | None = None
     template = env.get_template(template_name)
     if pending:
         available = set(template.list_blocks())
@@ -409,13 +551,17 @@ async def render_suspense(
                     f"Available blocks: {sorted(available)}"
                 )
                 raise ConfigurationError(msg)
-            blocks_to_render = [b for b in suspense.defer_blocks if b in available]
+            defer_plan = plan_defer_execution(
+                env,
+                template_name,
+                set(pending.keys()),
+                defer_blocks=suspense.defer_blocks,
+            )
+            blocks_to_render = list(defer_plan.blocks)
         else:
             deferred_keys = set(pending.keys())
-            key_to_blocks = _find_deferred_blocks(env, template_name, deferred_keys)
-            blocks_to_render = list(
-                dict.fromkeys(b for key in deferred_keys for b in key_to_blocks.get(key, []))
-            )
+            defer_plan = plan_defer_execution(env, template_name, deferred_keys)
+            blocks_to_render = list(defer_plan.blocks)
             if not blocks_to_render:
                 from chirp.errors import ConfigurationError
 
@@ -503,8 +649,20 @@ async def render_suspense(
             errors[key] = exc
 
     async with anyio.create_task_group() as tg:
-        for key, awaitable in pending.items():
-            tg.start_soon(_resolve, key, awaitable)
+        # Schedule independent defer keys first when a plan exists; coupled
+        # keys still run in the same task group (true concurrency). The
+        # execution DAG documents independence for pool checkout (#950) and
+        # the future defer-independence contract (#949).
+        if defer_plan is not None:
+            independent = defer_plan.independent_keys()
+            schedule = (
+                *(key for key in defer_plan.deferred_keys if key in independent and key in pending),
+                *(key for key in pending if key not in independent),
+            )
+        else:
+            schedule = tuple(pending)
+        for key in schedule:
+            tg.start_soon(_resolve, key, pending[key])
 
     if errors:
         logger.warning(

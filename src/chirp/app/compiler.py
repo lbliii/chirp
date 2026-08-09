@@ -837,6 +837,13 @@ class AppCompiler:
             route_templates=self._mutable.route_templates,
             route_layout_chains=self._mutable.route_layout_chains,
         )
+        from chirp.app._suspense_dag import compile_suspense_defer_dag
+
+        self._runtime._suspense_defer_dag = compile_suspense_defer_dag(
+            router=router,
+            kida_env=self._runtime.kida_env,
+            program=self._runtime.hypermedia_program,
+        )
 
         self._mutable.oob_registry.freeze()
         self._runtime.oob_registry = self._mutable.oob_registry

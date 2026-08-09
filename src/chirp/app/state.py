@@ -24,6 +24,7 @@ from .hypermedia_program import HypermediaProgram, TemplateDeclaration
 
 if TYPE_CHECKING:
     from chirp.app._signal_graph import _SignalGraph
+    from chirp.app._suspense_dag import _SuspenseDeferDAG
     from chirp.app.htmx_manifest import HtmxProvisioningManifest
     from chirp.data.database import Database
     from chirp.data.schema.types import SchemaSnapshot
@@ -295,6 +296,8 @@ class RuntimeAppState:
     hypermedia_program: HypermediaProgram | None = None
     #: Private immutable producer/dependency/sink topology compiled at freeze.
     _signal_graph: _SignalGraph | None = None
+    #: Private Suspense defer execution DAG (keys/blocks/edges) compiled at freeze.
+    _suspense_defer_dag: _SuspenseDeferDAG | None = None
     htmx_manifest: HtmxProvisioningManifest | None = None
     #: Internal frozen signal transport selection; not a public inspection API.
     _signal_backplane_descriptor: _SignalBackplaneDescriptor | None = None
@@ -360,6 +363,8 @@ class ContractCheckSnapshot:
     _hypermedia_program: HypermediaProgram | None = None
     #: Internal immutable signal topology. Not exposed to custom check behavior yet.
     _signal_graph: _SignalGraph | None = None
+    #: Internal Suspense defer execution DAG for #949 independence checks.
+    _suspense_defer_dag: _SuspenseDeferDAG | None = None
     #: Internal frozen htmx provisioning decision. Not a public inspection API.
     _htmx_manifest: HtmxProvisioningManifest | None = None
     #: Internal frozen signal transport selection; not exposed to custom checks.

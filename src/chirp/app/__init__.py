@@ -1327,6 +1327,7 @@ class App:
             schema=schema,
             _hypermedia_program=self._runtime_state.hypermedia_program,
             _signal_graph=self._runtime_state._signal_graph,
+            _suspense_defer_dag=self._runtime_state._suspense_defer_dag,
             _htmx_manifest=self._runtime_state.htmx_manifest,
             _signal_backplane_descriptor=(self._runtime_state._signal_backplane_descriptor),
         )
