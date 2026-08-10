@@ -397,6 +397,54 @@ def test_suspense_defer_silent_when_block_depends_on_key(tmp_path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# defer_coupling (#949) -- shared-leaf Suspense deferred keys
+# ---------------------------------------------------------------------------
+
+_COUPLED_PANEL = (
+    "<html><body>"
+    "{% block panel %}"
+    "{% if stats is deferred %}<span>…</span>"
+    "{% elif feed is deferred %}<span>…</span>"
+    "{% else %}<span>{{ stats }}|{{ feed }}</span>{% endif %}"
+    "{% endblock %}"
+    "</body></html>"
+)
+
+
+def _coupled_suspense_app(tmp_path, *, env: str) -> App:
+    (tmp_path / "page.html").write_text(_COUPLED_PANEL, encoding="utf-8")
+    kwargs = {"secret_key": "x" * 32} if env in ("staging", "production") else {}
+    app = App(AppConfig(skip_contract_checks=True, template_dir=str(tmp_path), env=env, **kwargs))
+
+    async def _stats() -> str:
+        return "s"
+
+    async def _feed() -> str:
+        return "f"
+
+    @app.route("/")
+    async def dashboard():
+        from chirp import Suspense
+
+        return Suspense("page.html", stats=_stats(), feed=_feed())
+
+    return app
+
+
+def test_defer_coupling_fires_for_shared_leaf_in_staging(tmp_path) -> None:
+    """Shared-leaf deferred keys → defer_coupling WARNING in staging."""
+    app = _coupled_suspense_app(tmp_path, env="staging")
+    coupling = [i for i in _issues(app) if i.category == "defer_coupling"]
+    assert coupling, "defer_coupling (#949) did not fire through check_hypermedia_surface"
+    assert all(i.severity is Severity.WARNING for i in coupling)
+
+
+def test_defer_coupling_silent_in_development(tmp_path) -> None:
+    app = _coupled_suspense_app(tmp_path, env="development")
+    assert "defer_coupling" not in _categories(app)
+
+
+# ---------------------------------------------------------------------------
 # shapecheck (#166/#168/#173) -- surface-contract registry drift
 # ---------------------------------------------------------------------------
 

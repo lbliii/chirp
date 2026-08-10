@@ -37,6 +37,7 @@ from .rules_context_cascade import check_context_cascade
 from .rules_csrf_forms import check_csrf_form_tokens
 from .rules_data_shapes import check_data_shapes
 from .rules_debug_wiring import check_debug_wiring
+from .rules_defer_coupling import check_defer_coupling
 from .rules_defer_falsy import check_defer_falsy_conditionals
 from .rules_form_routes import check_form_action_contracts
 from .rules_forms import validate_form_contracts
@@ -451,6 +452,9 @@ def _build_snapshot(app: App) -> ContractCheckSnapshot:
         signal_names=_signal_names(app),
         schema=schema,
         _hypermedia_program=getattr(app._runtime_state, "hypermedia_program", None),
+        _signal_graph=getattr(app._runtime_state, "_signal_graph", None),
+        _suspense_defer_dag=getattr(app._runtime_state, "_suspense_defer_dag", None),
+        _htmx_manifest=getattr(app._runtime_state, "htmx_manifest", None),
         _signal_backplane_descriptor=getattr(
             app._runtime_state, "_signal_backplane_descriptor", None
         ),
@@ -931,6 +935,14 @@ def check_hypermedia_surface(app: App, *, deploy: bool = False) -> CheckResult:
                 template_sources,
                 kida_env,
                 defer_blocks_templates=_collect_defer_blocks_templates(router),
+            )
+        )
+        # #949: freeze-time Suspense DAG couples edges → env-aware WARNING when
+        # deferred keys share a leaf block (silent in development).
+        result.issues.extend(
+            check_defer_coupling(
+                snapshot._suspense_defer_dag,
+                env=getattr(app.config, "env", "development"),
             )
         )
         result.issues.extend(check_fragment_block_scope(template_sources, kida_env))

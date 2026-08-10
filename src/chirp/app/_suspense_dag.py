@@ -3,7 +3,8 @@
 Extends Suspense block discovery + ancestor pruning into an explicit per-route
 execution DAG (nodes = defer keys / leaf blocks; edges = ``feeds`` /
 ``couples``). Stored on runtime state for concurrent resolution and the
-future #949 independence contract. Not a public return type or inspection API.
+``defer_coupling`` independence contract (#949). Not a public return type or
+inspection API.
 """
 
 from __future__ import annotations
@@ -347,7 +348,7 @@ def compile_suspense_defer_dag(
     same discovery + ancestor-pruning algorithm as runtime, and publishes an
     immutable route-indexed DAG.
     """
-    del program  # reserved for future HypermediaProgram cross-links (#949)
+    del program  # reserved for HypermediaProgram cross-links; DAG is sufficient for #949
     if kida_env is None:
         return _SuspenseDeferDAG()
 

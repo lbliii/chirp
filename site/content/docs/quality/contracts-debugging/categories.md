@@ -692,6 +692,7 @@ No-op when `kida_env` is `None` (registry drift still runs).
 | `alpine_cdn_url` | ERROR | Replace bare jsDelivr Alpine package URLs with explicit `/dist/cdn.min.js` URLs or Chirp injection helpers. |
 | `defer_falsy` | WARNING | Use `{% if key is deferred %}` or `"key" in __chirp_defer_pending__` to distinguish loading from loaded before testing resolved values. See [[docs/build-apps/request-pipeline/render-plan|Suspense deferred keys]]. |
 | `suspense_defer` | WARNING | A template declares a Suspense-deferred key (`is deferred` / `__chirp_defer_pending__`) that no block depends on, so auto-discovery finds nothing to re-render. Reference the key inside a `{% block ... %}`, or pass the blocks explicitly with `Suspense(..., defer_blocks=(...))`. |
+| `defer_coupling` | WARNING (staging/production; silent in development) | Freeze-time Suspense DAG reports deferred keys that share a leaf block (`couples` edges). Coupled keys cannot resolve independently for concurrent checkout. Split into separate leaf blocks when independence matters, or keep the shared panel and accept serial resolution. Promote with `app.override_contract_severity("defer_coupling", Severity.ERROR)` when CI requires independence. |
 | `a11y_interactive` | WARNING | Add keyboard and semantic affordances for interactive elements. |
 | `a11y_label` | WARNING | Add visible or accessible labels for form controls. |
 | `a11y_alt` | WARNING | Add meaningful `alt` text or intentionally empty decorative `alt=""`. |
