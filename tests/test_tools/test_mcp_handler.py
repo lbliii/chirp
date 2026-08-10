@@ -2,6 +2,7 @@
 
 import base64
 import json
+import warnings
 
 import pytest
 
@@ -268,7 +269,13 @@ class TestMCPHandler:
         assert status == 200
         result = body["result"]
         assert result["resultType"] == "complete"
-        assert result["supportedVersions"] == ["2026-07-28"]
+        assert result["supportedVersions"] == [
+            "2026-07-28",
+            "2025-06-18",
+            "2025-03-26",
+            "2024-11-05",
+        ]
+        assert result["supportedVersions"][0] == "2026-07-28"
         assert "tools" in result["capabilities"]
         assert result["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == "chirp"
 
@@ -722,3 +729,139 @@ class TestLegacyOfframp967:
         status, body = _parse_response(response)
         assert status == 400
         assert body["error"]["code"] == -32020
+
+
+class TestStandardProtocolNegotiation:
+    """Standard MCP 2025-06-18 clients (Cursor, Claude Code, …) — negotiation."""
+
+    def _make_registry(self) -> ToolRegistry:
+        def greet(name: str) -> str:
+            return f"Hello, {name}!"
+
+        return compile_tools(
+            [("greet", "Greet someone", greet)],
+            ToolEventBus(),
+        )
+
+    @pytest.mark.asyncio
+    async def test_initialize_echoes_requested_2025_06_18(self) -> None:
+        """A 2025-06-18 initialize gets 2025-06-18 back — not 2026-07-28."""
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "id": 1,
+                "params": {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {},
+                    "clientInfo": {"name": "cursor", "version": "1"},
+                },
+            },
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
+        assert status == 200
+        result = body["result"]
+        assert result["protocolVersion"] == "2025-06-18"
+        assert "chirp/legacyOfframp" not in result.get("_meta", {})
+
+    @pytest.mark.asyncio
+    async def test_initialize_echoes_requested_2025_03_26(self) -> None:
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "id": 1,
+                "params": {"protocolVersion": "2025-03-26"},
+            },
+        )
+        response = await handle_mcp_request(request, registry)
+        _, body = _parse_response(response)
+        assert body["result"]["protocolVersion"] == "2025-03-26"
+
+    @pytest.mark.asyncio
+    async def test_initialize_unknown_version_falls_back_to_current(self) -> None:
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "id": 1,
+                "params": {"protocolVersion": "1999-01-01"},
+            },
+        )
+        response = await handle_mcp_request(request, registry)
+        _, body = _parse_response(response)
+        result = body["result"]
+        assert result["protocolVersion"] == "2026-07-28"
+        # An explicit (if unknown) request is not the handshake-era offramp.
+        assert "chirp/legacyOfframp" not in result.get("_meta", {})
+
+    @pytest.mark.asyncio
+    async def test_initialize_omitted_version_advertises_current_with_offramp(self) -> None:
+        registry = self._make_registry()
+        request = _make_request(
+            body={"jsonrpc": "2.0", "method": "initialize", "id": 1, "params": {}},
+        )
+        with pytest.warns(DeprecationWarning, match="2024-11-05"):
+            response = await handle_mcp_request(request, registry)
+        _, body = _parse_response(response)
+        result = body["result"]
+        assert result["protocolVersion"] == "2026-07-28"
+        assert "chirp/legacyOfframp" in result["_meta"]
+
+    @pytest.mark.asyncio
+    async def test_initialize_explicit_legacy_version_is_echoed_with_offramp(self) -> None:
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "id": 1,
+                "params": {"protocolVersion": "2024-11-05"},
+            },
+        )
+        with pytest.warns(DeprecationWarning, match="2024-11-05"):
+            response = await handle_mcp_request(request, registry)
+        _, body = _parse_response(response)
+        result = body["result"]
+        assert result["protocolVersion"] == "2024-11-05"
+        assert "chirp/legacyOfframp" in result["_meta"]
+
+    @pytest.mark.asyncio
+    async def test_tools_list_2025_06_18_needs_no_routing_headers(self) -> None:
+        """Standard 2025-06-18 tools/list works without Mcp-Method (no -32020)."""
+        registry = self._make_registry()
+        request = _make_request(
+            body={"jsonrpc": "2.0", "method": "tools/list", "id": 2, "params": {}},
+            headers={"MCP-Protocol-Version": "2025-06-18"},
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
+        assert status == 200
+        assert "error" not in body
+        assert {t["name"] for t in body["result"]["tools"]} == {"greet"}
+
+    @pytest.mark.asyncio
+    async def test_tools_call_2025_06_18_needs_no_routing_headers(self) -> None:
+        """Standard 2025-06-18 tools/call routes from the body name (no Mcp-Name)."""
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "id": 3,
+                "params": {"name": "greet", "arguments": {"name": "World"}},
+            },
+            headers={"MCP-Protocol-Version": "2025-06-18"},
+        )
+        response = await handle_mcp_request(request, registry)
+        status, body = _parse_response(response)
+        assert status == 200
+        assert body["result"]["content"][0]["text"] == "Hello, World!"
