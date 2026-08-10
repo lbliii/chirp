@@ -48,13 +48,26 @@ class Pool:
         return self._type_catalog
 
     async def acquire(self) -> Connection:
-        """Check out a connection, blocking until one is free."""
+        """Check out a connection, blocking until one is free.
+
+        Exhaustion is a bounded wait on the pool semaphore — never a shared
+        borrow. Concurrent Suspense independent defers that each ``acquire``
+        therefore hold distinct connections (#950). Size the pool
+        (``PoolConfig.max_size`` / ``Database(..., pool_size=...)``) to the
+        peak concurrent checkouts you need, or accept queueing latency when
+        more defers contend than connections exist.
+        """
         await self._semaphore.acquire()
         async with self._lock:
             return self._available.pop()
 
     async def release(self, conn: Connection) -> None:
-        """Return a previously acquired connection to the pool."""
+        """Return a previously acquired connection to the pool.
+
+        Reset I/O finishes before the connection is republished, so the pool
+        lock is never held across await boundaries for callers that release
+        promptly after each defer query.
+        """
         await conn.reset_if_needed()
         async with self._lock:
             self._available.append(conn)

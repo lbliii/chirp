@@ -439,6 +439,8 @@ For a **file-backed** SQLite database, Chirp opens a small bounded pool of WAL-m
 
 PostgreSQL has the strongest concurrency: Chirp's in-tree pelt driver provides a bounded connection pool with per-transaction isolation, so reads and writes run concurrently up to `pool_size`.
 
+**Suspense + pool sizing.** Independent [[docs/about/core-concepts/return-values|`Suspense`]] defers that each run a `Database` query acquire **separate** pooled connections for the duration of that defer. Exhaustion is a bounded wait on `acquire()` until a connection is released — never a shared borrow across concurrent awaits. Size `pool_size` to the peak concurrent independent checkouts on a Suspense page (or accept queueing). Release inside each defer; do not pin one connection across sibling defer awaits.
+
 For Chirp's broader free-threading posture, see [[docs/about/thread-safety|Thread Safety]].
 :::{/dropdown}
 
