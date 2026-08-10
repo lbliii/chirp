@@ -29,11 +29,16 @@ def test_pelt_evidence_maps_every_concurrency_gate() -> None:
         "test_error_drains_ready_frame_before_rollback_and_reuse",
         "test_pool_rolls_back_failed_transaction_before_reuse",
         "test_parallel_checkouts_keep_statement_caches_single_owner",
+        "test_independent_suspense_defers_use_distinct_pelt_checkouts",
+        "test_pool_exhaustion_queues_acquire_without_sharing_connection",
+        "test_independent_suspense_pelt_checkouts_under_nogil",
     ):
         assert proof in text
 
     assert "not a throughput claim" in text
     assert "PYTHON_GIL=0" in text
+    assert "#950" in text
+    assert "#957" in text
 
 
 @pytest.mark.issue(259)

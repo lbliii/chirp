@@ -164,6 +164,8 @@ Chirp resolves the awaitables concurrently, then streams each affected block as 
 - **`defer_blocks`** — an explicit tuple of block names to re-render, bypassing analysis. Use it when deferred values pass through macro arguments the analyzer can't trace.
 - **`defer_map`** — maps a block name to a different DOM id for the swap target, e.g. `{"stats": "stats-panel"}`.
 
+When deferred loaders check out PostgreSQL connections from Chirp's Pelt pool (via `Database` or `Pool.acquire`), each independent defer holds its **own** connection for the duration of that awaitable. Connections are never shared across concurrent defers. If more independent defers need a checkout than `pool_size` allows, excess `acquire()` calls **wait** until a sibling releases — queueing latency, not a shared borrow. Size `pool_size` to the peak concurrent independent checkouts you need, and release promptly inside each defer (do not hold a checkout across unrelated awaits between defers).
+
 ::::{dropdown} Advanced: the deferred sentinel and pending-key set
 `is deferred` is the rule you need. Under the hood, the shell sets each unresolved awaitable key to the `DEFERRED` sentinel, and sets `__chirp_defer_pending__` to a `frozenset` of keys still awaiting resolution (empty once resolved, or when there were no awaitables). You can branch on `"stats" in __chirp_defer_pending__` if you prefer the pending-key set. The constant `CHIRP_DEFER_PENDING_KEY` holds the string `"__chirp_defer_pending__"`. These are provisional extension surfaces; prefer `is deferred` in templates.
 ::::{/dropdown}
