@@ -1,10 +1,10 @@
-"""Docs lock for MCP 2026-07-28 stateless transport + SEP-2243 headers (#968)."""
+"""Docs lock for MCP transport: 2025-06-18 negotiation + 2026-07-28 stateless core."""
 
 from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.issue(968)
+pytestmark = [pytest.mark.issue(968), pytest.mark.issue(1042)]
 
 _ROOT = Path(__file__).resolve().parents[2]
 _TOOLS_DOC = _ROOT / "site" / "content" / "docs" / "build-apps" / "ui-extensions" / "tools.md"
@@ -16,6 +16,8 @@ def test_tools_guide_documents_stateless_transport_and_routing_headers() -> None
 
     for required in (
         "2026-07-28",
+        "2025-06-18",
+        "params.protocolVersion",
         "stateless",
         "params._meta",
         "server/discover",
@@ -25,6 +27,7 @@ def test_tools_guide_documents_stateless_transport_and_routing_headers() -> None
         "HeaderMismatch",
         "-32020",
         "SEP-2243",
+        "chirp/legacyOfframp",
     ):
         assert required in docs, f"missing {required!r} in {_TOOLS_DOC.relative_to(_ROOT)}"
 

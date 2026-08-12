@@ -86,6 +86,14 @@ in per-request `params._meta` (reserved keys under
 versions. Legacy `initialize` / `notifications/initialized` remain
 accept-and-noop for older clients — they do not create session state.
 
+**Standard MCP `2025-06-18` clients (Cursor, Claude Code, …).** These clients
+negotiate during `initialize` via `params.protocolVersion` and then send
+`MCP-Protocol-Version: 2025-06-18` on follow-up requests. Chirp echoes the
+requested version, does **not** attach `chirp/legacyOfframp`, and does **not**
+require SEP-2243 `Mcp-Method` / `Mcp-Name` routing headers — method and tool
+name stay in the JSON-RPC body. This is the path Orrery and most IDE MCP hosts
+use today.
+
 **Streamable HTTP routing headers (SEP-2243).** Modern clients that advertise
 protocol `2026-07-28` must also send routing headers that agree with the
 JSON-RPC body:
