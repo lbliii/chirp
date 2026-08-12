@@ -323,6 +323,7 @@ coverage.
 | Field | Type | Default | Reason |
 |-------|------|---------|--------|
 | `mcp_path` | `str` | `"/mcp"` | MCP/tool integration is younger than the core hypermedia surface |
+| `mcp_connect_default` | `str | None` | `None` | Optional public Streamable HTTP connect default when `initialize` omits `protocolVersion` (e.g. `"2025-06-18"`); `None` keeps Chirp's internal newest default |
 | `islands` | `bool` | `False` | Islands runtime API is still settling |
 | `islands_version` | `str` | `"1"` | Version tag for the provisional islands runtime |
 | `islands_contract_strict` | `bool` | `False` | Contract strictness will stabilize with the islands API |
