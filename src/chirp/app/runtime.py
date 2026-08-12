@@ -45,6 +45,7 @@ class ASGIRuntime:
                 middleware=self._runtime.middleware,
                 tool_registry=self._runtime.tool_registry,
                 mcp_path=self._config.mcp_path,
+                mcp_connect_default=self._config.mcp_connect_default,
                 debug=self._config.debug,
                 providers=self._mutable.providers or None,
                 kida_env=self._runtime.kida_env,

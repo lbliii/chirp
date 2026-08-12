@@ -1,0 +1,1 @@
+Add optional ``AppConfig.mcp_connect_default`` so public MCP hosts can advertise a stable Streamable HTTP protocol version when clients omit ``initialize.params.protocolVersion`` (Cursor streamableHttp).
