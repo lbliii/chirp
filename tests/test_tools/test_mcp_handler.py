@@ -785,6 +785,24 @@ class TestStandardProtocolNegotiation:
         assert body["result"]["protocolVersion"] == "2025-03-26"
 
     @pytest.mark.asyncio
+    async def test_initialize_negotiates_2025_11_25(self) -> None:
+        """Legacy clients on the current spec revision (Claude, Cursor, …)."""
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "id": 1,
+                "params": {"protocolVersion": "2025-11-25"},
+            },
+        )
+        response = await handle_mcp_request(request, registry)
+        _, body = _parse_response(response)
+        result = body["result"]
+        assert result["protocolVersion"] == "2025-11-25"
+        assert "chirp/legacyOfframp" not in result.get("_meta", {})
+
+    @pytest.mark.asyncio
     async def test_initialize_unknown_version_falls_back_to_current(self) -> None:
         registry = self._make_registry()
         request = _make_request(
@@ -969,6 +987,59 @@ class TestMcpConnectDefault:
                 "params": {"capabilities": {}, "clientInfo": {"name": "cursor", "version": "1"}},
             },
             headers={"MCP-Protocol-Version": "2025-06-18"},
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            response = await handle_mcp_request(
+                request,
+                registry,
+                connect_default="2025-06-18",
+            )
+        _, body = _parse_response(response)
+        result = body["result"]
+        assert result["protocolVersion"] == "2025-06-18"
+        assert "chirp/legacyOfframp" not in result.get("_meta", {})
+
+    @pytest.mark.asyncio
+    async def test_legacy_2025_11_25_is_echoed(self) -> None:
+        """Current legacy spec revision — echo, do not upgrade to 2026-07-28."""
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "id": 3,
+                "params": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": {"name": "legacy-client", "version": "1"},
+                },
+            },
+            headers={"MCP-Protocol-Version": "2025-11-25"},
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            response = await handle_mcp_request(request, registry)
+        _, body = _parse_response(response)
+        result = body["result"]
+        assert result["protocolVersion"] == "2025-11-25"
+        assert "chirp/legacyOfframp" not in result.get("_meta", {})
+
+    @pytest.mark.asyncio
+    async def test_unknown_version_uses_connect_default(self) -> None:
+        """Future/foreign legacy versions downgrade to the host's public default."""
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "id": 4,
+                "params": {
+                    "protocolVersion": "1999-01-01",
+                    "capabilities": {},
+                    "clientInfo": {"name": "legacy-client", "version": "1"},
+                },
+            },
         )
         with warnings.catch_warnings():
             warnings.simplefilter("error", DeprecationWarning)
