@@ -196,6 +196,10 @@ class AppConfig:
 
     # MCP (Model Context Protocol)
     mcp_path: str = "/mcp"
+    # Public connect default when ``initialize`` omits a protocol version (or
+    # advertises only via ``MCP-Protocol-Version``).  Must be a supported
+    # negotiable version; ``None`` keeps Chirp's internal ``_MCP_VERSION``.
+    mcp_connect_default: str | None = None
 
     # htmx safe target — auto-add hx-target="this" to event-driven elements
     safe_target: bool = True

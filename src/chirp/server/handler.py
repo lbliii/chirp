@@ -220,6 +220,7 @@ def create_request_handler(
     middleware: tuple[Callable[..., Any], ...],
     tool_registry: ToolRegistry | None,
     mcp_path: str,
+    mcp_connect_default: str | None = None,
     debug: bool,
     providers: dict[type, Callable[..., Any]] | None,
     kida_env: Environment | None,
@@ -400,7 +401,11 @@ def create_request_handler(
         if tool_registry is not None and len(tool_registry) > 0 and req.path == mcp_path:
             from chirp.tools.handler import handle_mcp_request
 
-            return await handle_mcp_request(req, tool_registry)
+            return await handle_mcp_request(
+                req,
+                tool_registry,
+                connect_default=mcp_connect_default,
+            )
         query_discovery = prepare_query_discovery(router, req)
         if query_discovery is not None:
             return query_discovery

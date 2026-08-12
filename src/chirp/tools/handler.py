@@ -250,7 +250,12 @@ def _requires_routing_headers(header_version: str | None, body_version: str | No
     )
 
 
-def _is_legacy_mcp_request(request: Request, request_body: dict[str, Any]) -> bool:
+def _is_legacy_mcp_request(
+    request: Request,
+    request_body: dict[str, Any],
+    *,
+    connect_default: str | None = None,
+) -> bool:
     """Detect handshake-era / unversioned MCP clients on the legacy offramp.
 
     A request is legacy when:
@@ -273,8 +278,11 @@ def _is_legacy_mcp_request(request: Request, request_body: dict[str, Any]) -> bo
     if isinstance(method, str) and method in _LEGACY_HANDSHAKE_METHODS:
         # A standard ``initialize`` advertises its version via
         # ``params.protocolVersion`` rather than a header/_meta field.  A known
-        # non-legacy request is modern; anything else stays on the offramp.
+        # non-legacy request is modern; anything else stays on the offramp unless
+        # the host configured a public ``connect_default``.
         requested = _initialize_request_version(request_body)
+        if requested is None and connect_default is not None:
+            return False
         return requested is None or requested == _LEGACY_PROTOCOL_VERSION
     return header_version is None and body_version is None
 
@@ -450,6 +458,8 @@ def _parse_meta(request_body: dict[str, Any]) -> McpRequestMeta:
 async def handle_mcp_request(
     request: Request,
     registry: ToolRegistry,
+    *,
+    connect_default: str | None = None,
 ) -> Response:
     """Handle an MCP JSON-RPC request.
 
@@ -526,7 +536,7 @@ async def handle_mcp_request(
         )
 
     # Legacy offramp: bridge (warn), do not hard-error during the window.
-    if _is_legacy_mcp_request(request, rpc_request):
+    if _is_legacy_mcp_request(request, rpc_request, connect_default=connect_default):
         _emit_legacy_deprecation_warning()
 
     # SEP-2243 routing headers — validate before dispatch / notification noop.
@@ -555,7 +565,14 @@ async def handle_mcp_request(
 
     token: Token[McpRequestMeta | None] = _mcp_meta_var.set(meta)
     try:
-        result = await _dispatch(rpc_method, params, registry=registry, meta=meta)
+        result = await _dispatch(
+            rpc_method,
+            params,
+            registry=registry,
+            meta=meta,
+            request=request,
+            connect_default=connect_default,
+        )
     finally:
         _mcp_meta_var.reset(token)
 
@@ -597,12 +614,21 @@ async def _dispatch(
     *,
     registry: ToolRegistry,
     meta: McpRequestMeta,
+    request: Request | None = None,
+    connect_default: str | None = None,
 ) -> Any:
     """Route a JSON-RPC method to the appropriate handler."""
     match method:
         case "initialize":
             # Accept-and-noop (no session); negotiate the protocol version.
-            return _handle_initialize(params)
+            header_version = (
+                _header_value(request, _HEADER_PROTOCOL_VERSION) if request is not None else None
+            )
+            return _handle_initialize(
+                params,
+                header_version=header_version,
+                connect_default=connect_default,
+            )
         case "server/discover":
             return _handle_server_discover(meta)
         case "tools/list":
@@ -613,23 +639,40 @@ async def _dispatch(
             return {"error": JsonRpcError(code=-32601, message=f"Method not found: {method!r}")}
 
 
-def _handle_initialize(params: dict[str, Any]) -> dict[str, Any]:
+def _handle_initialize(
+    params: dict[str, Any],
+    *,
+    header_version: str | None = None,
+    connect_default: str | None = None,
+) -> dict[str, Any]:
     """MCP ``initialize`` — accept-and-noop capability reply with negotiation.
 
     Stateless servers need no handshake, but standard clients negotiate a
     protocol version here.  When the client requests a version this server
-    supports (``_NEGOTIABLE_PROTOCOL_VERSIONS``) the response echoes it;
-    otherwise it advertises the current version (``_MCP_VERSION``).
+    supports (``_NEGOTIABLE_PROTOCOL_VERSIONS``) the response echoes it.
+    An omitted body version may be supplied by ``MCP-Protocol-Version``.
+    When still omitted, ``connect_default`` (when set) is advertised instead
+    of ``_MCP_VERSION``; unknown explicit versions fall back to
+    ``_MCP_VERSION``.
 
-    Handshake-era clients — those that request no version, or the legacy
-    ``2024-11-05`` — also receive the structured deprecation offramp note in
-    ``_meta`` (bridged until ``_LEGACY_OFFRAMP_UNTIL``).
+    Handshake-era clients — legacy ``2024-11-05``, or unversioned clients
+    when no ``connect_default`` is configured — receive the structured
+    deprecation offramp note in ``_meta`` (bridged until
+    ``_LEGACY_OFFRAMP_UNTIL``).
     """
     requested = _requested_version_from_params(params)
-    negotiated = requested if requested in _NEGOTIABLE_PROTOCOL_VERSIONS else _MCP_VERSION
+    if requested is None and header_version:
+        requested = header_version
+
+    if requested in _NEGOTIABLE_PROTOCOL_VERSIONS:
+        negotiated = requested
+    elif requested is None:
+        negotiated = connect_default or _MCP_VERSION
+    else:
+        negotiated = _MCP_VERSION
 
     meta: dict[str, Any] = {_META_SERVER_INFO: dict(_SERVER_INFO)}
-    if requested is None or negotiated == _LEGACY_PROTOCOL_VERSION:
+    if negotiated == _LEGACY_PROTOCOL_VERSION or (requested is None and connect_default is None):
         meta[_META_LEGACY_OFFRAMP] = _legacy_offramp_meta()
 
     return {

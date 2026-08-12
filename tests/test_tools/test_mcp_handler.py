@@ -926,3 +926,58 @@ class TestStandardProtocolNegotiation:
         assert list_status == 200
         assert "error" not in list_body
         assert {tool["name"] for tool in list_body["result"]["tools"]} == {"greet"}
+
+
+class TestMcpConnectDefault:
+    """Optional ``connect_default`` for public Streamable HTTP hosts (Orrery)."""
+
+    def _make_registry(self) -> ToolRegistry:
+        def greet(name: str) -> str:
+            return f"Hello, {name}!"
+
+        return compile_tools(
+            [("greet", "Greet someone", greet)],
+            ToolEventBus(),
+        )
+
+    @pytest.mark.asyncio
+    async def test_omitted_version_uses_connect_default_without_offramp(self) -> None:
+        registry = self._make_registry()
+        request = _make_request(
+            body={"jsonrpc": "2.0", "method": "initialize", "id": 1, "params": {}},
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            response = await handle_mcp_request(
+                request,
+                registry,
+                connect_default="2025-06-18",
+            )
+        _, body = _parse_response(response)
+        result = body["result"]
+        assert result["protocolVersion"] == "2025-06-18"
+        assert "chirp/legacyOfframp" not in result.get("_meta", {})
+
+    @pytest.mark.asyncio
+    async def test_header_only_initialize_uses_connect_default(self) -> None:
+        registry = self._make_registry()
+        request = _make_request(
+            body={
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "id": 2,
+                "params": {"capabilities": {}, "clientInfo": {"name": "cursor", "version": "1"}},
+            },
+            headers={"MCP-Protocol-Version": "2025-06-18"},
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            response = await handle_mcp_request(
+                request,
+                registry,
+                connect_default="2025-06-18",
+            )
+        _, body = _parse_response(response)
+        result = body["result"]
+        assert result["protocolVersion"] == "2025-06-18"
+        assert "chirp/legacyOfframp" not in result.get("_meta", {})
