@@ -108,11 +108,14 @@ class McpRequestMeta:
 # MCP protocol version
 _MCP_VERSION = "2026-07-28"
 
-# Protocol versions this server negotiates on ``initialize`` (newest first).
-# A client that requests one of these gets it echoed back; anything else
-# (including an omitted version) falls back to ``_MCP_VERSION``.
+# Protocol versions this server negotiates on ``initialize`` (newest legacy first,
+# then modern).  A client that requests one of these gets it echoed back.
+# Omitted or unknown explicit versions use ``connect_default`` when set (dual-era
+# public hosts), else ``_MCP_VERSION``.
+_LEGACY_PROTOCOL_2025_11_25 = "2025-11-25"
 _SUPPORTED_PROTOCOL_VERSIONS: tuple[str, ...] = (
     _MCP_VERSION,
+    _LEGACY_PROTOCOL_2025_11_25,
     "2025-06-18",
     "2025-03-26",
     _LEGACY_PROTOCOL_VERSION,
@@ -651,9 +654,9 @@ def _handle_initialize(
     protocol version here.  When the client requests a version this server
     supports (``_NEGOTIABLE_PROTOCOL_VERSIONS``) the response echoes it.
     An omitted body version may be supplied by ``MCP-Protocol-Version``.
-    When still omitted, ``connect_default`` (when set) is advertised instead
-    of ``_MCP_VERSION``; unknown explicit versions fall back to
-    ``_MCP_VERSION``.
+    When still omitted, or when the client requests an unknown legacy version,
+    ``connect_default`` (when set) is advertised instead of ``_MCP_VERSION``.
+    Known legacy revisions (``2025-11-25``, ``2025-06-18``, …) are echoed back.
 
     Handshake-era clients — legacy ``2024-11-05``, or unversioned clients
     when no ``connect_default`` is configured — receive the structured
@@ -666,10 +669,8 @@ def _handle_initialize(
 
     if requested in _NEGOTIABLE_PROTOCOL_VERSIONS:
         negotiated = requested
-    elif requested is None:
-        negotiated = connect_default or _MCP_VERSION
     else:
-        negotiated = _MCP_VERSION
+        negotiated = connect_default or _MCP_VERSION
 
     meta: dict[str, Any] = {_META_SERVER_INFO: dict(_SERVER_INFO)}
     if negotiated == _LEGACY_PROTOCOL_VERSION or (requested is None and connect_default is None):

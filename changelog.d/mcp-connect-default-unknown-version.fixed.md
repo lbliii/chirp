@@ -1,0 +1,1 @@
+When ``connect_default`` is set, ``initialize`` advertises that version for unknown legacy client requests instead of falling back to ``2026-07-28``. Negotiate ``2025-11-25`` explicitly for current legacy streamable-HTTP clients.
