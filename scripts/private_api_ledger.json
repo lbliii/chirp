@@ -5,14 +5,14 @@
   "repositories": {
     "elbysodic": {
       "repository": "lbliii/elbysodic",
-      "revision": "635362f9ca9e6a358a3121bdb208b8c7018c9846",
+      "revision": "799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd",
       "receivers": [
         {
           "path": "scripts/kida_check.py",
           "scope": "run",
           "receiver": "app",
           "origin": "chirp.App",
-          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/scripts/kida_check.py#L45",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/scripts/kida_check.py#L45",
           "rationale": "Application factory returns the wrapped Chirp app; script reads its registered filters."
         },
         {
@@ -20,7 +20,7 @@
           "scope": "request_login",
           "receiver": "request",
           "origin": "chirp.http.request.Request",
-          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/services/auth.py#L482",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/services/auth.py#L482",
           "rationale": "Object-typed request is the incoming Chirp request supplied by the web handlers and middleware."
         },
         {
@@ -28,7 +28,7 @@
           "scope": "request_tenant_slug",
           "receiver": "request",
           "origin": "chirp.http.request.Request",
-          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/services/access.py#L276",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/services/access.py#L276",
           "rationale": "Object-typed request is the incoming Chirp request supplied by the web handlers and middleware."
         },
         {
@@ -36,7 +36,7 @@
           "scope": "request_tenant_slug",
           "receiver": "request",
           "origin": "chirp.http.request.Request",
-          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/tenant.py#L117",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/tenant.py#L117",
           "rationale": "Object-typed request is the incoming Chirp request supplied by the web handlers and middleware."
         },
         {
@@ -44,7 +44,7 @@
           "scope": "get_services",
           "receiver": "request",
           "origin": "chirp.http.request.Request",
-          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/state.py#L33",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/state.py#L33",
           "rationale": "Object-typed request is the incoming Chirp request supplied by the web handlers and middleware."
         },
         {
@@ -52,7 +52,7 @@
           "scope": "close_request_services",
           "receiver": "request",
           "origin": "chirp.http.request.Request",
-          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/state.py#L46",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/state.py#L46",
           "rationale": "Object-typed request is the incoming Chirp request supplied by the web handlers and middleware."
         },
         {
@@ -60,7 +60,7 @@
           "scope": "TenantPrefixMiddleware.__call__",
           "receiver": "scoped_request",
           "origin": "chirp.http.request.Request",
-          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/tenant.py#L93",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/tenant.py#L93",
           "rationale": "dataclasses.replace preserves the type of request.with_url_scope()."
         },
         {
@@ -68,7 +68,7 @@
           "scope": "DrainingAwareApp",
           "receiver": "self._app",
           "origin": "chirp.App",
-          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L108",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/worker_draining.py#L108",
           "rationale": "Constructor receives app: App and stores it unchanged for ASGI delegation."
         }
       ],
@@ -80,7 +80,7 @@
           "owner": "Chirp inspection and Elbysodic tooling maintainers",
           "rationale": "Template lint borrows the running app filter registry; immutable template inspection is needed to avoid private registry reads.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1056",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/scripts/kida_check.py#L46"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/scripts/kida_check.py#L46"
         },
         {
           "key": "scripts/password_rehash_smoke.py|_prepare|attribute|chirp.security.passwords._hash_scrypt",
@@ -89,7 +89,7 @@
           "owner": "Elbysodic authentication maintainers",
           "rationale": "Release smoke deliberately creates a legacy password hash to test migration; this is operator tooling, not a request handler.",
           "follow_up": "no-action: retain bounded legacy-hash smoke fixture",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/scripts/password_rehash_smoke.py#L64"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/scripts/password_rehash_smoke.py#L64"
         },
         {
           "key": "src/elbysodic/services/access.py|request_tenant_slug|dynamic-attribute|chirp.http.request.Request._cache",
@@ -98,7 +98,7 @@
           "owner": "Chirp provider and Elbysodic web maintainers",
           "rationale": "Request-local identity, tenant, and service resources are stored in Request._cache; cleanup currently belongs to the application.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1061",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/services/access.py#L276"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/services/access.py#L276"
         },
         {
           "key": "src/elbysodic/services/auth.py|request_login|dynamic-attribute|chirp.http.request.Request._cache",
@@ -107,7 +107,7 @@
           "owner": "Chirp provider and Elbysodic web maintainers",
           "rationale": "Request-local identity, tenant, and service resources are stored in Request._cache; cleanup currently belongs to the application.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1061",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/services/auth.py#L482"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/services/auth.py#L482"
         },
         {
           "key": "src/elbysodic/web/errors.py|_login_href|dynamic-attribute|chirp.http.request.Request.query._raw",
@@ -116,7 +116,7 @@
           "owner": "Chirp HTTP and Elbysodic security maintainers",
           "rationale": "Login redirects preserve the raw query through a private query-storage field; a public request representation must preserve URL semantics.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1056",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/errors.py#L289"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/errors.py#L289"
         },
         {
           "key": "src/elbysodic/web/pounce_railway.py|apply_railway_pounce_defaults|dynamic-attribute|chirp.server.production._elbysodic_railway_patch",
@@ -125,7 +125,7 @@
           "owner": "Chirp lifecycle and Elbysodic web maintainers",
           "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1056",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/pounce_railway.py#L43"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/pounce_railway.py#L43"
         },
         {
           "key": "src/elbysodic/web/pounce_railway.py|apply_railway_pounce_defaults|module-patch|chirp.server.production._elbysodic_railway_patch",
@@ -134,7 +134,7 @@
           "owner": "Chirp lifecycle and Elbysodic web maintainers",
           "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1056",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/pounce_railway.py#L60"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/pounce_railway.py#L60"
         },
         {
           "key": "src/elbysodic/web/pounce_railway.py|apply_railway_pounce_defaults|module-patch|chirp.server.production.run_production_server",
@@ -143,7 +143,7 @@
           "owner": "Chirp lifecycle and Elbysodic web maintainers",
           "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1056",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/pounce_railway.py#L59"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/pounce_railway.py#L59"
         },
         {
           "key": "src/elbysodic/web/security.py|RequireLoginMiddleware.__call__|dynamic-attribute|chirp.http.request.Request.query._raw",
@@ -152,7 +152,7 @@
           "owner": "Chirp HTTP and Elbysodic security maintainers",
           "rationale": "Login redirects preserve the raw query through a private query-storage field; a public request representation must preserve URL semantics.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1056",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/security.py#L223"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/security.py#L223"
         },
         {
           "key": "src/elbysodic/web/state.py|close_request_services|dynamic-attribute|chirp.http.request.Request._cache",
@@ -161,7 +161,7 @@
           "owner": "Chirp provider and Elbysodic web maintainers",
           "rationale": "Request-local identity, tenant, and service resources are stored in Request._cache; cleanup currently belongs to the application.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1061",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/state.py#L46"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/state.py#L46"
         },
         {
           "key": "src/elbysodic/web/state.py|get_services|dynamic-attribute|chirp.http.request.Request._cache",
@@ -170,7 +170,7 @@
           "owner": "Chirp provider and Elbysodic web maintainers",
           "rationale": "Request-local identity, tenant, and service resources are stored in Request._cache; cleanup currently belongs to the application.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1061",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/state.py#L33"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/state.py#L33"
         },
         {
           "key": "src/elbysodic/web/tenant.py|TenantPrefixMiddleware.__call__|attribute|chirp.http.request.Request._cache",
@@ -179,7 +179,7 @@
           "owner": "Chirp provider and Elbysodic web maintainers",
           "rationale": "Request-local identity, tenant, and service resources are stored in Request._cache; cleanup currently belongs to the application.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1061",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/tenant.py#L97"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/tenant.py#L97"
         },
         {
           "key": "src/elbysodic/web/tenant.py|request_tenant_slug|dynamic-attribute|chirp.http.request.Request._cache",
@@ -188,7 +188,7 @@
           "owner": "Chirp provider and Elbysodic web maintainers",
           "rationale": "Request-local identity, tenant, and service resources are stored in Request._cache; cleanup currently belongs to the application.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1061",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/tenant.py#L117"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/tenant.py#L117"
         },
         {
           "key": "src/elbysodic/web/worker_draining.py|DrainingAwareApp._runtime|attribute|chirp.App._runtime",
@@ -197,7 +197,7 @@
           "owner": "Chirp lifecycle and Elbysodic web maintainers",
           "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1056",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L118"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/worker_draining.py#L118"
         },
         {
           "key": "src/elbysodic/web/worker_draining.py|DrainingAwareApp.run|attribute|chirp.App._ensure_frozen",
@@ -206,7 +206,7 @@
           "owner": "Chirp lifecycle and Elbysodic web maintainers",
           "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1056",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L131"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/worker_draining.py#L131"
         },
         {
           "key": "src/elbysodic/web/worker_draining.py|DrainingAwareApp.run|attribute|chirp.App._server",
@@ -215,7 +215,7 @@
           "owner": "Chirp lifecycle and Elbysodic web maintainers",
           "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1056",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L132"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/worker_draining.py#L132"
         },
         {
           "key": "src/elbysodic/web/worker_draining.py||import|chirp._internal.asgi.Receive",
@@ -224,7 +224,7 @@
           "owner": "Chirp lifecycle and Elbysodic web maintainers",
           "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1056",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L19"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/worker_draining.py#L19"
         },
         {
           "key": "src/elbysodic/web/worker_draining.py||import|chirp._internal.asgi.Scope",
@@ -233,7 +233,7 @@
           "owner": "Chirp lifecycle and Elbysodic web maintainers",
           "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1056",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L19"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/worker_draining.py#L19"
         },
         {
           "key": "src/elbysodic/web/worker_draining.py||import|chirp._internal.asgi.Send",
@@ -242,7 +242,7 @@
           "owner": "Chirp lifecycle and Elbysodic web maintainers",
           "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1056",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L19"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/worker_draining.py#L19"
         },
         {
           "key": "tests/_passkey_vectors.py|patch_fixed_ceremony._fake_begin_authentication|import|chirp.security.passkeys._stash_challenge",
@@ -251,7 +251,7 @@
           "owner": "downstream test maintainers",
           "rationale": "Test fixtures inspect framework state to prove application behavior; no production access is authorized by this test-only entry.",
           "follow_up": "no-action: test-only inspection remains permitted",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/tests/_passkey_vectors.py#L136"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/tests/_passkey_vectors.py#L136"
         },
         {
           "key": "tests/_passkey_vectors.py|patch_fixed_ceremony._fake_begin_registration|import|chirp.security.passkeys._stash_challenge",
@@ -260,7 +260,7 @@
           "owner": "downstream test maintainers",
           "rationale": "Test fixtures inspect framework state to prove application behavior; no production access is authorized by this test-only entry.",
           "follow_up": "no-action: test-only inspection remains permitted",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/tests/_passkey_vectors.py#L130"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/tests/_passkey_vectors.py#L130"
         },
         {
           "key": "tests/test_password_hash_upgrades.py|test_successful_scrypt_login_upgrades_to_argon2id|attribute|chirp.security.passwords._hash_scrypt",
@@ -269,7 +269,7 @@
           "owner": "downstream test maintainers",
           "rationale": "Test fixtures inspect framework state to prove application behavior; no production access is authorized by this test-only entry.",
           "follow_up": "no-action: test-only inspection remains permitted",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/tests/test_password_hash_upgrades.py#L168"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/tests/test_password_hash_upgrades.py#L168"
         }
       ],
       "manual_decisions": [
@@ -279,7 +279,7 @@
           "owner": "elbysodic application maintainers",
           "rationale": "base_services is the application-owned AppServices object; its database storage is not Chirp private state.",
           "follow_up": "no-action: application services own database assembly",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/app.py#L96"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/app.py#L96"
         },
         {
           "operation": "sys._is_gil_enabled runtime probe",
@@ -287,7 +287,7 @@
           "owner": "elbysodic application maintainers",
           "rationale": "This is a CPython observability probe with fallback, not a private Chirp reference.",
           "follow_up": "no-action: runtime observability remains application-owned",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L42"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/worker_draining.py#L42"
         },
         {
           "operation": "Railway launcher compatibility patch",
@@ -295,7 +295,7 @@
           "owner": "elbysodic application maintainers",
           "rationale": "Temporarily adjusts Pounce configuration through a Chirp launcher wrapper. Its exact private imports/module patch are ratcheted above; replacing the integration belongs to lifecycle design.",
           "follow_up": "https://github.com/lbliii/chirp/issues/1056",
-          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/pounce_railway.py#L40"
+          "source": "https://github.com/lbliii/elbysodic/blob/799ab9ae6440f9921c18ebe043ceb6d4a2c73bfd/src/elbysodic/web/pounce_railway.py#L40"
         }
       ]
     },
