@@ -225,3 +225,19 @@ async def server_error(request, exc):
 ```
 
 Custom error handlers bypass the debug page and htmx headers — you control the full response.
+
+## MCP Tool Errors and Tracing
+
+Tool gates can raise `HTTPError(401, "Unauthorized")` or
+`HTTPError(403, "Forbidden")` directly, including inside traced calls. Tracing
+preserves the original exception instance and traceback with or without
+OpenTelemetry; `HTTPError` remains frozen. Existing `ToolAuthError` gates remain
+supported.
+
+MCP returns the intentional authorization detail as a JSON-RPC error with code
+`-32603`, defaulting to `Unauthorized` or `Forbidden` when the detail is empty.
+Existing `PermissionError` gates retain their `Tool execution error: <detail>`
+message for compatibility. Use caller-safe details in authorization errors.
+Unexpected tool failures are
+logged with their traceback to `chirp.tools` and return `Tool execution error`
+without exception details or tracebacks on the wire.

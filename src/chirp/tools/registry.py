@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Any, TypedDict
 
 from chirp.telemetry import trace_span
+from chirp.tools._validation import validate_arguments
 from chirp.tools.events import ToolCallEvent, ToolEventBus
 from chirp.tools.schema import function_to_schema
 
@@ -83,6 +84,7 @@ class ToolRegistry:
         Calls the handler with the provided arguments, emits a
         ``ToolCallEvent`` on success, and returns the result.
 
+        Raises ``TypeError`` if arguments violate the advertised input schema.
         Raises ``KeyError`` if the tool name is not registered.
         Raises ``ToolApprovalRequired`` when ``approval_required`` is set
         and ``approval_granted`` is false.
@@ -93,6 +95,8 @@ class ToolRegistry:
         if tool is None:
             msg = f"Tool not found: {name!r}"
             raise KeyError(msg)
+
+        validate_arguments(name, arguments, tool.schema)
 
         if tool.approval_required and not approval_granted:
             raise ToolApprovalError(tool.name, arguments)
