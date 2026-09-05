@@ -1,0 +1,52 @@
+name: Pinned first-party private API audit
+
+# Explicit source audit: run when the ratchet's code, ledger, or workflow changes.
+# Downstream applications are checked out at public commits and only parsed.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/private-api-audit.yml"
+      - "scripts/private_api_ledger.json"
+      - "scripts/private_api_ratchet.py"
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.ledger.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14"
+      - id: ledger
+        run: echo "matrix=$(uv run --no-project python scripts/private_api_ratchet.py --matrix)" >> "$GITHUB_OUTPUT"
+
+  audit:
+    needs: inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.inventory.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: chirp
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.revision }}
+          path: downstream
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14"
+      - name: Check classified production access at the audited revision
+        env:
+          DOWNSTREAM_NAME: ${{ matrix.name }}
+        run: uv run --no-project python chirp/scripts/private_api_ratchet.py --pinned --repo "$DOWNSTREAM_NAME=downstream"

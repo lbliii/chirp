@@ -1,0 +1,731 @@
+{
+  "schema_version": 1,
+  "issue": "https://github.com/lbliii/chirp/issues/1053",
+  "test_policy": "Private inspection in test/ and tests/ or test_*.py is recorded as test-only, never prohibited. Production copies are newly classified accesses.",
+  "repositories": {
+    "elbysodic": {
+      "repository": "lbliii/elbysodic",
+      "revision": "635362f9ca9e6a358a3121bdb208b8c7018c9846",
+      "receivers": [
+        {
+          "path": "scripts/kida_check.py",
+          "scope": "run",
+          "receiver": "app",
+          "origin": "chirp.App",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/scripts/kida_check.py#L45",
+          "rationale": "Application factory returns the wrapped Chirp app; script reads its registered filters."
+        },
+        {
+          "path": "src/elbysodic/services/auth.py",
+          "scope": "request_login",
+          "receiver": "request",
+          "origin": "chirp.http.request.Request",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/services/auth.py#L482",
+          "rationale": "Object-typed request is the incoming Chirp request supplied by the web handlers and middleware."
+        },
+        {
+          "path": "src/elbysodic/services/access.py",
+          "scope": "request_tenant_slug",
+          "receiver": "request",
+          "origin": "chirp.http.request.Request",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/services/access.py#L276",
+          "rationale": "Object-typed request is the incoming Chirp request supplied by the web handlers and middleware."
+        },
+        {
+          "path": "src/elbysodic/web/tenant.py",
+          "scope": "request_tenant_slug",
+          "receiver": "request",
+          "origin": "chirp.http.request.Request",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/tenant.py#L117",
+          "rationale": "Object-typed request is the incoming Chirp request supplied by the web handlers and middleware."
+        },
+        {
+          "path": "src/elbysodic/web/state.py",
+          "scope": "get_services",
+          "receiver": "request",
+          "origin": "chirp.http.request.Request",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/state.py#L33",
+          "rationale": "Object-typed request is the incoming Chirp request supplied by the web handlers and middleware."
+        },
+        {
+          "path": "src/elbysodic/web/state.py",
+          "scope": "close_request_services",
+          "receiver": "request",
+          "origin": "chirp.http.request.Request",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/state.py#L46",
+          "rationale": "Object-typed request is the incoming Chirp request supplied by the web handlers and middleware."
+        },
+        {
+          "path": "src/elbysodic/web/tenant.py",
+          "scope": "TenantPrefixMiddleware.__call__",
+          "receiver": "scoped_request",
+          "origin": "chirp.http.request.Request",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/tenant.py#L93",
+          "rationale": "dataclasses.replace preserves the type of request.with_url_scope()."
+        },
+        {
+          "path": "src/elbysodic/web/worker_draining.py",
+          "scope": "DrainingAwareApp",
+          "receiver": "self._app",
+          "origin": "chirp.App",
+          "evidence": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L108",
+          "rationale": "Constructor receives app: App and stores it unchanged for ASGI delegation."
+        }
+      ],
+      "findings": [
+        {
+          "key": "scripts/kida_check.py|run|attribute|chirp.App._template_filters",
+          "count": 1,
+          "classification": "diagnostics-gap",
+          "owner": "Chirp inspection and Elbysodic tooling maintainers",
+          "rationale": "Template lint borrows the running app filter registry; immutable template inspection is needed to avoid private registry reads.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/scripts/kida_check.py#L46"
+        },
+        {
+          "key": "scripts/password_rehash_smoke.py|_prepare|attribute|chirp.security.passwords._hash_scrypt",
+          "count": 1,
+          "classification": "app-owned",
+          "owner": "Elbysodic authentication maintainers",
+          "rationale": "Release smoke deliberately creates a legacy password hash to test migration; this is operator tooling, not a request handler.",
+          "follow_up": "no-action: retain bounded legacy-hash smoke fixture",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/scripts/password_rehash_smoke.py#L64"
+        },
+        {
+          "key": "src/elbysodic/services/access.py|request_tenant_slug|dynamic-attribute|chirp.http.request.Request._cache",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp provider and Elbysodic web maintainers",
+          "rationale": "Request-local identity, tenant, and service resources are stored in Request._cache; cleanup currently belongs to the application.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1061",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/services/access.py#L276"
+        },
+        {
+          "key": "src/elbysodic/services/auth.py|request_login|dynamic-attribute|chirp.http.request.Request._cache",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp provider and Elbysodic web maintainers",
+          "rationale": "Request-local identity, tenant, and service resources are stored in Request._cache; cleanup currently belongs to the application.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1061",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/services/auth.py#L482"
+        },
+        {
+          "key": "src/elbysodic/web/errors.py|_login_href|dynamic-attribute|chirp.http.request.Request.query._raw",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp HTTP and Elbysodic security maintainers",
+          "rationale": "Login redirects preserve the raw query through a private query-storage field; a public request representation must preserve URL semantics.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/errors.py#L289"
+        },
+        {
+          "key": "src/elbysodic/web/pounce_railway.py|apply_railway_pounce_defaults|dynamic-attribute|chirp.server.production._elbysodic_railway_patch",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Elbysodic web maintainers",
+          "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/pounce_railway.py#L43"
+        },
+        {
+          "key": "src/elbysodic/web/pounce_railway.py|apply_railway_pounce_defaults|module-patch|chirp.server.production._elbysodic_railway_patch",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Elbysodic web maintainers",
+          "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/pounce_railway.py#L60"
+        },
+        {
+          "key": "src/elbysodic/web/pounce_railway.py|apply_railway_pounce_defaults|module-patch|chirp.server.production.run_production_server",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Elbysodic web maintainers",
+          "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/pounce_railway.py#L59"
+        },
+        {
+          "key": "src/elbysodic/web/security.py|RequireLoginMiddleware.__call__|dynamic-attribute|chirp.http.request.Request.query._raw",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp HTTP and Elbysodic security maintainers",
+          "rationale": "Login redirects preserve the raw query through a private query-storage field; a public request representation must preserve URL semantics.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/security.py#L223"
+        },
+        {
+          "key": "src/elbysodic/web/state.py|close_request_services|dynamic-attribute|chirp.http.request.Request._cache",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp provider and Elbysodic web maintainers",
+          "rationale": "Request-local identity, tenant, and service resources are stored in Request._cache; cleanup currently belongs to the application.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1061",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/state.py#L46"
+        },
+        {
+          "key": "src/elbysodic/web/state.py|get_services|dynamic-attribute|chirp.http.request.Request._cache",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp provider and Elbysodic web maintainers",
+          "rationale": "Request-local identity, tenant, and service resources are stored in Request._cache; cleanup currently belongs to the application.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1061",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/state.py#L33"
+        },
+        {
+          "key": "src/elbysodic/web/tenant.py|TenantPrefixMiddleware.__call__|attribute|chirp.http.request.Request._cache",
+          "count": 2,
+          "classification": "missing-public-seam",
+          "owner": "Chirp provider and Elbysodic web maintainers",
+          "rationale": "Request-local identity, tenant, and service resources are stored in Request._cache; cleanup currently belongs to the application.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1061",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/tenant.py#L97"
+        },
+        {
+          "key": "src/elbysodic/web/tenant.py|request_tenant_slug|dynamic-attribute|chirp.http.request.Request._cache",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp provider and Elbysodic web maintainers",
+          "rationale": "Request-local identity, tenant, and service resources are stored in Request._cache; cleanup currently belongs to the application.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1061",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/tenant.py#L117"
+        },
+        {
+          "key": "src/elbysodic/web/worker_draining.py|DrainingAwareApp._runtime|attribute|chirp.App._runtime",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Elbysodic web maintainers",
+          "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L118"
+        },
+        {
+          "key": "src/elbysodic/web/worker_draining.py|DrainingAwareApp.run|attribute|chirp.App._ensure_frozen",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Elbysodic web maintainers",
+          "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L131"
+        },
+        {
+          "key": "src/elbysodic/web/worker_draining.py|DrainingAwareApp.run|attribute|chirp.App._server",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Elbysodic web maintainers",
+          "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L132"
+        },
+        {
+          "key": "src/elbysodic/web/worker_draining.py||import|chirp._internal.asgi.Receive",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Elbysodic web maintainers",
+          "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L19"
+        },
+        {
+          "key": "src/elbysodic/web/worker_draining.py||import|chirp._internal.asgi.Scope",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Elbysodic web maintainers",
+          "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L19"
+        },
+        {
+          "key": "src/elbysodic/web/worker_draining.py||import|chirp._internal.asgi.Send",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Elbysodic web maintainers",
+          "rationale": "Production launch/draining wrapper integrates Pounce by reading Chirp runtime/server state or patching its launcher; keep single-owner lifecycle until a reviewed seam exists.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L19"
+        },
+        {
+          "key": "tests/_passkey_vectors.py|patch_fixed_ceremony._fake_begin_authentication|import|chirp.security.passkeys._stash_challenge",
+          "count": 1,
+          "classification": "test-only",
+          "owner": "downstream test maintainers",
+          "rationale": "Test fixtures inspect framework state to prove application behavior; no production access is authorized by this test-only entry.",
+          "follow_up": "no-action: test-only inspection remains permitted",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/tests/_passkey_vectors.py#L136"
+        },
+        {
+          "key": "tests/_passkey_vectors.py|patch_fixed_ceremony._fake_begin_registration|import|chirp.security.passkeys._stash_challenge",
+          "count": 1,
+          "classification": "test-only",
+          "owner": "downstream test maintainers",
+          "rationale": "Test fixtures inspect framework state to prove application behavior; no production access is authorized by this test-only entry.",
+          "follow_up": "no-action: test-only inspection remains permitted",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/tests/_passkey_vectors.py#L130"
+        },
+        {
+          "key": "tests/test_password_hash_upgrades.py|test_successful_scrypt_login_upgrades_to_argon2id|attribute|chirp.security.passwords._hash_scrypt",
+          "count": 1,
+          "classification": "test-only",
+          "owner": "downstream test maintainers",
+          "rationale": "Test fixtures inspect framework state to prove application behavior; no production access is authorized by this test-only entry.",
+          "follow_up": "no-action: test-only inspection remains permitted",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/tests/test_password_hash_upgrades.py#L168"
+        }
+      ],
+      "manual_decisions": [
+        {
+          "operation": "AppServices._database",
+          "classification": "app-owned",
+          "owner": "elbysodic application maintainers",
+          "rationale": "base_services is the application-owned AppServices object; its database storage is not Chirp private state.",
+          "follow_up": "no-action: application services own database assembly",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/app.py#L96"
+        },
+        {
+          "operation": "sys._is_gil_enabled runtime probe",
+          "classification": "app-owned",
+          "owner": "elbysodic application maintainers",
+          "rationale": "This is a CPython observability probe with fallback, not a private Chirp reference.",
+          "follow_up": "no-action: runtime observability remains application-owned",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/worker_draining.py#L42"
+        },
+        {
+          "operation": "Railway launcher compatibility patch",
+          "classification": "missing-public-seam",
+          "owner": "elbysodic application maintainers",
+          "rationale": "Temporarily adjusts Pounce configuration through a Chirp launcher wrapper. Its exact private imports/module patch are ratcheted above; replacing the integration belongs to lifecycle design.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/elbysodic/blob/635362f9ca9e6a358a3121bdb208b8c7018c9846/src/elbysodic/web/pounce_railway.py#L40"
+        }
+      ]
+    },
+    "furatena": {
+      "repository": "lbliii/furatena",
+      "revision": "63891bf0fa1782446db0725865d7c4bd15bd1dc1",
+      "receivers": [
+        {
+          "path": "src/furatena/catalog/dev_reload.py",
+          "scope": "run_docs_dev_server",
+          "receiver": "app",
+          "origin": "chirp.App",
+          "evidence": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/dev_reload.py#L197",
+          "rationale": "docs_app.app comes from DocsApp._build_app() -> App."
+        },
+        {
+          "path": "src/furatena/catalog/docs_app.py",
+          "scope": "DocsApp._validation_template_env",
+          "receiver": "app",
+          "origin": "chirp.App",
+          "evidence": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/docs_app.py#L498",
+          "rationale": "getattr retrieves self.app, assigned from _build_app() -> App in __init__."
+        },
+        {
+          "path": "src/furatena/catalog/static_export.py",
+          "scope": "_ExportClient",
+          "receiver": "self.app",
+          "origin": "chirp.App",
+          "evidence": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/static_export.py#L760",
+          "rationale": "Constructor receives docs_app.create_app() at this call site; DocsApp.create_app() -> App returns the underlying Chirp app. The export client drives that ASGI lifecycle."
+        },
+        {
+          "path": "src/furatena/catalog/route_manifest.py",
+          "scope": "route_manifest_entries",
+          "receiver": "app",
+          "origin": "chirp.App",
+          "evidence": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/route_registrars.py#L1659",
+          "rationale": "Route registrar passes the Chirp app to route_manifest_payload(), which delegates unchanged to route_manifest_entries()."
+        },
+        {
+          "path": "src/furatena/catalog/template_env.py",
+          "scope": "build_docs_template_env",
+          "receiver": "chirp_app",
+          "origin": "chirp.App",
+          "evidence": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/template_env.py#L37",
+          "rationale": "docs_app.app comes from DocsApp._build_app() -> App."
+        }
+      ],
+      "findings": [
+        {
+          "key": "src/furatena/catalog/dev_reload.py|run_docs_dev_server|attribute|chirp.App._ensure_frozen",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Furatena export maintainers",
+          "rationale": "Export and development launch manually freeze or drive startup/database/hooks/readiness; retain one owned lifecycle until the lifecycle RFC replaces this access.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/dev_reload.py#L202"
+        },
+        {
+          "key": "src/furatena/catalog/docs_app.py|DocsApp._build_app|attribute|chirp.App._freeze_lock",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Furatena export maintainers",
+          "rationale": "Export and development launch manually freeze or drive startup/database/hooks/readiness; retain one owned lifecycle until the lifecycle RFC replaces this access.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/docs_app.py#L620"
+        },
+        {
+          "key": "src/furatena/catalog/docs_app.py|DocsApp._validation_template_env|dynamic-attribute|chirp.App._runtime_state",
+          "count": 1,
+          "classification": "diagnostics-gap",
+          "owner": "Chirp inspection and Furatena tooling maintainers",
+          "rationale": "App checks, route manifests, and template validation inspect framework compilation/runtime state; require an immutable supported inspection surface.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/docs_app.py#L499"
+        },
+        {
+          "key": "src/furatena/catalog/route_manifest.py|route_manifest_entries|attribute|chirp.App._pending_routes",
+          "count": 1,
+          "classification": "diagnostics-gap",
+          "owner": "Chirp inspection and Furatena tooling maintainers",
+          "rationale": "App checks, route manifests, and template validation inspect framework compilation/runtime state; require an immutable supported inspection surface.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/route_manifest.py#L148"
+        },
+        {
+          "key": "src/furatena/catalog/static_export.py|_ExportClient.__aenter__|attribute|chirp.App._db",
+          "count": 4,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Furatena export maintainers",
+          "rationale": "Export and development launch manually freeze or drive startup/database/hooks/readiness; retain one owned lifecycle until the lifecycle RFC replaces this access.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/static_export.py#L98"
+        },
+        {
+          "key": "src/furatena/catalog/static_export.py|_ExportClient.__aenter__|attribute|chirp.App._ensure_frozen",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Furatena export maintainers",
+          "rationale": "Export and development launch manually freeze or drive startup/database/hooks/readiness; retain one owned lifecycle until the lifecycle RFC replaces this access.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/static_export.py#L97"
+        },
+        {
+          "key": "src/furatena/catalog/static_export.py|_ExportClient.__aenter__|attribute|chirp.App._migrations_dir",
+          "count": 2,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Furatena export maintainers",
+          "rationale": "Export and development launch manually freeze or drive startup/database/hooks/readiness; retain one owned lifecycle until the lifecycle RFC replaces this access.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/static_export.py#L103"
+        },
+        {
+          "key": "src/furatena/catalog/static_export.py|_ExportClient.__aenter__|attribute|chirp.App._mutable_state",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Furatena export maintainers",
+          "rationale": "Export and development launch manually freeze or drive startup/database/hooks/readiness; retain one owned lifecycle until the lifecycle RFC replaces this access.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/static_export.py#L116"
+        },
+        {
+          "key": "src/furatena/catalog/static_export.py|_ExportClient.__aenter__|attribute|chirp.App._startup_hooks",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Furatena export maintainers",
+          "rationale": "Export and development launch manually freeze or drive startup/database/hooks/readiness; retain one owned lifecycle until the lifecycle RFC replaces this access.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/static_export.py#L107"
+        },
+        {
+          "key": "src/furatena/catalog/static_export.py|_ExportClient.__aenter__|import|chirp.data.database._db_var",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Furatena export maintainers",
+          "rationale": "Export and development launch manually freeze or drive startup/database/hooks/readiness; retain one owned lifecycle until the lifecycle RFC replaces this access.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/static_export.py#L100"
+        },
+        {
+          "key": "src/furatena/catalog/static_export.py|_ExportClient.__aexit__|attribute|chirp.App._db",
+          "count": 2,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Furatena export maintainers",
+          "rationale": "Export and development launch manually freeze or drive startup/database/hooks/readiness; retain one owned lifecycle until the lifecycle RFC replaces this access.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/static_export.py#L130"
+        },
+        {
+          "key": "src/furatena/catalog/static_export.py|_ExportClient.__aexit__|attribute|chirp.App._mutable_state",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Furatena export maintainers",
+          "rationale": "Export and development launch manually freeze or drive startup/database/hooks/readiness; retain one owned lifecycle until the lifecycle RFC replaces this access.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/static_export.py#L120"
+        },
+        {
+          "key": "src/furatena/catalog/static_export.py|_ExportClient.__aexit__|attribute|chirp.App._shutdown_hooks",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Furatena export maintainers",
+          "rationale": "Export and development launch manually freeze or drive startup/database/hooks/readiness; retain one owned lifecycle until the lifecycle RFC replaces this access.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/static_export.py#L126"
+        },
+        {
+          "key": "src/furatena/catalog/template_env.py|build_docs_template_env|attribute|chirp.App._runtime_state",
+          "count": 1,
+          "classification": "diagnostics-gap",
+          "owner": "Chirp inspection and Furatena tooling maintainers",
+          "rationale": "App checks, route manifests, and template validation inspect framework compilation/runtime state; require an immutable supported inspection surface.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/template_env.py#L39"
+        },
+        {
+          "key": "src/furatena/cli/commands/check.py|_run_chirp_app_check|import|chirp.cli._resolve.resolve_app",
+          "count": 1,
+          "classification": "diagnostics-gap",
+          "owner": "Chirp inspection and Furatena tooling maintainers",
+          "rationale": "App checks, route manifests, and template validation inspect framework compilation/runtime state; require an immutable supported inspection surface.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/cli/commands/check.py#L119"
+        }
+      ],
+      "manual_decisions": [
+        {
+          "operation": "DocsApp._shell_context and DocsApp._site_base",
+          "classification": "app-owned",
+          "owner": "furatena application maintainers",
+          "rationale": "The app parameter is Furatena DocsApp, not Chirp App; error-page context and canonical URL helpers are application internals.",
+          "follow_up": "no-action: keep catalog-owned rendering helpers",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/error_experience.py#L125"
+        },
+        {
+          "operation": "_ExportClient manual lifespan compatibility client",
+          "classification": "missing-public-seam",
+          "owner": "furatena application maintainers",
+          "rationale": "Standalone export avoids testing extras by manually reproducing startup/database/migration/hook/readiness/shutdown behavior. Private access findings above are the bounded reproduction.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/furatena/blob/63891bf0fa1782446db0725865d7c4bd15bd1dc1/src/furatena/catalog/static_export.py#L90"
+        }
+      ]
+    },
+    "showrun": {
+      "repository": "lbliii/showrun",
+      "revision": "b85c4c571147905cf8b4497a2032a6a5427b6c62",
+      "receivers": [],
+      "findings": [],
+      "manual_decisions": [
+        {
+          "operation": "PublicEmbedPolicy framing exception",
+          "classification": "app-owned",
+          "owner": "showrun application maintainers",
+          "rationale": "Dedicated public embed routes require framing while ordinary pages remain protected. This uses public request/response values and is deliberate product policy, not a private Chirp API.",
+          "follow_up": "no-action: retain route-scoped application framing policy; composition can be expressed by #1062 when accepted",
+          "source": "https://github.com/lbliii/showrun/blob/b85c4c571147905cf8b4497a2032a6a5427b6c62/showrun/embed_policy.py#L35"
+        }
+      ]
+    },
+    "pidge": {
+      "repository": "lbliii/pidge",
+      "revision": "47bdb846f07fe496a906717336758808734a24dd",
+      "receivers": [],
+      "findings": [
+        {
+          "key": "src/pidge/web.py|_csp_nonce_middleware|attribute|chirp.middleware.csp_nonce.CSPNonceMiddleware._script_origins",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp security and Pidge web maintainers",
+          "rationale": "Application narrows script origins by mutating CSPNonceMiddleware private state; reviewed CSP composition should express this without mutation.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1062",
+          "source": "https://github.com/lbliii/pidge/blob/47bdb846f07fe496a906717336758808734a24dd/src/pidge/web.py#L1087"
+        }
+      ],
+      "manual_decisions": [
+        {
+          "operation": "require_agent PermissionError authorization shim",
+          "classification": "framework-defect",
+          "owner": "pidge application maintainers",
+          "rationale": "Gate raises PermissionError to avoid frozen HTTPError traceback mutation. Chirp #1063 was fixed in #1077; a disposable downstream removal test passes with canonical HTTPError(401/403). Adoption remains tracked by Pidge #139.",
+          "follow_up": "https://github.com/lbliii/pidge/issues/139",
+          "source": "https://github.com/lbliii/pidge/blob/47bdb846f07fe496a906717336758808734a24dd/src/pidge/web.py#L173"
+        }
+      ]
+    },
+    "orrery": {
+      "repository": "lbliii/orrery",
+      "revision": "c87a0cddbd2517800d36cf5049b8d1c0161dd701",
+      "receivers": [
+        {
+          "path": "catalog/star_page.py",
+          "scope": "load_tool_contracts",
+          "receiver": "skill",
+          "origin": "chirp.skill.Skill",
+          "evidence": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/catalog/star_page.py#L261",
+          "rationale": "Registered skill factory result is a Chirp Skill; tools are extracted for the contract page."
+        },
+        {
+          "path": "dogfood.py",
+          "scope": "_skills_tool_registry",
+          "receiver": "skill",
+          "origin": "chirp.skill.Skill",
+          "evidence": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/dogfood.py#L602",
+          "rationale": "Loop element of skills: tuple[Skill, ...]."
+        },
+        {
+          "path": "sky/vitals.py",
+          "scope": "attach_vitals_to_tool_events",
+          "receiver": "app",
+          "origin": "chirp.App",
+          "evidence": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/sky/vitals.py#L186",
+          "rationale": "Any-typed receiver is the mounted Chirp app passed by app assembly."
+        }
+      ],
+      "findings": [
+        {
+          "key": "app.py||import|chirp.middleware.csp_nonce._reset_csp_nonce",
+          "count": 1,
+          "classification": "framework-defect",
+          "owner": "Chirp security and Orrery web maintainers",
+          "rationale": "Custom nonce middleware avoids rewriting script-tag text inside application JSON while setting and resetting the shared nonce context.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1062",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/app.py#L44"
+        },
+        {
+          "key": "app.py||import|chirp.middleware.csp_nonce._set_csp_nonce",
+          "count": 1,
+          "classification": "framework-defect",
+          "owner": "Chirp security and Orrery web maintainers",
+          "rationale": "Custom nonce middleware avoids rewriting script-tag text inside application JSON while setting and resetting the shared nonce context.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1062",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/app.py#L44"
+        },
+        {
+          "key": "catalog/star_page.py|load_tool_contracts|dynamic-attribute|chirp.skill.Skill._pending",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp tools and Orrery skill maintainers",
+          "rationale": "Skill mounting, contract discovery, and publish gates inspect or change pending tool handlers/private stages. Keep the operation application-owned until a bounded follow-up under the escape-hatch epic defines the required contract.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1052",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/catalog/star_page.py#L265"
+        },
+        {
+          "key": "dogfood.py|_skills_tool_registry|attribute|chirp.skill.Skill._pending",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp tools and Orrery skill maintainers",
+          "rationale": "Skill mounting, contract discovery, and publish gates inspect or change pending tool handlers/private stages. Keep the operation application-owned until a bounded follow-up under the escape-hatch epic defines the required contract.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1052",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/dogfood.py#L603"
+        },
+        {
+          "key": "dogfood.py|_tool_handler|attribute|chirp.skill.Skill._pending",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp tools and Orrery skill maintainers",
+          "rationale": "Skill mounting, contract discovery, and publish gates inspect or change pending tool handlers/private stages. Keep the operation application-owned until a bounded follow-up under the escape-hatch epic defines the required contract.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1052",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/dogfood.py#L445"
+        },
+        {
+          "key": "dogfood.py|run_dogfood_publish_gate|import|chirp.skill.publish._check_stage",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp tools and Orrery skill maintainers",
+          "rationale": "Skill mounting, contract discovery, and publish gates inspect or change pending tool handlers/private stages. Keep the operation application-owned until a bounded follow-up under the escape-hatch epic defines the required contract.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1052",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/dogfood.py#L679"
+        },
+        {
+          "key": "dogfood.py|run_dogfood_publish_gate|import|chirp.skill.publish._freeze_stage",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp tools and Orrery skill maintainers",
+          "rationale": "Skill mounting, contract discovery, and publish gates inspect or change pending tool handlers/private stages. Keep the operation application-owned until a bounded follow-up under the escape-hatch epic defines the required contract.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1052",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/dogfood.py#L679"
+        },
+        {
+          "key": "dogfood.py|use_skill_structured_mcp|attribute|chirp.skill.Skill._pending",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp tools and Orrery skill maintainers",
+          "rationale": "Skill mounting, contract discovery, and publish gates inspect or change pending tool handlers/private stages. Keep the operation application-owned until a bounded follow-up under the escape-hatch epic defines the required contract.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1052",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/dogfood.py#L81"
+        },
+        {
+          "key": "sky/vitals.py|attach_vitals_to_tool_events|attribute|chirp.App._mutable_state",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp lifecycle and Orrery telemetry maintainers",
+          "rationale": "Tool event recording replaces the app event bus through mutable private state; a supported assembly/observation seam is needed.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1056",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/sky/vitals.py#L188"
+        },
+        {
+          "key": "stars/_core/direct_mcp.py|direct_tool_registry|attribute|chirp.skill.Skill._pending",
+          "count": 1,
+          "classification": "missing-public-seam",
+          "owner": "Chirp tools and Orrery skill maintainers",
+          "rationale": "Skill mounting, contract discovery, and publish gates inspect or change pending tool handlers/private stages. Keep the operation application-owned until a bounded follow-up under the escape-hatch epic defines the required contract.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1052",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/stars/_core/direct_mcp.py#L85"
+        },
+        {
+          "key": "tests/stars/test_write_authority_check.py|test_witness_envelope_verifies_and_covers_paths|attribute|chirp.skill.Skill._pending",
+          "count": 1,
+          "classification": "test-only",
+          "owner": "downstream test maintainers",
+          "rationale": "Test fixtures inspect framework state to prove application behavior; no production access is authorized by this test-only entry.",
+          "follow_up": "no-action: test-only inspection remains permitted",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/tests/stars/test_write_authority_check.py#L88"
+        },
+        {
+          "key": "tests/stars/test_write_authority_check.py|test_witness_path_mismatch_denies|attribute|chirp.skill.Skill._pending",
+          "count": 1,
+          "classification": "test-only",
+          "owner": "downstream test maintainers",
+          "rationale": "Test fixtures inspect framework state to prove application behavior; no production access is authorized by this test-only entry.",
+          "follow_up": "no-action: test-only inspection remains permitted",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/tests/stars/test_write_authority_check.py#L113"
+        },
+        {
+          "key": "tests/test_mcp_tool_content.py|test_skill_tool_discovery_miss_skips_chirp_seal|attribute|chirp.skill.Skill._pending",
+          "count": 1,
+          "classification": "test-only",
+          "owner": "downstream test maintainers",
+          "rationale": "Test fixtures inspect framework state to prove application behavior; no production access is authorized by this test-only entry.",
+          "follow_up": "no-action: test-only inspection remains permitted",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/tests/test_mcp_tool_content.py#L102"
+        },
+        {
+          "key": "tests/test_mcp_tool_content.py|test_skill_tool_signed_negative_stays_ok|attribute|chirp.skill.Skill._pending",
+          "count": 1,
+          "classification": "test-only",
+          "owner": "downstream test maintainers",
+          "rationale": "Test fixtures inspect framework state to prove application behavior; no production access is authorized by this test-only entry.",
+          "follow_up": "no-action: test-only inspection remains permitted",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/tests/test_mcp_tool_content.py#L126"
+        },
+        {
+          "key": "tests/test_world_time_canary.py|signed_envelope|attribute|chirp.skill.Skill._pending",
+          "count": 1,
+          "classification": "test-only",
+          "owner": "downstream test maintainers",
+          "rationale": "Test fixtures inspect framework state to prove application behavior; no production access is authorized by this test-only entry.",
+          "follow_up": "no-action: test-only inspection remains permitted",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/tests/test_world_time_canary.py#L25"
+        }
+      ],
+      "manual_decisions": [
+        {
+          "operation": "Custom CSP nonce middleware",
+          "classification": "framework-defect",
+          "owner": "orrery application maintainers",
+          "rationale": "Avoids corrupting embedded script-tag text in JSON by generating nonce headers without body rewriting. Private nonce context imports are ratcheted above.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1062",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/app.py#L134"
+        },
+        {
+          "operation": "Structured MCP skill handler compatibility wrapper",
+          "classification": "missing-public-seam",
+          "owner": "orrery application maintainers",
+          "rationale": "The application wraps pending skill handlers to preserve its structured MCP result contract before mounting; private pending-list accesses are ratcheted above.",
+          "follow_up": "https://github.com/lbliii/chirp/issues/1052",
+          "source": "https://github.com/lbliii/orrery/blob/c87a0cddbd2517800d36cf5049b8d1c0161dd701/dogfood.py#L79"
+        }
+      ]
+    }
+  }
+}
