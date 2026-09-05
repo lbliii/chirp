@@ -56,7 +56,7 @@ def test_default_scaffold_teaches_explicit_template_roles(
     component = (project / "templates" / "components" / "chrome" / "panel.html").read_text()
     pattern = (project / "templates" / "patterns" / "account_summary.html").read_text()
 
-    assert 'component_dirs=("templates",)' in app
+    assert 'component_dirs=(ROOT / "templates",)' in app
     assert "{% block page_root %}" in page
     assert "{% block page_content %}" in page
     assert 'from "patterns/account_summary.html" import account_summary' in page

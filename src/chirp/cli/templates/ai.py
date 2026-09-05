@@ -4,14 +4,16 @@ AI_APP_PY = """\
 \"\"\"AI chat scaffold — tools, SSE activity feed, secure stack.\"\"\"
 
 import os
-from pathlib import Path
+
+from project_paths import ROOT
 
 from chirp import App, AppConfig, EventStream, Fragment, Request, Template, secure_stack
+from chirp.contracts import SSEContract, contract
 from chirp.ai import AgentRun, InMemoryConversationStore, LLM
 
-TEMPLATES_DIR = Path(__file__).parent / \"templates\"
+TEMPLATES_DIR = ROOT / \"templates\"
 
-app = App(AppConfig.from_env(template_dir=TEMPLATES_DIR, worker_mode=\"async\"))
+app = App(AppConfig.from_env(htmx=True, csp_nonce_enabled=True, template_dir=TEMPLATES_DIR, worker_mode=\"async\"))
 for middleware in secure_stack(app.config):
     app.add_middleware(middleware)
 
@@ -57,6 +59,7 @@ async def post_chat(request: Request):
 
 
 @app.route(\"/chat/stream\", referenced=True)
+@contract(returns=SSEContract(event_types=frozenset({\"stream_token\"})))
 def chat_stream():
     async def generate():
         global _pending_user
@@ -69,7 +72,7 @@ def chat_stream():
 
         async for event in agent.stream(user_message):
             if isinstance(event, TokenEvent):
-                yield Fragment(\"chat.html\", \"stream_token\", token=event.text)
+                yield Fragment(\"chat.html\", \"stream_token\", text_chunk=event.text)
 
     return EventStream(generate())
 
@@ -97,9 +100,10 @@ AI_CHAT_HTML = """\
 <p><strong>{{ msg.role }}:</strong> {{ msg.content }}</p>
 {% end %}
 </div>
-<form hx-post=\"/chat\" hx-target=\"#chat-input\" hx-swap=\"outerHTML\">
+<form hx-post=\"/chat\" hx-target=\"#stream-region\" hx-select=\"unset\" hx-swap=\"innerHTML\">
+  {{ csrf_field() }}
   <div id=\"chat-input\">
-    <input name=\"message\" placeholder=\"Ask anything...\" autocomplete=\"off\" />
+    <input name=\"message\" aria-label=\"Message\" placeholder=\"Ask anything...\" autocomplete=\"off\" />
     <button type=\"submit\">Send</button>
   </div>
 </form>
@@ -107,18 +111,18 @@ AI_CHAT_HTML = """\
 {% end %}
 
 {% block stream_start %}
-<div id=\"stream-region\" hx-ext=\"sse\" sse-connect=\"/chat/stream\" sse-swap=\"stream_token\">
+<div hx-ext=\"sse\" sse-connect=\"/chat/stream\" hx-target=\"this\" hx-disinherit=\"hx-target hx-swap\">
   <p><strong>user:</strong> {{ user_content }}</p>
-  <p id=\"assistant-stream\"></p>
+  <p id=\"assistant-stream\" sse-swap=\"stream_token\" hx-target=\"this\" hx-swap=\"beforeend\"></p>
 </div>
 {% end %}
 
 {% block stream_token %}
-<p id=\"assistant-stream\">{{ token }}</p>
+<span>{{ text_chunk }}</span>
 {% end %}
 
 {% block activity_row %}
-<div class=\"activity\">{{ event.tool_name }}({{ event.arguments | format_json }})</div>
+<div class=\"activity\">{{ event.tool_name }}({{ event.arguments | tojson }})</div>
 {% end %}
 
 {% block empty_response %}

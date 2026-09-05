@@ -151,7 +151,7 @@ class TestVersionFloors:
         match = re.search(r'^version\s*=\s*"(\d+)\.(\d+)\.\d+"', root, re.MULTILINE)
         assert match, "Could not find version in root pyproject.toml"
         major, minor = match.group(1), match.group(2)
-        expected = f'"bengal-chirp>={major}.{minor}.'
+        expected = f'"bengal-chirp[sessions]>={major}.{minor}.'
         assert expected in PYPROJECT_TOML, (
             f"Scaffold PYPROJECT_TOML bengal-chirp floor must start with "
             f"{expected} (current root version is {major}.{minor}.x)"

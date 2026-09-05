@@ -93,7 +93,12 @@ async def main():
 
         # 6. GET /dashboard authenticated
         r = await client.get("/dashboard", headers={"Cookie": f"chirp_session={auth_cookie}"})
-        out["steps"]["dashboard_auth"] = {"status": r.status, "has_admin": "Admin" in r.text}
+        out["steps"]["dashboard_auth"] = {
+            "status": r.status,
+            "has_admin": "Admin" in r.text,
+            "has_refresh_target": 'id="refresh-counter"' in r.text
+            and 'hx-target="#refresh-counter"' in r.text,
+        }
 
         # 7. POST /dashboard/refresh — OOB two-target swap (v2+chirpui only)
         csrf2 = _extract_csrf(r.text)
@@ -160,5 +165,6 @@ def test_v2_scaffold_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mo
         assert refresh["status"] == 200
         assert refresh["has_count"] is True
         assert refresh["has_oob_stamp"] is True
+        assert steps["dashboard_auth"]["has_refresh_target"] is True
     else:
         assert refresh["status"] == 404

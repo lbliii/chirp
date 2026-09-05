@@ -24,29 +24,26 @@ h1 {{
 TEST_APP_PY = """\
 \"\"\"Basic smoke tests for {name}.\"\"\"
 
-from chirp import App
+from app import app
 from chirp.testing import TestClient
 
 
-app = App()
-
-
-@app.route("/")
-async def index():
-    return "Hello, world!"
-
-
 class TestSmoke:
-    def test_index(self) -> None:
-        client = TestClient(app)
-        response = client.get("/")
-        assert response.status == 200
+    async def test_index(self) -> None:
+        async with TestClient(app) as client:
+            response = await client.get("/")
+            assert response.status == 200
+
 """
 
 SSE_APP_PY = """\
-from chirp import App, AppConfig, EventStream, Fragment, Request, Template
+from project_paths import ROOT
 
-app = App(AppConfig.from_env(worker_mode="async"))
+from chirp import App, AppConfig, EventStream, Fragment, Request, Template, secure_stack
+
+app = App(AppConfig.from_env(template_dir=ROOT / "templates", csp_nonce_enabled=True, worker_mode="async"))
+for middleware in secure_stack(app.config):
+    app.add_middleware(middleware)
 
 
 @app.route("/")

@@ -106,9 +106,9 @@ class TestChirpNewDefaultV2:
         assert "env=_env" in source
         assert "CHIRP_ENV" in source
         assert "AppConfig.from_env(" in source
-        assert "SessionConfig" in source
-        assert "CSRFMiddleware(CSRFConfig())" in source
-        assert "SecurityHeadersMiddleware()" in source
+        assert "secure_stack(config" in source
+        assert "app.add_middleware(middleware)" in source
+        assert "from chirp import secure_stack" in source
 
     def test_generated_v2_chirpui_layout_loads_theme_override_slot(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -226,9 +226,9 @@ class TestChirpNewMinimal:
         assert "env=_env" in source
         assert "CHIRP_ENV" in source
         assert "AppConfig.from_env(" in source
-        assert "SessionMiddleware" in source
-        assert "CSRFMiddleware(CSRFConfig())" in source
-        assert "SecurityHeadersMiddleware()" in source
+        assert "secure_stack(config" in source
+        assert "app.add_middleware(middleware)" in source
+        assert "from chirp import secure_stack" in source
 
 
 @pytest.mark.issue(437)
@@ -284,6 +284,7 @@ class TestChirpNewSkill:
         monkeypatch.chdir(tmp_path)
         main(["new", "skillapp", "--skill"])
 
+        monkeypatch.syspath_prepend(str(tmp_path / "skillapp"))
         app_path = tmp_path / "skillapp" / "app.py"
         spec = importlib.util.spec_from_file_location("skillapp_scaffold", app_path)
         assert spec is not None
@@ -295,6 +296,7 @@ class TestChirpNewSkill:
             module.app.check()  # raises SystemExit(1) on ERROR
         finally:
             sys.modules.pop("skillapp_scaffold", None)
+            sys.modules.pop("project_paths", None)
 
 
 class TestChirpNewStream:
@@ -373,9 +375,9 @@ class TestChirpNewShell:
         assert "env=_env" in source
         assert "CHIRP_ENV" in source
         assert "AppConfig.from_env(" in source
-        assert "SessionMiddleware" in source
-        assert "CSRFMiddleware(CSRFConfig())" in source
-        assert "SecurityHeadersMiddleware()" in source
+        assert "secure_stack(config" in source
+        assert "app.add_middleware(middleware)" in source
+        assert "from chirp import secure_stack" in source
 
     def test_plain_shell_keeps_transition_off_broad_main(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

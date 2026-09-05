@@ -10,8 +10,9 @@ STREAM_APP_PY = """\
 
 import asyncio
 import os
+
+from project_paths import ROOT
 from collections.abc import AsyncIterator
-from pathlib import Path
 from urllib.parse import quote
 
 from chirp import (
@@ -23,16 +24,21 @@ from chirp import (
     SSEEvent,
     Template,
     TemplateStream,
+    secure_stack,
 )
 
-TEMPLATES_DIR = Path(__file__).parent / "templates"
+TEMPLATES_DIR = ROOT / "templates"
 app = App(
     AppConfig.from_env(
+        csp_nonce_enabled=True,
         template_dir=TEMPLATES_DIR,
         worker_mode="async",
         sse_close_event="close",
     )
 )
+for middleware in secure_stack(app.config):
+    app.add_middleware(middleware)
+
 TOKEN_DELAY = float(os.environ.get("STREAM_DELAY", "0.04"))
 
 
@@ -72,7 +78,7 @@ async def stream(request: Request) -> EventStream:
 
     async def generate():
         async for token in simulated_stream(prompt):
-            yield Fragment("response.html", "token", token=token)
+            yield Fragment("response.html", "token", text_chunk=token)
         yield SSEEvent(event="close", data="done")
 
     return EventStream(generate())
@@ -91,22 +97,24 @@ STREAM_INDEX_HTML = """\
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
   <style>
-    body {{ font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }}
-    form {{ display: flex; gap: 0.5rem; margin: 0.5rem 0 1rem; }}
-    input {{ flex: 1; padding: 0.5rem; }}
-    .response {{ background: #f1f5f9; padding: 1rem; border-radius: 0.5rem; min-height: 4rem; white-space: pre-wrap; }}
-    .hint {{ color: #64748b; font-size: 0.875rem; }}
-    .prompt {{ color: #475569; margin-bottom: 0.5rem; }}
+    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
+    form { display: flex; gap: 0.5rem; margin: 0.5rem 0 1rem; }
+    input { flex: 1; padding: 0.5rem; }
+    .response { background: #f1f5f9; padding: 1rem; border-radius: 0.5rem; min-height: 4rem; white-space: pre-wrap; }
+    .hint { color: #64748b; font-size: 0.875rem; }
+    .prompt { color: #475569; margin-bottom: 0.5rem; }
   </style>
 </head>
 <body>
+<main>
   <h1>{{ title }}</h1>
   <p class="hint">Simulated tokens — no API keys required.</p>
 
   <h2>TemplateStream</h2>
   <p class="hint">Plain form POST → full-page chunked HTML.</p>
-  <form action="/ask" method="post">
-    <input name="prompt" placeholder="Hello" autocomplete="off">
+  <form action="/ask" method="post" hx-target="body" hx-select="unset">
+    {{ csrf_field() }}
+    <input name="prompt" aria-label="Prompt" placeholder="Hello" autocomplete="off">
     <button type="submit">Stream</button>
   </form>
 
@@ -117,10 +125,12 @@ STREAM_INDEX_HTML = """\
         hx-swap="innerHTML"
         hx-on::after-request="if(event.detail.successful) this.reset()"
         method="post">
-    <input name="prompt" placeholder="Hello" autocomplete="off">
+    {{ csrf_field() }}
+    <input name="prompt" aria-label="Prompt" placeholder="Hello" autocomplete="off">
     <button type="submit">Stream SSE</button>
   </form>
   <div id="sse-section"><p class="hint">Submit to stream here.</p></div>
+</main>
 </body>
 </html>
 """
@@ -130,10 +140,12 @@ STREAM_RESPONSE_HTML = """\
 <html lang="en">
 <head><meta charset="utf-8"><title>Response</title></head>
 <body>
+<main>
   <p class="prompt">Prompt: {{ prompt }}</p>
-  <div class="response">{% async for token in stream %}{{ token }}{% end %}</div>
+  <div class="response">{% async for chunk in stream %}{{ chunk }}{% end %}</div>
   <p><a href="/">← Back</a></p>
-  {% block token %}{% if (token ?? '') %}<span>{{ token }}</span>{% end %}{% endblock %}
+  {% block token %}<span>{{ text_chunk }}</span>{% endblock %}
+</main>
 </body>
 </html>
 """
@@ -157,6 +169,7 @@ STREAM_TEST_APP_PY = """\
 \"\"\"Smoke tests for {name}.\"\"\"
 
 import importlib.util
+import re
 from pathlib import Path
 
 import pytest
@@ -180,14 +193,32 @@ class TestStreamScaffold:
             response = await client.get("/")
             assert response.status == 200
 
+    async def test_template_stream_renders_generated_chunks(self, app_module) -> None:
+        async with TestClient(app_module.app) as client:
+            page = await client.get("/")
+            csrf = re.search(r'name="_csrf_token" value="([^" ]+)"', page.text).group(1)
+            cookie = next(value.split(";")[0] for name, value in page.headers if name == "set-cookie")
+            response = await client.post(
+                "/ask",
+                data={{"prompt": "Hello", "_csrf_token": csrf}},
+                headers={{"Content-Type": "application/x-www-form-urlencoded", "Cookie": cookie}},
+            )
+            assert response.status == 200
+            assert "You asked: Hello" in response.text
+            assert "Tokens stream to the browser" in response.text
+
     async def test_sse_start_uses_htmx(self, app_module) -> None:
         async with TestClient(app_module.app) as client:
+            page = await client.get("/")
+            csrf = re.search(r'name="_csrf_token" value="([^" ]+)"', page.text).group(1)
+            cookie = next(value.split(";")[0] for name, value in page.headers if name == "set-cookie")
             response = await client.post(
                 "/stream/start",
-                data={{"prompt": "Hello"}},
+                data={{"prompt": "Hello", "_csrf_token": csrf}},
                 headers={{
                     "Content-Type": "application/x-www-form-urlencoded",
                     "HX-Request": "true",
+                    "Cookie": cookie,
                 }},
             )
             assert response.status == 200
