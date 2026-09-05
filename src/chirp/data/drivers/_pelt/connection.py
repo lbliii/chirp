@@ -575,6 +575,13 @@ def _decode_row_values(
     return tuple(decoder(raw) for decoder, raw in zip(codec_plan, raw_values, strict=True))
 
 
+def _decode_row_chunk(
+    codec_plan: tuple[Any, ...],
+    raw_rows: Sequence[tuple[bytes | None, ...]],
+) -> list[tuple[Any, ...]]:
+    return [_decode_row_values(codec_plan, raw_values) for raw_values in raw_rows]
+
+
 def _decode_rows(
     codec_plan: tuple[Any, ...] | None,
     column_names: tuple[str, ...],
@@ -584,8 +591,19 @@ def _decode_rows(
         return []
     if _runtime.should_parallelize(n_rows=len(pending_rows), n_cols=len(codec_plan)):
         workers = min(32, len(pending_rows))
+        # Submit contiguous chunks instead of one future per row. Executor.map preserves chunk
+        # order, so flattening retains the portal's wire order while amortizing scheduling cost.
+        chunk_size = (len(pending_rows) + workers - 1) // workers
+        chunks = [
+            pending_rows[start : start + chunk_size]
+            for start in range(0, len(pending_rows), chunk_size)
+        ]
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            decoded = list(pool.map(lambda raw: _decode_row_values(codec_plan, raw), pending_rows))
+            decoded = [
+                values
+                for chunk in pool.map(lambda rows: _decode_row_chunk(codec_plan, rows), chunks)
+                for values in chunk
+            ]
     else:
         decoded = [_decode_row_values(codec_plan, raw) for raw in pending_rows]
     return [Record(column_names, values) for values in decoded]
