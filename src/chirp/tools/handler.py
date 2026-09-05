@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import base64
 import json as json_module
+import logging
 import re
 import warnings
 from contextvars import ContextVar, Token
@@ -38,6 +39,7 @@ from typing import Any, TypedDict
 
 from chirp.http.request import Request
 from chirp.http.response import Response
+from chirp.tools._validation import ToolArgumentsError
 from chirp.tools.registry import ToolRegistry
 
 # Reserved ``_meta`` keys (MCP 2026-07-28 RequestMetaObject)
@@ -733,23 +735,24 @@ async def _handle_tools_call(
 
     try:
         result = await registry.call_tool(tool_name, arguments)
-    except KeyError:
-        return {"error": JsonRpcError(code=-32602, message=f"Tool not found: {tool_name!r}")}
-    except TypeError as exc:
+    except ToolArgumentsError as exc:
         return {"error": JsonRpcError(code=-32602, message=f"Invalid arguments: {exc}")}
     except ToolAuthError as exc:
         # skill.tool scopes (and similar) map enforce_auth 401/403 here.
         message = exc.detail or ("Forbidden" if exc.status == 403 else "Unauthorized")
         return {"error": JsonRpcError(code=-32603, message=message)}
     except HTTPError as exc:
-        # Defensive: a tool that raises HTTPError directly (frozen) may still
-        # surface here if dispatch did not rewrite it.
+        # Canonical frozen errors retain their identity through tracing.
         if exc.status in (401, 403):
             message = exc.detail or ("Forbidden" if exc.status == 403 else "Unauthorized")
             return {"error": JsonRpcError(code=-32603, message=message)}
         return {"error": JsonRpcError(code=-32603, message=f"Tool execution error: {exc}")}
-    except Exception as exc:
+    except PermissionError as exc:
+        # Existing agent gates use PermissionError for intentional denials.
         return {"error": JsonRpcError(code=-32603, message=f"Tool execution error: {exc}")}
+    except Exception:
+        logging.getLogger("chirp.tools").exception("MCP tool execution failed")
+        return {"error": JsonRpcError(code=-32603, message="Tool execution error")}
 
     # MCP tools/call result format: content array
     return {

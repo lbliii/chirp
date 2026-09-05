@@ -106,11 +106,9 @@ class PayloadTooLarge(HTTPError):  # noqa: N818 — conventional name in web fra
 class ToolAuthError(ChirpError):
     """Auth denial raised from a tool handler (401/403).
 
-    Mutable counterpart to :class:`HTTPError` for the MCP tool path:
-    frozen ``HTTPError`` cannot accept ``__traceback__`` assignment inside
-    ``trace_span`` / ``contextlib``, so skill (and similar) gates catch the
-    shared ``enforce_auth`` ``HTTPError`` and re-raise this type. MCP
-    ``tools/call`` maps it to a JSON-RPC error.
+    Compatibility error for existing MCP authorization gates. New gates can
+    raise the canonical frozen :class:`HTTPError` directly; tracing preserves
+    both error types and MCP maps their 401/403 details to JSON-RPC errors.
     """
 
     def __init__(self, *, status: int = 403, detail: str = "Forbidden") -> None:

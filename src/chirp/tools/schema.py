@@ -35,7 +35,15 @@ def function_to_schema(func: Callable[..., Any]) -> dict[str, Any]:
     Supports: ``str``, ``int``, ``float``, ``bool``, ``list[str]``,
     ``list[int]``, ``list[float]``, ``X | None``.
     """
-    sig = inspect.signature(func)
+    try:
+        sig = inspect.signature(func, eval_str=True)
+    except NameError as exc:
+        handler_name = getattr(func, "__qualname__", type(func).__qualname__)
+        msg = (
+            f"Cannot generate tool inputSchema for {handler_name!r}: {exc}. "
+            "Make annotation types available in the handler's module globals."
+        )
+        raise ValueError(msg) from exc
     properties: dict[str, Any] = {}
     required: list[str] = []
 
@@ -49,10 +57,8 @@ def function_to_schema(func: Callable[..., Any]) -> dict[str, Any]:
             # Unannotated params default to string
             annotation = str
 
-        # Unwrap X | None → X (optional param)
+        # None in a union makes the parameter optional.
         is_optional = _is_optional(annotation)
-        if is_optional:
-            annotation = _unwrap_optional(annotation)
 
         schema = _type_to_schema(annotation)
 
@@ -81,6 +87,12 @@ def _type_to_schema(annotation: Any) -> dict[str, Any]:
 
     # Handle list[X] (generic alias)
     origin = get_origin(annotation)
+    if origin is Union or origin is types.UnionType:
+        # Preserve the existing omission-only meaning of None in tool schemas.
+        variants = [_type_to_schema(arg) for arg in get_args(annotation) if arg is not type(None)]
+        if len(variants) == 1:
+            return variants[0]
+        return {"anyOf": variants}
     if origin is list:
         args = get_args(annotation)
         if args and args[0] in _TYPE_MAP:
@@ -102,13 +114,3 @@ def _is_optional(annotation: Any) -> bool:
         args = get_args(annotation)
         return type(None) in args
     return False
-
-
-def _unwrap_optional(annotation: Any) -> Any:
-    """Extract the non-None type from X | None."""
-    args = get_args(annotation)
-    non_none = [a for a in args if a is not type(None)]
-    if len(non_none) == 1:
-        return non_none[0]
-    # Multi-type union — fall back to string
-    return str

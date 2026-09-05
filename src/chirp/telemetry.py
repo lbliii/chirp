@@ -9,30 +9,42 @@ from __future__ import annotations
 
 import contextlib
 import time
-from collections.abc import Iterator
-from contextlib import contextmanager
+from types import TracebackType
 from typing import Any
 
 
-@contextmanager
-def trace_span(name: str, /, **attributes: Any) -> Iterator[_SpanScope | None]:
-    """Open a best-effort OTel span for a synchronous or ``await`` block.
+def trace_span(name: str, /, **attributes: Any) -> _TraceSpan:
+    """Open a best-effort OTel span without mutating raised exceptions.
 
-    Yields a :class:`_SpanScope` when OTel is available, else ``None``.
+    Enters a :class:`_SpanScope` when OTel is available, else ``None``.
     Records ``duration_ms`` on close and marks ERROR status when the block
-    raises.
+    raises, preserving the original exception and traceback.
     """
-    scope = _SpanScope.start(name, **attributes)
-    if scope is None:
-        yield None
-        return
-    try:
-        yield scope
-    except BaseException as exc:
-        scope.close(error=exc)
-        raise
-    else:
-        scope.close()
+    return _TraceSpan(name, attributes)
+
+
+class _TraceSpan:
+    """Class-based exit avoids contextlib assigning frozen error tracebacks."""
+
+    __slots__ = ("_attributes", "_name", "_scope")
+
+    def __init__(self, name: str, attributes: dict[str, Any]) -> None:
+        self._name = name
+        self._attributes = attributes
+        self._scope: _SpanScope | None = None
+
+    def __enter__(self) -> _SpanScope | None:
+        self._scope = _SpanScope.start(self._name, **self._attributes)
+        return self._scope
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        if self._scope is not None:
+            self._scope.close(error=exc)
 
 
 class _SpanScope:

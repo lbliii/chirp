@@ -180,9 +180,8 @@ class Skill:
         When ``scopes`` is non-empty, the wrapper calls
         :func:`~chirp.security.auth_core.enforce_auth` with
         ``AuthSpec(scopes=...)`` before the body. A 403 denial from the shared
-        gate is mapped to :class:`~chirp.errors.ToolAuthError` (mutable; safe
-        through tool dispatch); MCP ``tools/call`` turns that into a JSON-RPC
-        error and ``authz.scope.denied`` is audited by the gate. Declare scopes
+        gate is mapped to :class:`~chirp.errors.ToolAuthError` for compatibility;
+        MCP ``tools/call`` turns that into a JSON-RPC error and ``authz.scope.denied`` is audited by the gate. Declare scopes
         with ``app.register_scope(...)`` so the ``auth_spec`` contract can
         validate them at startup. Passing an already-built ``Envelope`` leaves
         it unchanged.
@@ -389,9 +388,8 @@ def _scope_gate_wrapper(
         try:
             await enforce_auth(spec, get_request(), get_user())
         except HTTPError as exc:
-            # Frozen HTTPError cannot carry __traceback__ through tool
-            # dispatch (trace_span / contextlib). Map 401/403 to a mutable
-            # ToolAuthError; MCP tools/call turns that into JSON-RPC.
+            # Preserve the established skill gate exception type. Direct
+            # HTTPError also propagates safely through traced tool calls.
             if exc.status in (401, 403):
                 raise ToolAuthError(
                     status=exc.status,

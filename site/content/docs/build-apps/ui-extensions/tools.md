@@ -67,11 +67,20 @@ The schema is built at freeze time from each parameter's annotation:
 
 - `str` → `"string"`, `int` → `"integer"`, `float` → `"number"`, `bool` → `"boolean"`
 - `list[str]` → `"array"` with `"items": {"type": "string"}` (also `list[int]`, `list[float]`)
+- `X | Y` → `"anyOf"` with each supported alternative
 - `X | None` → optional parameter (unwrapped to `X`, left out of `required`)
 - Parameters with a default value are optional
 - Parameters named `request` (or annotated `Request`) are excluded
 - Unannotated parameters default to `"string"`
 :::{/dropdown}
+
+Before invoking a tool, Chirp validates arguments against the `inputSchema`
+advertised by `tools/list`. Missing required arguments, incorrect types, and
+incorrect array item types return JSON-RPC `-32602` (`Invalid arguments`) with
+the tool name, argument path, and expected type or missing-field explanation.
+The handler is not entered and values are not coerced. Omit optional arguments
+to use their Python defaults; `X | None` currently advertises `X`, so an explicit
+JSON `null` does not satisfy that schema.
 
 ## The MCP endpoint
 

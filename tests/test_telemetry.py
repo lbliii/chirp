@@ -274,3 +274,56 @@ class TestIssue428Acceptance:
         event = await asyncio.wait_for(collector, timeout=1.0)
         assert event.tool_name == "add"
         assert any(s.name == "tool.call" for s in tracer.spans)
+
+
+@pytest.mark.issue(1063)
+@pytest.mark.parametrize("otel_enabled", [False, True])
+@pytest.mark.parametrize("async_handler", [False, True])
+@pytest.mark.parametrize("error_kind", ["unauthorized", "forbidden", "unexpected", "cancelled"])
+async def test_traced_tool_preserves_exception_identity(
+    monkeypatch: pytest.MonkeyPatch, otel_enabled: bool, async_handler: bool, error_kind: str
+) -> None:
+    import asyncio
+    from dataclasses import FrozenInstanceError
+
+    from chirp.errors import HTTPError
+
+    tracer = _install_recording_otel(monkeypatch) if otel_enabled else None
+    if not otel_enabled:
+        monkeypatch.setitem(sys.modules, "opentelemetry", None)
+    error = {
+        "unauthorized": HTTPError(401, "Unauthorized"),
+        "forbidden": HTTPError(403, "Forbidden"),
+        "unexpected": RuntimeError("internal-secret"),
+        "cancelled": asyncio.CancelledError(),
+    }[error_kind]
+
+    def gate() -> None:
+        raise error
+
+    async def async_gate() -> None:
+        await asyncio.sleep(0)
+        gate()
+
+    registry = compile_tools(
+        [("gate", "Authorization gate", async_gate if async_handler else gate)], ToolEventBus()
+    )
+    with pytest.raises(type(error)) as caught:
+        await registry.call_tool("gate", {})
+    assert caught.value is error
+    frames = []
+    traceback = error.__traceback__
+    while traceback is not None:
+        frames.append(traceback.tb_frame.f_code.co_name)
+        traceback = traceback.tb_next
+    assert "gate" in frames
+    assert "__exit__" not in frames
+    if isinstance(error, HTTPError):
+        with pytest.raises(FrozenInstanceError):
+            error.detail = "changed"
+    if tracer is not None:
+        span = tracer.spans[0]
+        assert span.exceptions == [error]
+        assert span.attributes["error"] == type(error).__name__
+        assert span.status.code == "ERROR"
+        assert span.ended
