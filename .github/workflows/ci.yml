@@ -41,6 +41,9 @@ jobs:
       - name: Exception hygiene ratchet
         run: uv run python scripts/lint_exception_hygiene.py
 
+      - name: First-party private API ledger
+        run: uv run python scripts/private_api_ratchet.py
+
   ty:
     runs-on: ubuntu-latest
     steps:
