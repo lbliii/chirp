@@ -3,10 +3,11 @@
 MINIMAL_APP_PY = """\
 import os
 
+from project_paths import ROOT
+
+from chirp import secure_stack
+
 from chirp import App, AppConfig, Request, Template
-from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
-from chirp.middleware.security_headers import SecurityHeadersMiddleware
-from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
 _DEFAULT_SECRET = "change-me-before-deploying"
 _secret = os.environ.get("CHIRP_SECRET_KEY", _DEFAULT_SECRET)
@@ -23,7 +24,9 @@ _debug = os.environ.get("CHIRP_DEBUG", "1" if _env != "production" else "0") not
 )
 
 config = AppConfig.from_env(
+    csp_nonce_enabled=True,
     secret_key=_secret,
+    template_dir=ROOT / "templates",
     env=_env,
     debug=_debug,
 )
@@ -36,19 +39,8 @@ if config.env != "development" and config.secret_key == _DEFAULT_SECRET:
     )
     raise RuntimeError(msg)
 
-app.add_middleware(
-    SessionMiddleware(
-        SessionConfig(
-            secret_key=config.secret_key,
-            # secure defaults to "auto": Secure cookies in production/staging
-            # (resolved from AppConfig.env at freeze), off in local dev.
-            httponly=True,
-            samesite="lax",
-        )
-    )
-)
-app.add_middleware(CSRFMiddleware(CSRFConfig()))
-app.add_middleware(SecurityHeadersMiddleware())
+for middleware in secure_stack(config):
+    app.add_middleware(middleware)
 
 
 @app.route("/")

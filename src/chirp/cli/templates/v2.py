@@ -3,11 +3,13 @@
 V2_APP_PY = """\
 import os
 
+from project_paths import ROOT
+
+from chirp import secure_stack
+
 from chirp import App, AppConfig, Redirect, Request, is_safe_url, logout
-from chirp.middleware.auth import AuthConfig, AuthMiddleware
-from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
-from chirp.middleware.security_headers import SecurityHeadersMiddleware
-from chirp.middleware.sessions import SessionConfig, SessionMiddleware
+from chirp.middleware.auth import AuthConfig
+from chirp.middleware.security_headers import SecurityHeadersConfig
 
 from models import load_user
 from theme import normalize_theme, theme_redirect
@@ -28,9 +30,11 @@ _debug = os.environ.get("CHIRP_DEBUG", "1" if _env != "production" else "0") not
 )
 
 config = AppConfig.from_env(
+    csp_nonce_enabled=True,
+    static_dir=ROOT / "static",
     secret_key=_secret,
-    template_dir="pages",
-    component_dirs=("templates",),
+    template_dir=ROOT / "pages",
+    component_dirs=(ROOT / "templates",),
     env=_env,
     debug=_debug,
 )
@@ -43,22 +47,10 @@ if config.env != "development" and config.secret_key == _DEFAULT_SECRET:
     )
     raise RuntimeError(msg)
 
-app.add_middleware(
-    SessionMiddleware(
-        SessionConfig(
-            secret_key=config.secret_key,
-            # secure defaults to "auto": Secure cookies in production/staging
-            # (resolved from AppConfig.env at freeze), off in local dev.
-            httponly=True,
-            samesite="lax",
-        )
-    )
-)
-app.add_middleware(AuthMiddleware(AuthConfig(load_user=load_user)))
-app.add_middleware(CSRFMiddleware(CSRFConfig()))
-app.add_middleware(SecurityHeadersMiddleware())
+for middleware in secure_stack(config, auth=AuthConfig(load_user=load_user), headers=SecurityHeadersConfig(content_security_policy=None)):
+    app.add_middleware(middleware)
 
-app.mount_pages("pages")
+app.mount_pages(ROOT / "pages")
 
 
 @app.route("/logout", methods=["POST"])
@@ -87,6 +79,10 @@ if __name__ == "__main__":
 
 V2_APP_CHIRPUI_PY = """\
 import os
+
+from project_paths import ROOT
+
+from chirp import secure_stack
 from itertools import count as _counter
 
 from chirp import (
@@ -101,10 +97,8 @@ from chirp import (
     logout,
     use_chirp_ui,
 )
-from chirp.middleware.auth import AuthConfig, AuthMiddleware
-from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
-from chirp.middleware.security_headers import SecurityHeadersMiddleware
-from chirp.middleware.sessions import SessionConfig, SessionMiddleware
+from chirp.middleware.auth import AuthConfig
+from chirp.middleware.security_headers import SecurityHeadersConfig
 
 from models import load_user
 
@@ -129,12 +123,13 @@ _debug = os.environ.get("CHIRP_DEBUG", "1" if _env != "production" else "0") not
 # csp_nonce_enabled=True auto-wires CSPNonceMiddleware (with 'unsafe-eval' for
 # Alpine), keeping the csp_nonce contract clean while Alpine stays functional.
 config = AppConfig.from_env(
+    csp_nonce_enabled=True,
+    static_dir=ROOT / "static",
     secret_key=_secret,
-    template_dir="pages",
+    template_dir=ROOT / "pages",
     env=_env,
     debug=_debug,
     islands=True,
-    csp_nonce_enabled=True,
 )
 app = App(config=config)
 
@@ -145,24 +140,12 @@ if config.env != "development" and config.secret_key == _DEFAULT_SECRET:
     )
     raise RuntimeError(msg)
 
-app.add_middleware(
-    SessionMiddleware(
-        SessionConfig(
-            secret_key=config.secret_key,
-            # secure defaults to "auto": Secure cookies in production/staging
-            # (resolved from AppConfig.env at freeze), off in local dev.
-            httponly=True,
-            samesite="lax",
-        )
-    )
-)
-app.add_middleware(AuthMiddleware(AuthConfig(load_user=load_user)))
-app.add_middleware(CSRFMiddleware(CSRFConfig()))
-app.add_middleware(SecurityHeadersMiddleware())
+for middleware in secure_stack(config, auth=AuthConfig(load_user=load_user), headers=SecurityHeadersConfig(content_security_policy=None)):
+    app.add_middleware(middleware)
 
 use_chirp_ui(app)
 
-app.mount_pages("pages")
+app.mount_pages(ROOT / "pages")
 
 
 @app.route("/logout", methods=["POST"])
@@ -216,6 +199,7 @@ if __name__ == "__main__":
 """
 
 V2_MODELS_PY = """\
+import os
 from dataclasses import dataclass
 
 from chirp.security.passwords import hash_password, verify_login
@@ -229,11 +213,11 @@ class User:
     is_authenticated: bool = True
 
 
-_DEMO_HASH = hash_password("password")
-
-USERS: dict[str, User] = {
-    "admin": User(id="admin", name="Admin", password_hash=_DEMO_HASH),
-}
+# The demo identity is local-only. Supply an application-owned user store
+# before deploying; never authenticate a built-in account outside development.
+USERS: dict[str, User] = {}
+if os.environ.get("CHIRP_ENV", "development") == "development":
+    USERS["admin"] = User(id="admin", name="Admin", password_hash=hash_password("password"))
 
 
 async def load_user(user_id: str) -> User | None:
@@ -272,7 +256,7 @@ V2_LAYOUT_HTML = """\
         <a href="/">Home</a>
         {% if user.is_authenticated %}
         <a href="/dashboard">Dashboard</a>
-        <form method="post" action="/logout" style="margin:0">
+        <form hx-target="#page-root" hx-select="#page-root" method="post" action="/logout" style="margin:0">
             {{ csrf_field() }}
             <button type="submit">Logout</button>
         </form>
@@ -280,7 +264,7 @@ V2_LAYOUT_HTML = """\
         <a href="/login">Login</a>
         {% end %}
         <form method="post" action="/theme" class="theme-control" data-theme-control
-              hx-boost="false">
+              hx-boost="false" hx-target="#page-root" hx-select="#page-root">
             {{ csrf_field() }}
             <input type="hidden" name="next" value="{{ current_path }}">
             <fieldset>
@@ -292,7 +276,7 @@ V2_LAYOUT_HTML = """\
             <button type="submit">Apply theme</button>
         </form>
     </nav>
-    {% block content %}{% endblock %}
+    <main>{% block content %}{% endblock %}</main>
 </body>
 </html>
 """
@@ -322,7 +306,7 @@ V2_LAYOUT_CHIRPUI_HTML = """\
         <div class="chirpui-navbar__links chirpui-navbar__links--end">
         {% if user.is_authenticated %}
         <a href="/dashboard" class="chirpui-navbar__link">Dashboard</a>
-        <form method="post" action="/logout" style="margin:0;display:inline">
+        <form hx-target="#page-root" hx-select="#page-root" method="post" action="/logout" style="margin:0;display:inline">
             {{ csrf_field() }}
             <button type="submit" class="chirpui-btn chirpui-btn--ghost chirpui-btn--sm">Logout</button>
         </form>
@@ -332,7 +316,7 @@ V2_LAYOUT_CHIRPUI_HTML = """\
         </div>
     </nav>
     {% call stack() %}
-    {% block content %}{% endblock %}
+    <main>{% block content %}{% endblock %}</main>
     {% end %}
     {% end %}
 </body>
@@ -410,7 +394,7 @@ V2_LOGIN_HTML = """\
 {% if error %}
 <p class="error">{{ error }}</p>
 {% end %}
-<form method="post" action="/login">
+<form hx-target="#page-root" hx-select="#page-root" method="post" action="/login">
     {{ csrf_field() }}
     <label for="username">Username</label>
     <input type="text" id="username" name="username" required>
@@ -418,7 +402,7 @@ V2_LOGIN_HTML = """\
     <input type="password" id="password" name="password" required>
     <button type="submit">Sign in</button>
 </form>
-<p><small>Hint: admin / password</small></p>
+<p><small>Development only: admin / password</small></p>
 {% end %}
 {% end %}
 </div>
@@ -438,7 +422,7 @@ V2_LOGIN_CHIRPUI_HTML = """\
 <p class="chirpui-alert chirpui-alert--error">{{ error }}</p>
 {% end %}
 {% call stack() %}
-<form method="post" action="/login">
+<form hx-target="#page-root" hx-select="#page-root" method="post" action="/login">
     {{ csrf_field() }}
     {% call block() %}
     {% call text_field("username", label="Username", required=true) %}
@@ -448,7 +432,7 @@ V2_LOGIN_CHIRPUI_HTML = """\
     <button type="submit" class="chirpui-btn chirpui-btn--primary">Sign in</button>
 </form>
 {% end %}
-<p class="chirpui-text-muted">Hint: admin / password</p>
+<p class="chirpui-text-muted">Development only: admin / password</p>
 {% end %}
 {% end %}
 {% end %}
@@ -530,7 +514,7 @@ V2_DASHBOARD_CHIRPUI_HTML = """\
 {% call block() %}
 {% call card(title="Welcome") %}
 <p>Signed in as <strong>{{ user.name }}</strong>.</p>
-<form method="post" action="/logout">
+<form hx-target="#page-root" hx-select="#page-root" method="post" action="/logout">
     {{ csrf_field() }}
     <button type="submit" class="chirpui-btn chirpui-btn--secondary">Logout</button>
 </form>
@@ -539,8 +523,8 @@ V2_DASHBOARD_CHIRPUI_HTML = """\
 {% call block() %}
 {% call card(title="Notes") %}
 {% call draft_store("dashboard_notes", mount_id="notes-root", cls="chirpui-card") %}
-<label>Notes</label>
-<textarea name="notes" data-draft-field rows="4" style="width:100%;"></textarea>
+<label for="notes">Notes</label>
+<textarea id="notes" name="notes" data-draft-field rows="4" style="width:100%;"></textarea>
 <p class="chirpui-text-muted">Last saved: <span data-draft-saved-at>never</span></p>
 {% end %}
 {% end %}
@@ -548,13 +532,13 @@ V2_DASHBOARD_CHIRPUI_HTML = """\
 {% call block() %}
 {% call card(title="Sample Data") %}
 {% call grid_state("demo_grid", cols, mount_id="grid-root", cls="chirpui-card") %}
-<input data-grid-filter type="text" placeholder="Filter..." style="width:100%;">
+<input aria-label="Filter rows" data-grid-filter type="text" placeholder="Filter..." style="width:100%;">
 <button type="button" data-grid-sort class="chirpui-btn chirpui-btn--secondary chirpui-btn--sm">Sort</button>
 <table>
     <tbody data-grid-body>
-    <tr data-grid-row data-grid-id="1"><td data-grid-select><input type="checkbox"></td><td>Alice</td><td>Admin</td></tr>
-    <tr data-grid-row data-grid-id="2"><td data-grid-select><input type="checkbox"></td><td>Bob</td><td>User</td></tr>
-    <tr data-grid-row data-grid-id="3"><td data-grid-select><input type="checkbox"></td><td>Carol</td><td>Editor</td></tr>
+    <tr data-grid-row data-grid-id="1"><td data-grid-select><input aria-label="Select row" type="checkbox"></td><td>Alice</td><td>Admin</td></tr>
+    <tr data-grid-row data-grid-id="2"><td data-grid-select><input aria-label="Select row" type="checkbox"></td><td>Bob</td><td>User</td></tr>
+    <tr data-grid-row data-grid-id="3"><td data-grid-select><input aria-label="Select row" type="checkbox"></td><td>Carol</td><td>Editor</td></tr>
     </tbody>
 </table>
 {% end %}
@@ -563,9 +547,11 @@ V2_DASHBOARD_CHIRPUI_HTML = """\
 {% call block() %}
 {% call card(title="OOB two-target swap") %}
 <p class="chirpui-text-muted">One POST updates both regions — main swap + hx-swap-oob.</p>
-{% call safe_region("refresh-counter") %}{% block refresh_counter %}<strong>Count: {{ count ?? 0 }}</strong>{% end %}{% end %}
+{% call safe_region("refresh-counter") %}
+{% block refresh_counter %}<strong>Count: {{ count ?? 0 }}</strong>{% end %}
+{% end %}
 <div id="refresh-stamp" class="chirpui-text-muted">{% block refresh_stamp %}<small>{{ stamp ?? "Never refreshed" }}</small>{% end %}</div>
-<form hx-post="/dashboard/refresh" hx-target="#refresh-counter" hx-swap="innerHTML" style="margin:0">
+<form hx-post="/dashboard/refresh" hx-select="unset" hx-target="#refresh-counter" hx-swap="innerHTML" style="margin:0">
     {{ csrf_field() }}
     <button type="submit" class="chirpui-btn chirpui-btn--sm">Refresh</button>
 </form>
@@ -575,7 +561,7 @@ V2_DASHBOARD_CHIRPUI_HTML = """\
 {% call card(title="Live Clock") %}
 <div hx-ext="sse" sse-connect="/time" hx-disinherit="hx-target hx-swap">
     <div sse-swap="time_block" hx-target="this">
-        <span>Connecting...</span>
+        {% block time_block %}<span>{{ now ?? "Connecting..." }}</span>{% end %}
     </div>
 </div>
 {% end %}
@@ -586,9 +572,6 @@ V2_DASHBOARD_CHIRPUI_HTML = """\
 </div>
 {% end %}
 
-{% block time_block %}
-<span>{{ now }}</span>
-{% end %}
 """
 
 # Kept for backward-compatible imports; default scaffold writes layered CSS instead.

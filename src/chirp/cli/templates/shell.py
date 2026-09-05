@@ -3,10 +3,12 @@
 SHELL_APP_PY = """\
 import os
 
+from project_paths import ROOT
+
+from chirp import secure_stack
+from chirp.middleware.security_headers import SecurityHeadersConfig
+
 from chirp import App, AppConfig, Request, is_safe_url
-from chirp.middleware.csrf import CSRFConfig, CSRFMiddleware
-from chirp.middleware.security_headers import SecurityHeadersMiddleware
-from chirp.middleware.sessions import SessionConfig, SessionMiddleware
 
 from theme import normalize_theme, theme_redirect
 
@@ -25,8 +27,11 @@ _debug = os.environ.get("CHIRP_DEBUG", "1" if _env != "production" else "0") not
 )
 
 config = AppConfig.from_env(
+    htmx=True,
+    csp_nonce_enabled=True,
+    static_dir=ROOT / "static",
     secret_key=_secret,
-    template_dir="pages",
+    template_dir=ROOT / "pages",
     env=_env,
     debug=_debug,
 )
@@ -39,21 +44,10 @@ if config.env != "development" and config.secret_key == _DEFAULT_SECRET:
     )
     raise RuntimeError(msg)
 
-app.add_middleware(
-    SessionMiddleware(
-        SessionConfig(
-            secret_key=config.secret_key,
-            # secure defaults to "auto": Secure cookies in production/staging
-            # (resolved from AppConfig.env at freeze), off in local dev.
-            httponly=True,
-            samesite="lax",
-        )
-    )
-)
-app.add_middleware(CSRFMiddleware(CSRFConfig()))
-app.add_middleware(SecurityHeadersMiddleware())
+for middleware in secure_stack(config, headers=SecurityHeadersConfig(content_security_policy=None)):
+    app.add_middleware(middleware)
 
-app.mount_pages("pages")
+app.mount_pages(ROOT / "pages")
 
 
 @app.route("/theme", methods=["POST"])
@@ -140,15 +134,14 @@ SHELL_LAYOUT_CHIRPUI_HTML = """\
 """
 
 SHELL_PAGE_PY = """\
-from chirp import Template
+from chirp import Page
 
 
-def get() -> Template:
-    return Template("page.html")
+def get() -> Page:
+    return Page("page.html", "content", page_block_name="content")
 """
 
 SHELL_PAGE_HTML = """\
-{% extends "_layout.html" %}
 {% block content %}
 <h1>Welcome</h1>
 <p>Persistent shell with hx-select. Navigate to /items for inner shell example.</p>
@@ -169,17 +162,41 @@ SHELL_ITEMS_LAYOUT_HTML = """\
 """
 
 SHELL_ITEMS_PAGE_PY = """\
-from chirp import Template
+from chirp import Page
 
 
-def get() -> Template:
-    return Template("items/page.html")
+def get() -> Page:
+    return Page("items/page.html", "content", page_block_name="content")
 """
 
 SHELL_ITEMS_PAGE_HTML = """\
-{% extends "items/_layout.html" %}
 {% block content %}
 <h2>Items</h2>
 <p>Inner shell with shell_section macro.</p>
 {% end %}
 """
+
+SHELL_APP_CHIRPUI_PY = SHELL_APP_PY.replace(
+    "app.mount_pages(ROOT",
+    "from chirp import use_chirp_ui\n\nuse_chirp_ui(app)\n\napp.mount_pages(ROOT",
+)
+
+SHELL_PAGE_CHIRPUI_PY = SHELL_PAGE_PY.replace(
+    '"content", page_block_name="content"',
+    '"page_content", page_block_name="page_root"',
+)
+SHELL_ITEMS_PAGE_CHIRPUI_PY = SHELL_PAGE_CHIRPUI_PY.replace('"page.html"', '"items/page.html"')
+
+_SHELL_UI_BLOCKS = (
+    '{% block page_root %}<div id="page-root">{% block page_root_inner %}'
+    '<div id="page-content-inner">{% block page_content %}'
+)
+SHELL_PAGE_CHIRPUI_HTML = (
+    SHELL_PAGE_HTML.replace("{% block content %}", _SHELL_UI_BLOCKS)
+    + "</div>{% end %}</div>{% end %}\n"
+)
+SHELL_ITEMS_PAGE_CHIRPUI_HTML = (
+    SHELL_ITEMS_PAGE_HTML.replace("{% block content %}", _SHELL_UI_BLOCKS)
+    + "</div>{% end %}</div>{% end %}\n"
+)
+SHELL_ITEMS_LAYOUT_CHIRPUI_HTML = "{% block content %}{% end %}\n"

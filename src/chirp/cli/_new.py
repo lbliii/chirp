@@ -9,6 +9,9 @@ Creates a new chirp project directory with starter files.  Modes include:
 """
 
 import argparse
+import json
+import platform
+import re
 import sys
 from pathlib import Path
 
@@ -77,6 +80,14 @@ from chirp.cli.templates import (
     V2_STYLE_CHIRPUI_CSS,
     V2_TEST_APP_PY,
 )
+from chirp.cli.templates.scaffold import PROJECT_PATHS_PY, PROJECT_README
+from chirp.cli.templates.shell import (
+    SHELL_APP_CHIRPUI_PY,
+    SHELL_ITEMS_PAGE_CHIRPUI_HTML,
+    SHELL_ITEMS_PAGE_CHIRPUI_PY,
+    SHELL_PAGE_CHIRPUI_HTML,
+    SHELL_PAGE_CHIRPUI_PY,
+)
 
 
 def _has_chirpui() -> bool:
@@ -116,6 +127,53 @@ def _write_scaffold_extras(project_dir: Path, name: str) -> None:
     mig.mkdir(exist_ok=True)
     (mig / ".gitkeep").write_text("", encoding="utf-8")
     (mig / "README.md").write_text(MIGRATIONS_README, encoding="utf-8")
+
+
+def _finish_project_metadata(project_dir: Path, args: argparse.Namespace) -> None:
+    """Make each profile's flat source tree explicit to the build backend."""
+    (project_dir / "README.md").write_text(PROJECT_README.format(name=args.name), encoding="utf-8")
+    (project_dir / ".python-version").write_text(platform.python_version() + "\n", encoding="utf-8")
+    (project_dir / "project_paths.py").write_text(
+        PROJECT_PATHS_PY.format(
+            name=args.name, asset_dir="pages" if (project_dir / "pages").exists() else "templates"
+        ),
+        encoding="utf-8",
+    )
+    metadata = project_dir / "pyproject.toml"
+    source = metadata.read_text(encoding="utf-8")
+    extras = ["sessions"]
+    if (project_dir / "models.py").exists():
+        extras.extend(["auth", "forms"])
+    if getattr(args, "ai", False):
+        extras.extend(["ai", "forms"])
+    if getattr(args, "stream", False):
+        extras.append("forms")
+    if getattr(args, "skill", False):
+        extras.append("skill")
+    if getattr(args, "with_chirpui", False):
+        extras.append("ui")
+    source = re.sub(r"bengal-chirp\[[^]]+\]", "bengal-chirp[" + ",".join(extras) + "]", source)
+    source += (
+        '\n[dependency-groups]\ndev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "httpx>=0.27,<1"]\n'
+    )
+    source += '\n[tool.pytest.ini_options]\nasyncio_mode = "auto"\n'
+    modules = sorted(path.stem for path in project_dir.glob("*.py"))
+    source += "\n[tool.setuptools]\npackages = []\npy-modules = " + json.dumps(modules) + "\n"
+    source += "\n[tool.setuptools.data-files]\n"
+    for directory in sorted(project_dir.rglob("*")):
+        if not directory.is_dir() or directory.parts[-1] == "tests":
+            continue
+        files = sorted(
+            str(path.relative_to(project_dir)) for path in directory.iterdir() if path.is_file()
+        )
+        if files:
+            source += (
+                json.dumps("share/" + args.name + "/" + str(directory.relative_to(project_dir)))
+                + " = "
+                + json.dumps(files)
+                + "\n"
+            )
+    metadata.write_text(source, encoding="utf-8")
 
 
 def create_project(args: argparse.Namespace) -> None:
@@ -162,6 +220,8 @@ def create_project(args: argparse.Namespace) -> None:
             args.name,
             with_chirpui=getattr(args, "with_chirpui", False),
         )
+
+    _finish_project_metadata(project_dir, args)
 
     print(f"Created project '{args.name}'")
     if getattr(args, "skill", False):
@@ -262,25 +322,32 @@ def _create_shell(project_dir: Path, name: str, *, with_chirpui: bool) -> None:
     pages_dir.mkdir(parents=True)
     static_dir.mkdir(parents=True)
 
-    (project_dir / "app.py").write_text(SHELL_APP_PY)
+    (project_dir / "app.py").write_text(SHELL_APP_CHIRPUI_PY if use_chirpui else SHELL_APP_PY)
     (pages_dir / "_context.py").write_text(SHELL_CONTEXT_PY)
     (pages_dir / "_layout.html").write_text(
         SHELL_LAYOUT_CHIRPUI_HTML if use_chirpui else SHELL_LAYOUT_HTML,
     )
-    (pages_dir / "page.py").write_text(SHELL_PAGE_PY)
-    (pages_dir / "page.html").write_text(SHELL_PAGE_HTML)
+    (pages_dir / "page.py").write_text(SHELL_PAGE_CHIRPUI_PY if use_chirpui else SHELL_PAGE_PY)
+    (pages_dir / "page.html").write_text(
+        SHELL_PAGE_CHIRPUI_HTML if use_chirpui else SHELL_PAGE_HTML
+    )
 
     items_dir = pages_dir / "items"
     items_dir.mkdir()
-    (items_dir / "_layout.html").write_text(SHELL_ITEMS_LAYOUT_HTML)
-    (items_dir / "page.py").write_text(SHELL_ITEMS_PAGE_PY)
-    (items_dir / "page.html").write_text(SHELL_ITEMS_PAGE_HTML)
+    if not use_chirpui:
+        (items_dir / "_layout.html").write_text(SHELL_ITEMS_LAYOUT_HTML)
+    (items_dir / "page.py").write_text(
+        SHELL_ITEMS_PAGE_CHIRPUI_PY if use_chirpui else SHELL_ITEMS_PAGE_PY
+    )
+    (items_dir / "page.html").write_text(
+        SHELL_ITEMS_PAGE_CHIRPUI_HTML if use_chirpui else SHELL_ITEMS_PAGE_HTML
+    )
 
+    (project_dir / "theme.py").write_text(THEME_PY, encoding="utf-8")
     _write_scaffold_extras(project_dir, name)
     if use_chirpui:
         (static_dir / "theme.css").write_text(THEME_CSS_STUB, encoding="utf-8")
     else:
-        (project_dir / "theme.py").write_text(THEME_PY, encoding="utf-8")
         _write_app_theme_assets(static_dir)
 
 
